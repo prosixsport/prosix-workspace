@@ -77,8 +77,8 @@
 
             <div class="login-hint">
                 Super Admin:
-                <strong>superadmin@monday.com</strong> /
-                <strong>password</strong>
+                <!-- <strong>superadmin@monday.com</strong> /
+                <strong>password</strong> -->
             </div>
 
         </div>

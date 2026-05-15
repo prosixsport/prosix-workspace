@@ -496,10 +496,10 @@
     </div>
 
     <!-- EMPTY -->
-    <div class="orders-right orders-empty-right" v-else>
+    <!-- <div class="orders-right orders-empty-right" v-else>
       <i class="fa-solid fa-clipboard-list empty-big-icon"></i>
       <p>Select an order to view details</p>
-    </div>
+    </div> -->
 
     <!-- ADD ORDER MODAL -->
     <div v-if="showAddModal" class="modal-overlay" @click.self="showAddModal = false">
