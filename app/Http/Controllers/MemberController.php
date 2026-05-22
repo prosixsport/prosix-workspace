@@ -8,21 +8,20 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Str;
 use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Facades\Storage;
+use Illuminate\Support\Facades\Hash;
 
 class MemberController extends Controller
 {
-    // Get all members
     public function index()
     {
         return response()->json(User::latest()->get());
     }
 
-    // Invite member
     public function invite(Request $request)
     {
         $request->validate([
             'name'  => 'required|string|max:255',
-            'email' => 'required|email|unique:users',
+            'email' => 'required|email|unique:users,email',
             'role'  => 'required|in:member,admin',
         ]);
 
@@ -34,6 +33,14 @@ class MemberController extends Controller
             'role'  => $request->role,
         ], now()->addDays(7));
 
+        $user = User::create([
+            'name'      => $request->name,
+            'email'     => $request->email,
+            'password'  => Hash::make(Str::random(16)),
+            'role'      => $request->role,
+            'is_active' => false,
+        ]);
+
         $inviteLink = url("/register?invite={$token}&email={$request->email}");
 
         Mail::to($request->email)->send(new InviteMail(
@@ -44,18 +51,10 @@ class MemberController extends Controller
 
         return response()->json([
             'invite_link' => $inviteLink,
-            'user' => [
-                'id' => null,
-                'name' => $request->name,
-                'email' => $request->email,
-                'role' => $request->role,
-                'is_active' => true,
-                'created_at' => now(),
-            ]
+            'user' => $user->fresh()
         ]);
     }
 
-    // View profile
     public function profile(User $user)
     {
         return response()->json([
@@ -66,10 +65,11 @@ class MemberController extends Controller
             'about' => $user->about,
             'profile_photo' => $user->profile_photo,
             'profile_photo_url' => $user->profile_photo_url,
+            'is_active' => $user->is_active,
+            'created_at' => $user->created_at,
         ]);
     }
 
-    // Update own profile
     public function updateProfile(Request $request)
     {
         $user = auth()->user();
@@ -99,10 +99,16 @@ class MemberController extends Controller
         ]);
     }
 
-    // Toggle active status
     public function toggle($id)
     {
         $user = User::findOrFail($id);
+
+        if ($user->role === 'super_admin') {
+            return response()->json([
+                'message' => 'Super admin status cannot be changed'
+            ], 403);
+        }
+
         $user->is_active = !$user->is_active;
         $user->save();
 
@@ -112,10 +118,17 @@ class MemberController extends Controller
         ]);
     }
 
-    // Delete member
     public function destroy($id)
     {
-        User::findOrFail($id)->delete();
+        $user = User::findOrFail($id);
+
+        if ($user->role === 'super_admin') {
+            return response()->json([
+                'message' => 'Super admin cannot be deleted'
+            ], 403);
+        }
+
+        $user->delete();
 
         return response()->json([
             'message' => 'Member deleted'
