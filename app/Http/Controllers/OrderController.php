@@ -3,6 +3,8 @@
 namespace App\Http\Controllers;
 
 use App\Models\Order;
+use App\Models\OrderRead;
+use Illuminate\Support\Facades\DB;
 use App\Models\User;
 use App\Mail\NewOrderAssignedMail;
 use Illuminate\Http\Request;
@@ -10,15 +12,12 @@ use Illuminate\Support\Facades\Mail;
 
 class OrderController extends Controller
 {
-    public function index()
+public function index()
 {
     $user = auth()->user();
 
-    $orders = Order::with([
-            'members',
-            'reads.user:id,name,email,profile_photo'
-        ])
-        ->when($user && !in_array($user->role, ['super_admin']), function ($q) use ($user) {
+    $orders = Order::with(['members', 'reads.user:id,name,email,profile_photo'])
+        ->when($user && !in_array($user->role, ['super_admin', 'admin']), function ($q) use ($user) {
             $q->whereHas('members', function ($m) use ($user) {
                 $m->where('users.id', $user->id);
             });
@@ -28,24 +27,14 @@ class OrderController extends Controller
         ->map(function ($order) use ($user) {
             $read = $order->reads->firstWhere('user_id', $user?->id);
 
-            $order->user_has_seen = $read && $read->read_at;
+            $order->user_has_seen = !empty($read?->read_at);
             $order->read_at = $read?->read_at;
-
-            $order->read_info = $order->reads->map(function ($read) {
-                return [
-                    'user_id' => $read->user_id,
-                    'name' => $read->user?->name,
-                    'email' => $read->user?->email,
-                    'read_at' => $read->read_at,
-                ];
-            })->values();
 
             return $order;
         });
 
     return response()->json($orders);
 }
-
     public function store(Request $request)
     {
         $request->validate([
@@ -274,23 +263,33 @@ class OrderController extends Controller
             Mail::to($member->email)->send(new NewOrderAssignedMail($order, $member));
         }
     }
-    public function markRead(Order $order)
+public function markRead($orderId)
 {
-    $this->checkAccess($order);
+    $user = auth()->user();
 
-    OrderRead::updateOrCreate(
+    $order = \App\Models\Order::findOrFail($orderId);
+
+    // super admin ko save nahi karna
+    if (in_array($user->role, ['super_admin', 'admin'])) {
+        return response()->json([
+            'success' => true
+        ]);
+    }
+
+    \DB::table('order_reads')->updateOrInsert(
         [
             'order_id' => $order->id,
-            'user_id' => auth()->id(),
+            'user_id'  => $user->id,
         ],
         [
-            'read_at' => now(),
+            'read_at'   => now(),
+            'created_at'=> now(),
+            'updated_at'=> now(),
         ]
     );
 
     return response()->json([
-        'success' => true,
-        'read_at' => now(),
+        'success' => true
     ]);
 }
 
