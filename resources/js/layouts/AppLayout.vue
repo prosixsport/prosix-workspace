@@ -1,111 +1,230 @@
 <template>
     <div class="prosix-layout">
 
+        <!-- SIDEBAR -->
         <aside class="prosix-sidebar">
 
+            <!-- LOGO -->
             <div class="sidebar-logo">
                 <div class="logo-icon">P</div>
+
                 <div>
                     <h5>Prosixflow</h5>
                     <small>Work Management</small>
                 </div>
             </div>
 
-            <!-- User Info Clickable -->
+            <!-- USER -->
             <div class="user-card" @click="openProfile">
+
                 <div class="user-avatar" :class="{ 'has-photo': userPhoto }">
-                    <img v-if="userPhoto" :src="userPhoto" class="user-avatar-img" alt="Profile" />
-                    <span v-else>{{ userInitial }}</span>
+
+                    <img
+                        v-if="userPhoto"
+                        :src="userPhoto"
+                        class="user-avatar-img"
+                        alt="Profile"
+                    />
+
+                    <span v-else>
+                        {{ userInitial }}
+                    </span>
                 </div>
 
                 <div class="user-info">
-                    <div class="user-name">{{ user?.name || 'User' }}</div>
-                    <div class="user-role">{{ formatRole(user?.role) }}</div>
+                    <div class="user-name">
+                        {{ user?.name || 'User' }}
+                    </div>
+
+                    <div class="user-role">
+                        {{ formatRole(user?.role) }}
+                    </div>
                 </div>
 
                 <i class="fa-solid fa-pen edit-profile-icon"></i>
             </div>
 
+            <!-- NAV -->
             <nav class="sidebar-nav">
-                <router-link to="/dashboard" class="nav-link-custom" :class="{ active: $route.path === '/dashboard' }">
-                    <span class="nav-icon"><i class="fa-solid fa-house"></i></span>
+
+                <!-- DASHBOARD -->
+                <router-link
+                    to="/dashboard"
+                    class="nav-link-custom"
+                    :class="{ active: $route.path === '/dashboard' }"
+                >
+                    <span class="nav-icon">
+                        <i class="fa-solid fa-house"></i>
+                    </span>
+
                     <span>Home</span>
                 </router-link>
 
-                <router-link to="/orders" class="nav-link-custom" :class="{ active: $route.path.startsWith('/orders') }">
-                    <span class="nav-icon"><i class="fa-solid fa-clipboard-list"></i></span>
+                <!-- ORDERS -->
+                <router-link
+                    to="/orders"
+                    class="nav-link-custom"
+                    :class="{ active: $route.path.startsWith('/orders') }"
+                    @click="clearOrderBadge"
+                >
+                    <span class="nav-icon">
+                        <i class="fa-solid fa-clipboard-list"></i>
+                    </span>
+
                     <span>All Orders</span>
+
+                    <!-- NOTIFICATION -->
+                    <span
+                        v-if="showOrderBadge"
+                        class="order-badge"
+                    >
+                        {{ orderNotificationCount }}
+                    </span>
                 </router-link>
 
+                <!-- MEMBERS -->
                 <router-link
                     v-if="isSuperAdmin || isAdmin"
                     to="/members"
                     class="nav-link-custom"
                     :class="{ active: $route.path === '/members' }"
                 >
-                    <span class="nav-icon"><i class="fa-solid fa-users"></i></span>
+                    <span class="nav-icon">
+                        <i class="fa-solid fa-users"></i>
+                    </span>
+
                     <span>Members</span>
                 </router-link>
+
             </nav>
 
+            <!-- LOGOUT -->
             <div class="sidebar-bottom">
+
                 <button @click="logout" class="logout-btn">
+
                     <i class="fa-solid fa-right-from-bracket"></i>
+
                     Logout
                 </button>
+
             </div>
 
         </aside>
 
+        <!-- MAIN -->
         <main class="prosix-main">
             <slot />
         </main>
 
-        <!-- Profile Modal -->
-        <div v-if="profileModal" class="profile-modal-overlay" @click.self="closeProfile">
+        <!-- PROFILE MODAL -->
+        <div
+            v-if="profileModal"
+            class="profile-modal-overlay"
+            @click.self="closeProfile"
+        >
+
             <div class="profile-modal">
-                <button class="profile-close" @click="closeProfile">
+
+                <button
+                    class="profile-close"
+                    @click="closeProfile"
+                >
                     <i class="fa-solid fa-xmark"></i>
                 </button>
 
                 <h4>Edit Profile</h4>
-                <p class="profile-subtitle">Update your Prosix profile</p>
 
+                <p class="profile-subtitle">
+                    Update your Prosix profile
+                </p>
+
+                <!-- PHOTO -->
                 <div class="profile-photo-wrap">
-                    <img v-if="profileForm.preview" :src="profileForm.preview" class="profile-photo" />
-                    <div v-else class="profile-photo-empty">{{ userInitial }}</div>
+
+                    <img
+                        v-if="profileForm.preview"
+                        :src="profileForm.preview"
+                        class="profile-photo"
+                    />
+
+                    <div
+                        v-else
+                        class="profile-photo-empty"
+                    >
+                        {{ userInitial }}
+                    </div>
+
                 </div>
 
-                <input type="file" accept="image/*" class="profile-file" @change="onProfilePhotoChange" />
+                <input
+                    type="file"
+                    accept="image/*"
+                    class="profile-file"
+                    @change="onProfilePhotoChange"
+                />
 
+                <!-- NAME -->
                 <div class="profile-field">
                     <label>Name</label>
-                    <input v-model="profileForm.name" type="text" />
+
+                    <input
+                        v-model="profileForm.name"
+                        type="text"
+                    />
                 </div>
 
+                <!-- EMAIL -->
                 <div class="profile-field">
                     <label>Email</label>
-                    <input :value="user?.email || ''" readonly />
+
+                    <input
+                        :value="user?.email || ''"
+                        readonly
+                    />
                 </div>
 
+                <!-- ROLE -->
                 <div class="profile-field">
                     <label>Role</label>
-                    <input :value="formatRole(user?.role)" readonly />
+
+                    <input
+                        :value="formatRole(user?.role)"
+                        readonly
+                    />
                 </div>
 
+                <!-- ABOUT -->
                 <div class="profile-field">
                     <label>About</label>
-                    <textarea v-model="profileForm.about" rows="4" placeholder="Write something about yourself..."></textarea>
+
+                    <textarea
+                        v-model="profileForm.about"
+                        rows="4"
+                        placeholder="Write something about yourself..."
+                    ></textarea>
                 </div>
 
-                <button class="profile-save-btn" @click="saveProfile" :disabled="savingProfile">
+                <!-- SAVE -->
+                <button
+                    class="profile-save-btn"
+                    @click="saveProfile"
+                    :disabled="savingProfile"
+                >
+
                     <span v-if="savingProfile">
                         <i class="fa-solid fa-spinner fa-spin"></i>
                         Saving...
                     </span>
-                    <span v-else>Save Profile</span>
+
+                    <span v-else>
+                        Save Profile
+                    </span>
+
                 </button>
+
             </div>
+
         </div>
 
     </div>
@@ -115,12 +234,19 @@
 import axios from 'axios'
 
 export default {
+
     name: 'AppLayout',
 
     data() {
+
         return {
+
             profileModal: false,
+
             savingProfile: false,
+
+            orderNotificationCount: 0,
+
             profileForm: {
                 name: '',
                 about: '',
@@ -131,11 +257,19 @@ export default {
     },
 
     computed: {
+
         user() {
+
             try {
+
                 const user = localStorage.getItem('user')
-                return user ? JSON.parse(user) : null
+
+                return user
+                    ? JSON.parse(user)
+                    : null
+
             } catch (e) {
+
                 return null
             }
         },
@@ -154,27 +288,114 @@ export default {
 
         isAdmin() {
             return this.user?.role === 'admin'
+        },
+
+        // ONLY MEMBERS SEE BADGE
+        showOrderBadge() {
+
+            return !this.isSuperAdmin
+                && !this.isAdmin
+                && this.orderNotificationCount > 0
+        }
+    },
+
+    mounted() {
+
+        this.loadOrderNotificationCount()
+    },
+
+    watch: {
+
+        '$route.path'(newPath) {
+
+            if (newPath.startsWith('/orders')) {
+
+                this.clearOrderBadge()
+
+            } else {
+
+                this.loadOrderNotificationCount()
+            }
         }
     },
 
     methods: {
+
         headers() {
+
             return {
+
                 Authorization: `Bearer ${localStorage.getItem('token')}`,
+
                 Accept: 'application/json'
             }
         },
 
+        // LOAD ORDER BADGE
+        async loadOrderNotificationCount() {
+
+            // ADMIN NO BADGE
+            if (this.isSuperAdmin || this.isAdmin) {
+
+                this.orderNotificationCount = 0
+
+                return
+            }
+
+            // OPENED ORDERS PAGE
+            if (this.$route.path.startsWith('/orders')) {
+
+                this.orderNotificationCount = 0
+
+                return
+            }
+
+            try {
+
+                const res = await axios.get('/api/orders', {
+                    headers: this.headers()
+                })
+
+                const orders = Array.isArray(res.data)
+                    ? res.data
+                    : (res.data?.data || [])
+
+                // UNREAD ORDERS
+                this.orderNotificationCount = orders.filter(order => {
+                    return !order.user_has_seen
+                }).length
+
+            } catch (e) {
+
+                console.error('Order badge error:', e)
+            }
+        },
+
+        // CLEAR BADGE
+        clearOrderBadge() {
+
+            this.orderNotificationCount = 0
+        },
+
         formatRole(role) {
+
             if (!role) return 'Member'
-            return role.replace('_', ' ').replace(/\b\w/g, c => c.toUpperCase())
+
+            return role
+                .replace('_', ' ')
+                .replace(/\b\w/g, c => c.toUpperCase())
         },
 
         openProfile() {
+
             this.profileForm = {
+
                 name: this.user?.name || '',
+
                 about: this.user?.about || '',
+
                 profile_photo: null,
+
                 preview: this.user?.profile_photo_url || ''
             }
 
@@ -182,69 +403,101 @@ export default {
         },
 
         closeProfile() {
+
             this.profileModal = false
-            this.profileForm = {
-                name: '',
-                about: '',
-                profile_photo: null,
-                preview: ''
-            }
         },
 
         onProfilePhotoChange(event) {
+
             const file = event.target.files?.[0]
+
             if (!file) return
 
             this.profileForm.profile_photo = file
+
             this.profileForm.preview = URL.createObjectURL(file)
         },
 
         async saveProfile() {
+
             this.savingProfile = true
 
             const form = new FormData()
+
             form.append('name', this.profileForm.name || '')
+
             form.append('about', this.profileForm.about || '')
 
             if (this.profileForm.profile_photo) {
-                form.append('profile_photo', this.profileForm.profile_photo)
+
+                form.append(
+                    'profile_photo',
+                    this.profileForm.profile_photo
+                )
             }
 
             try {
-                const res = await axios.post('/api/me/profile', form, {
-                    headers: {
-                        ...this.headers(),
-                        'Content-Type': 'multipart/form-data'
+
+                const res = await axios.post(
+                    '/api/me/profile',
+                    form,
+                    {
+                        headers: {
+                            ...this.headers(),
+                            'Content-Type': 'multipart/form-data'
+                        }
                     }
-                })
+                )
 
                 const updatedUser = res.data?.user || res.data
 
                 if (updatedUser) {
-                    localStorage.setItem('user', JSON.stringify(updatedUser))
+
+                    localStorage.setItem(
+                        'user',
+                        JSON.stringify(updatedUser)
+                    )
                 }
 
                 this.closeProfile()
+
                 window.location.reload()
+
             } catch (e) {
+
                 console.error(e)
-                alert(e.response?.data?.message || 'Profile save nahi hui')
+
+                alert(
+                    e.response?.data?.message
+                    || 'Profile save failed'
+                )
+
             } finally {
+
                 this.savingProfile = false
             }
         },
 
         async logout() {
+
             try {
-                await axios.post('/api/logout', {}, {
-                    headers: this.headers()
-                })
+
+                await axios.post(
+                    '/api/logout',
+                    {},
+                    {
+                        headers: this.headers()
+                    }
+                )
+
             } catch (e) {
+
                 console.error(e)
             }
 
             localStorage.removeItem('token')
             localStorage.removeItem('user')
+
             this.$router.push('/login')
         }
     }
