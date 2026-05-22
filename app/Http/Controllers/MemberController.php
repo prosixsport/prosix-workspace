@@ -3,12 +3,11 @@
 namespace App\Http\Controllers;
 
 use App\Models\User;
-use App\Mail\InviteMail;
 use Illuminate\Http\Request;
 use Illuminate\Support\Str;
-use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Facades\Http;
 
 class MemberController extends Controller
 {
@@ -43,16 +42,91 @@ class MemberController extends Controller
 
         $inviteLink = url("/register?invite={$token}&email={$request->email}");
 
-        Mail::to($request->email)->send(new InviteMail(
-            $inviteLink,
-            $request->name,
-            $request->role
-        ));
+        $emailResponse = Http::timeout(15)->withHeaders([
+            'api-key' => env('BREVO_API_KEY'),
+            'accept' => 'application/json',
+            'content-type' => 'application/json',
+        ])->post('https://api.brevo.com/v3/smtp/email', [
+            'sender' => [
+                'name' => env('MAIL_FROM_NAME', 'Prosix Sports'),
+                'email' => env('MAIL_FROM_ADDRESS', 'prosixsports@gmail.com'),
+            ],
+            'to' => [
+                [
+                    'email' => $request->email,
+                    'name' => $request->name,
+                ]
+            ],
+            'subject' => 'You are invited to Prosix Sports',
+            'htmlContent' => $this->inviteEmailHtml(
+                $request->name,
+                $request->role,
+                $inviteLink
+            ),
+        ]);
+
+        if (!$emailResponse->successful()) {
+            $user->delete();
+
+            return response()->json([
+                'message' => 'Invite email could not be sent.',
+                'brevo_error' => $emailResponse->json(),
+            ], 500);
+        }
 
         return response()->json([
+            'message' => 'Invitation sent successfully',
             'invite_link' => $inviteLink,
             'user' => $user->fresh()
         ]);
+    }
+
+    private function inviteEmailHtml($name, $role, $inviteLink)
+    {
+        return '
+        <!DOCTYPE html>
+        <html>
+        <head>
+            <meta charset="UTF-8">
+        </head>
+        <body style="margin:0;background:#f5f5f5;font-family:Arial,sans-serif;">
+            <div style="max-width:560px;margin:30px auto;background:#ffffff;border-radius:16px;overflow:hidden;border:1px solid #e5e7eb;">
+                <div style="background:#000;color:#fff;padding:26px 30px;">
+                    <h1 style="margin:0;font-size:24px;">Prosix Sports</h1>
+                    <p style="margin:8px 0 0;color:#d1d5db;">Workspace invitation</p>
+                </div>
+
+                <div style="padding:30px;">
+                    <h2 style="margin:0 0 12px;color:#111;">You are invited!</h2>
+
+                    <p style="color:#374151;font-size:15px;line-height:1.6;">
+                        Hello <strong>' . e($name) . '</strong>,
+                    </p>
+
+                    <p style="color:#374151;font-size:15px;line-height:1.6;">
+                        You have been invited to join <strong>Prosix Sports</strong> as a <strong>' . e($role) . '</strong>.
+                    </p>
+
+                    <p style="margin:26px 0;">
+                        <a href="' . e($inviteLink) . '"
+                           style="background:#000;color:#fff;padding:13px 22px;border-radius:10px;text-decoration:none;font-weight:bold;display:inline-block;">
+                            Accept Invitation
+                        </a>
+                    </p>
+
+                    <p style="color:#6b7280;font-size:13px;line-height:1.5;">
+                        If the button does not work, copy this link:
+                        <br>
+                        <span style="word-break:break-all;">' . e($inviteLink) . '</span>
+                    </p>
+
+                    <p style="color:#9ca3af;font-size:12px;margin-top:24px;">
+                        This invitation link will expire in 7 days.
+                    </p>
+                </div>
+            </div>
+        </body>
+        </html>';
     }
 
     public function profile(User $user)
