@@ -889,14 +889,40 @@ computed: {
   }
 },
 
-mounted() {
+async mounted() {
+
   this.loadCustomStatuses()
-  this.fetchOrders()
-  this.fetchMembers()
+
+  await this.fetchOrders()
+
+  await this.fetchMembers()
+
+  // Dashboard sy open hua order
+  const orderId = this.$route.query.order_id
+
+  if (orderId) {
+
+    const foundOrder = this.orders.find(
+      o => Number(o.id) === Number(orderId)
+    )
+
+    if (foundOrder) {
+
+      this.activeGroup = foundOrder.group
+
+      await this.selectOrder(foundOrder)
+    }
+
+  } else if (this.filteredOrders.length) {
+
+    // Default first order
+    await this.selectOrder(this.filteredOrders[0])
+  }
 
   this.unreadTimer = setInterval(() => {
     this.fetchUnreadCount()
   }, 5000)
+
 },
 
 beforeUnmount() {
@@ -1312,31 +1338,38 @@ async toggleChat() {
       }
     },
 
-    async fetchOrders() {
-      this.loadingOrders = true
+   async fetchOrders() {
+  this.loadingOrders = true
 
-      try {
-        const res = await axios.get('/api/orders', {
-          headers: this.headers()
-        })
+  try {
+    const res = await axios.get('/api/orders', {
+      headers: this.headers()
+    })
 
-        const list = Array.isArray(res.data) ? res.data : (res.data?.data || [])
-        this.orders = list.map(order => this.formatOrder(order))
+    const list = Array.isArray(res.data)
+      ? res.data
+      : (res.data?.data || [])
 
-        if (this.orders.length && !this.selectedOrder) {
-          await this.selectOrder(this.orders[0])
-        }
+    this.orders = list.map(order => this.formatOrder(order))
 
-        if (this.selectedOrder) {
-          const fresh = this.orders.find(o => o.id === this.selectedOrder.id)
-          if (fresh) this.selectedOrder = fresh
-        }
-      } catch (e) {
-        console.error('fetchOrders error:', e)
-      } finally {
-        this.loadingOrders = false
+    // sirf selected order refresh
+    if (this.selectedOrder) {
+
+      const fresh = this.orders.find(
+        o => Number(o.id) === Number(this.selectedOrder.id)
+      )
+
+      if (fresh) {
+        this.selectedOrder = fresh
       }
-    },
+    }
+
+  } catch (e) {
+    console.error('fetchOrders error:', e)
+  } finally {
+    this.loadingOrders = false
+  }
+},
 
     async fetchMembers() {
       try {

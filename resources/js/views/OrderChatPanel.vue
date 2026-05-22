@@ -459,6 +459,9 @@ watch: {
         }
     }
 },
+
+
+
   methods: {
     async openProfile(member) {
       if (!member?.id) return

@@ -92,7 +92,7 @@ export default {
     name: 'Login',
 
     data() {
-        return {
+        return {                          
             form: {
                 email: '',
                 password: ''

@@ -1,6 +1,6 @@
 <template>
     <AppLayout>
-        <div class="p-4">
+        <div class="members-page">
 
             <!-- Toast -->
             <div v-if="toast.show" class="toast-msg" :class="toast.type">
@@ -9,63 +9,87 @@
             </div>
 
             <!-- Header -->
-            <div class="d-flex justify-content-between align-items-center mb-4">
-                <h4 class="fw-bold mb-0">Members</h4>
-                <button @click="openInviteModal" class="btn text-white fw-semibold" style="background:#ff3d57;">
-                    + Invite Member
+            <div class="members-header">
+                <div>
+                    <h4>Members</h4>
+                    <p>Manage Prosix team members and roles</p>
+                </div>
+
+                <button @click="openInviteModal" class="primary-btn">
+                    <i class="fa-solid fa-user-plus"></i>
+                    Invite Member
                 </button>
             </div>
 
             <!-- Members Table -->
-            <div class="card border-0 shadow-sm">
-                <div class="card-body p-0">
+            <div class="members-card">
+                <div class="table-responsive">
                     <table class="table table-hover mb-0 align-middle">
-                        <thead class="table-light">
+                        <thead>
                             <tr>
-                                <th class="px-4">Member</th>
+                                <th>Member</th>
                                 <th>Email</th>
                                 <th>Role</th>
                                 <th>Status</th>
                                 <th>Joined</th>
-                                <th>Actions</th>
+                                <th class="text-end">Actions</th>
                             </tr>
                         </thead>
+
                         <tbody>
                             <tr v-if="members.length === 0">
-                                <td colspan="6" class="text-center py-5 text-muted">No members yet</td>
+                                <td colspan="6" class="empty-text">
+                                    No members yet
+                                </td>
                             </tr>
+
                             <tr v-for="member in members" :key="member.id">
-                                <td class="px-4">
-                                    <div class="d-flex align-items-center gap-2">
-                                        <div class="rounded-circle text-white d-flex align-items-center justify-content-center fw-bold"
-                                            style="width:36px;height:36px;background:#ff3d57;font-size:14px;">
-                                            {{ member.name.charAt(0).toUpperCase() }}
-                                        </div>
-                                        <span class="fw-semibold">{{ member.name }}</span>
+                                <td>
+                                    <div class="member-info">
+                                      <div class="member-avatar" :class="{ 'has-photo': member.profile_photo_url }">
+    <img
+        v-if="member.profile_photo_url"
+        :src="member.profile_photo_url"
+        class="member-avatar-img"
+        alt="Profile"
+    />
+    <span v-else>
+        {{ member.name.charAt(0).toUpperCase() }}
+    </span>
+</div>
+                                        <span>{{ member.name }}</span>
                                     </div>
                                 </td>
+
                                 <td class="text-muted">{{ member.email }}</td>
+
                                 <td>
-                                    <span class="badge" :class="roleBadge(member.role)">
-                                        {{ member.role }}
+                                    <span class="role-badge" :class="roleBadge(member.role)">
+                                        {{ formatRole(member.role) }}
                                     </span>
                                 </td>
+
                                 <td>
-                                    <span class="badge" :class="member.is_active ? 'bg-success' : 'bg-danger'">
+                                    <span class="status-badge" :class="member.is_active ? 'active' : 'inactive'">
                                         {{ member.is_active ? 'Active' : 'Inactive' }}
                                     </span>
                                 </td>
-                                <td class="text-muted small">{{ formatDate(member.created_at) }}</td>
-                                <td>
-                                    <!-- super_admin ka koi action nahi -->
+
+                                <td class="text-muted small">
+                                    {{ formatDate(member.created_at) }}
+                                </td>
+
+                                <td class="text-end">
                                     <template v-if="member.role === 'super_admin'">
                                         <span class="text-muted small">—</span>
                                     </template>
+
                                     <template v-else>
-                                        <button @click="toggleStatus(member)" class="btn btn-sm btn-outline-secondary me-1">
+                                        <button @click="toggleStatus(member)" class="outline-btn me-1">
                                             {{ member.is_active ? 'Deactivate' : 'Activate' }}
                                         </button>
-                                        <button @click="deleteMember(member.id)" class="btn btn-sm btn-outline-danger">
+
+                                        <button @click="deleteMember(member.id)" class="danger-btn">
                                             Delete
                                         </button>
                                     </template>
@@ -78,43 +102,59 @@
 
             <!-- Invite Modal -->
             <div v-if="showInviteModal" class="modal-overlay" @click.self="closeInviteModal">
-                <div class="card border-0 shadow-lg" style="width:450px;">
-                    <div class="card-body p-4">
-                        <div class="d-flex justify-content-between align-items-center mb-3">
-                            <h5 class="fw-bold mb-0">Invite Member</h5>
-                            <button @click="closeInviteModal" class="btn-close"></button>
+                <div class="invite-modal">
+                    <div class="modal-header-custom">
+                        <div>
+                            <h5>Invite Member</h5>
+                            <p>Send Prosix workspace invitation</p>
                         </div>
 
-                        <div class="mb-3">
-                            <label class="form-label fw-semibold">Name</label>
-                            <input v-model="inviteForm.name" type="text" class="form-control" placeholder="Member name" />
+                        <button @click="closeInviteModal" class="close-btn">
+                            <i class="fa-solid fa-xmark"></i>
+                        </button>
+                    </div>
+
+                    <div class="modal-body-custom">
+                        <div class="field-group">
+                            <label>Name</label>
+                            <input
+                                v-model="inviteForm.name"
+                                type="text"
+                                placeholder="Member name"
+                            />
                         </div>
 
-                        <div class="mb-3">
-                            <label class="form-label fw-semibold">Email</label>
-                            <input v-model="inviteForm.email" type="email" class="form-control" placeholder="member@example.com" />
+                        <div class="field-group">
+                            <label>Email</label>
+                            <input
+                                v-model="inviteForm.email"
+                                type="email"
+                                placeholder="member@example.com"
+                            />
                         </div>
 
-                        <div class="mb-3">
-                            <label class="form-label fw-semibold">Role</label>
-                            <select v-model="inviteForm.role" class="form-select">
+                        <div class="field-group">
+                            <label>Role</label>
+                            <select v-model="inviteForm.role">
                                 <option value="member">Member</option>
                                 <option value="admin">Admin</option>
                             </select>
                         </div>
+                    </div>
 
-                        <div class="d-flex gap-2 justify-content-end">
-                            <button @click="closeInviteModal" class="btn btn-outline-secondary">Cancel</button>
-                            <button
-                                @click="inviteMember"
-                                class="btn text-white d-flex align-items-center gap-2"
-                                style="background:#ff3d57;"
-                                :disabled="loading"
-                            >
-                                <span v-if="loading" class="spinner-border spinner-border-sm"></span>
-                                <span>{{ loading ? 'Inviting...' : 'Send Invite' }}</span>
-                            </button>
-                        </div>
+                    <div class="modal-footer-custom">
+                        <button @click="closeInviteModal" class="cancel-btn">
+                            Cancel
+                        </button>
+
+                        <button
+                            @click="inviteMember"
+                            class="primary-btn"
+                            :disabled="loading"
+                        >
+                            <span v-if="loading" class="spinner-border spinner-border-sm"></span>
+                            <span>{{ loading ? 'Inviting...' : 'Send Invite' }}</span>
+                        </button>
                     </div>
                 </div>
             </div>
@@ -129,42 +169,70 @@ import axios from 'axios'
 
 export default {
     name: 'Members',
+
     components: { AppLayout },
+
     data() {
         return {
             members: [],
             showInviteModal: false,
             loading: false,
-            inviteForm: { name: '', email: '', role: 'member' },
-            toast: { show: false, text: '', type: 'success' }
+            inviteForm: {
+                name: '',
+                email: '',
+                role: 'member'
+            },
+            toast: {
+                show: false,
+                text: '',
+                type: 'success'
+            }
         }
     },
+
     mounted() {
         this.fetchMembers()
     },
+
     methods: {
         headers() {
-            return { Authorization: `Bearer ${localStorage.getItem('token')}` }
+            return {
+                Authorization: `Bearer ${localStorage.getItem('token')}`
+            }
         },
 
         showToast(text, type = 'success') {
             this.toast = { show: true, text, type }
-            setTimeout(() => { this.toast.show = false }, 3000)
+
+            setTimeout(() => {
+                this.toast.show = false
+            }, 3000)
         },
 
         openInviteModal() {
-            this.inviteForm = { name: '', email: '', role: 'member' }
+            this.inviteForm = {
+                name: '',
+                email: '',
+                role: 'member'
+            }
+
             this.showInviteModal = true
         },
 
         closeInviteModal() {
+            if (this.loading) return
             this.showInviteModal = false
         },
 
         async fetchMembers() {
             try {
-                const res = await axios.get('/api/members', { headers: this.headers() })
-                this.members = Array.isArray(res.data) ? res.data : (res.data?.data || [])
+                const res = await axios.get('/api/members', {
+                    headers: this.headers()
+                })
+
+                this.members = Array.isArray(res.data)
+                    ? res.data
+                    : (res.data?.data || [])
             } catch (e) {
                 console.error(e)
                 this.showToast('Members load nahi hue', 'error')
@@ -178,15 +246,17 @@ export default {
             }
 
             this.loading = true
-            try {
-                const res = await axios.post('/api/members/invite', this.inviteForm, { headers: this.headers() })
 
-                // Naya member list mein add karo
+            try {
+                const res = await axios.post('/api/members/invite', this.inviteForm, {
+                    headers: this.headers()
+                })
+
                 if (res.data.user) {
                     this.members.push(res.data.user)
                 }
 
-                this.showToast('Member successfully invite ho gaya! ✅')
+                this.showToast('Member successfully invited ✅')
                 this.closeInviteModal()
             } catch (e) {
                 console.error(e)
@@ -198,9 +268,13 @@ export default {
 
         async toggleStatus(member) {
             try {
-                const res = await axios.post(`/api/members/${member.id}/toggle`, {}, { headers: this.headers() })
+                const res = await axios.post(`/api/members/${member.id}/toggle`, {}, {
+                    headers: this.headers()
+                })
+
                 member.is_active = res.data.is_active
-                this.showToast(`Member ${res.data.is_active ? 'activate' : 'deactivate'} ho gaya`)
+
+                this.showToast(`Member ${res.data.is_active ? 'activated' : 'deactivated'} ho gaya`)
             } catch (e) {
                 console.error(e)
                 this.showToast('Status change nahi hua', 'error')
@@ -209,8 +283,12 @@ export default {
 
         async deleteMember(id) {
             if (!confirm('Delete this member?')) return
+
             try {
-                await axios.delete(`/api/members/${id}`, { headers: this.headers() })
+                await axios.delete(`/api/members/${id}`, {
+                    headers: this.headers()
+                })
+
                 this.members = this.members.filter(m => m.id !== id)
                 this.showToast('Member delete ho gaya')
             } catch (e) {
@@ -221,14 +299,24 @@ export default {
 
         roleBadge(role) {
             const badges = {
-                'super_admin': 'bg-danger',
-                'admin': 'bg-warning text-dark',
-                'member': 'bg-primary',
+                super_admin: 'super-admin',
+                admin: 'admin',
+                member: 'member'
             }
-            return badges[role] || 'bg-secondary'
+
+            return badges[role] || 'member'
+        },
+
+        formatRole(role) {
+            if (!role) return 'Member'
+
+            return role
+                .replace('_', ' ')
+                .replace(/\b\w/g, c => c.toUpperCase())
         },
 
         formatDate(date) {
+            if (!date) return '—'
             return new Date(date).toLocaleDateString()
         }
     }
@@ -236,15 +324,314 @@ export default {
 </script>
 
 <style scoped>
+.members-page {
+    padding: 28px;
+    background: #f6f7fb;
+    min-height: 100vh;
+}
+
+/* Header */
+.members-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 22px;
+}
+
+.members-header h4 {
+    margin: 0;
+    color: #000;
+    font-size: 24px;
+    font-weight: 900;
+}
+
+.members-header p {
+    margin: 4px 0 0;
+    color: #6b7280;
+    font-size: 14px;
+}
+
+/* Buttons */
+.primary-btn {
+    min-height: 42px;
+    border: none;
+    background: #000;
+    color: #fff;
+    border-radius: 10px;
+    padding: 0 18px;
+    font-size: 14px;
+    font-weight: 800;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    transition: 0.2s;
+}
+
+.primary-btn:hover:not(:disabled) {
+    background: #222;
+    transform: translateY(-1px);
+}
+
+.primary-btn:disabled {
+    opacity: 0.65;
+    cursor: not-allowed;
+}
+
+.outline-btn {
+    height: 34px;
+    border: 1px solid #000;
+    background: #fff;
+    color: #000;
+    border-radius: 8px;
+    padding: 0 12px;
+    font-size: 12px;
+    font-weight: 700;
+}
+
+.outline-btn:hover {
+    background: #000;
+    color: #fff;
+}
+
+.danger-btn {
+    height: 34px;
+    border: 1px solid #dc2626;
+    background: #fff;
+    color: #dc2626;
+    border-radius: 8px;
+    padding: 0 12px;
+    font-size: 12px;
+    font-weight: 700;
+}
+
+.danger-btn:hover {
+    background: #dc2626;
+    color: #fff;
+}
+
+.cancel-btn {
+    height: 42px;
+    border: 1px solid #d1d5db;
+    background: #fff;
+    color: #374151;
+    border-radius: 10px;
+    padding: 0 18px;
+    font-size: 14px;
+    font-weight: 700;
+}
+
+.cancel-btn:hover {
+    background: #f3f4f6;
+}
+
+/* Card */
+.members-card {
+    background: #fff;
+    border-radius: 16px;
+    border: 1px solid #e5e7eb;
+    box-shadow: 0 16px 40px rgba(0,0,0,0.06);
+    overflow: hidden;
+}
+
+.table thead th {
+    background: #000;
+    color: #fff;
+    border: none;
+    padding: 15px 18px;
+    font-size: 13px;
+    font-weight: 800;
+    white-space: nowrap;
+}
+
+.table tbody td {
+    padding: 16px 18px;
+    border-color: #eef0f4;
+    font-size: 14px;
+}
+
+.empty-text {
+    text-align: center;
+    padding: 50px !important;
+    color: #6b7280;
+}
+
+/* Member */
+.member-info {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    font-weight: 800;
+    color: #111;
+}
+
+.member-avatar {
+    width: 38px;
+    height: 38px;
+    border-radius: 50%;
+    background: #000;
+    color: #fff;
+    font-size: 14px;
+    font-weight: 900;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+.member-avatar.has-photo {
+    background: #fff;
+    overflow: hidden;
+    border: 1px solid #e5e7eb;
+}
+
+.member-avatar-img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    border-radius: 50%;
+}
+/* Badges */
+.role-badge,
+.status-badge {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-height: 24px;
+    border-radius: 999px;
+    padding: 3px 10px;
+    font-size: 11px;
+    font-weight: 900;
+    text-transform: capitalize;
+}
+
+.role-badge.super-admin {
+    background: #000;
+    color: #fff;
+}
+
+.role-badge.admin {
+    background: #fff;
+    color: #000;
+    border: 1px solid #000;
+}
+
+.role-badge.member {
+    background: #f3f4f6;
+    color: #111;
+    border: 1px solid #d1d5db;
+}
+
+.status-badge.active {
+    background: #000;
+    color: #fff;
+}
+
+.status-badge.inactive {
+    background: #fff;
+    color: #000;
+    border: 1px solid #000;
+}
+
+/* Modal */
 .modal-overlay {
     position: fixed;
-    top: 0; left: 0;
-    width: 100%; height: 100%;
-    background: rgba(0,0,0,0.5);
+    inset: 0;
+    background: rgba(0,0,0,0.55);
     display: flex;
     align-items: center;
     justify-content: center;
     z-index: 9999;
+}
+
+.invite-modal {
+    width: 450px;
+    max-width: calc(100vw - 30px);
+    background: #fff;
+    border-radius: 18px;
+    box-shadow: 0 35px 100px rgba(0,0,0,0.35);
+    overflow: hidden;
+}
+
+.modal-header-custom {
+    background: #000;
+    color: #fff;
+    padding: 22px 24px;
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+}
+
+.modal-header-custom h5 {
+    margin: 0;
+    font-size: 20px;
+    font-weight: 900;
+}
+
+.modal-header-custom p {
+    margin: 4px 0 0;
+    color: #d1d5db;
+    font-size: 13px;
+}
+
+.close-btn {
+    width: 32px;
+    height: 32px;
+    border: none;
+    background: rgba(255,255,255,0.12);
+    color: #fff;
+    border-radius: 8px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.close-btn:hover {
+    background: #fff;
+    color: #000;
+}
+
+.modal-body-custom {
+    padding: 24px;
+}
+
+.field-group {
+    margin-bottom: 16px;
+}
+
+.field-group label {
+    display: block;
+    margin-bottom: 7px;
+    color: #111;
+    font-size: 13px;
+    font-weight: 900;
+}
+
+.field-group input,
+.field-group select {
+    width: 100%;
+    height: 46px;
+    border: 1.5px solid #d1d5db;
+    border-radius: 10px;
+    padding: 0 13px;
+    color: #111;
+    font-size: 14px;
+    font-weight: 600;
+    outline: none;
+    background: #fff;
+}
+
+.field-group input:focus,
+.field-group select:focus {
+    border-color: #000;
+    box-shadow: 0 0 0 4px rgba(0,0,0,0.08);
+}
+
+.modal-footer-custom {
+    padding: 16px 24px;
+    background: #f9fafb;
+    border-top: 1px solid #e5e7eb;
+    display: flex;
+    justify-content: flex-end;
+    gap: 10px;
 }
 
 /* Toast */
@@ -253,29 +640,54 @@ export default {
     top: 20px;
     right: 20px;
     z-index: 99999;
-    padding: 12px 20px;
-    border-radius: 10px;
+    padding: 13px 20px;
+    border-radius: 12px;
     font-size: 14px;
-    font-weight: 600;
+    font-weight: 800;
     display: flex;
     align-items: center;
     gap: 8px;
-    box-shadow: 0 8px 24px rgba(0,0,0,0.15);
+    box-shadow: 0 15px 40px rgba(0,0,0,0.18);
     animation: slideIn 0.3s ease;
 }
 
 .toast-msg.success {
-    background: #00c875;
+    background: #000;
     color: #fff;
 }
 
 .toast-msg.error {
-    background: #ff3d57;
-    color: #fff;
+    background: #fff;
+    color: #000;
+    border: 1px solid #000;
 }
 
 @keyframes slideIn {
-    from { opacity: 0; transform: translateY(-10px); }
-    to   { opacity: 1; transform: translateY(0); }
+    from {
+        opacity: 0;
+        transform: translateY(-10px);
+    }
+
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+/* Responsive */
+@media (max-width: 768px) {
+    .members-page {
+        padding: 18px;
+    }
+
+    .members-header {
+        align-items: flex-start;
+        flex-direction: column;
+        gap: 14px;
+    }
+
+    .primary-btn {
+        width: 100%;
+    }
 }
 </style>
