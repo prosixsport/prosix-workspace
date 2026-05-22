@@ -13,7 +13,7 @@ class AuthController extends Controller
     {
         $request->validate([
             'name'         => 'required|string|max:255',
-            'email'        => 'required|email|unique:users,email',
+            'email'        => 'required|email',
             'password'     => 'required|min:8|confirmed',
             'invite_token' => 'required',
         ]);
@@ -32,19 +32,21 @@ class AuthController extends Controller
             ], 403);
         }
 
-        $user = User::create([
-            'name'      => $request->name,
-            'email'     => $request->email,
-            'password'  => Hash::make($request->password),
-            'role'      => $inviteData['role'],
-            'is_active' => true,
-        ]);
+        $user = User::updateOrCreate(
+            ['email' => $request->email],
+            [
+                'name'      => $request->name,
+                'password'  => Hash::make($request->password),
+                'role'      => $inviteData['role'] ?? 'member',
+                'is_active' => true,
+            ]
+        );
 
         cache()->forget("invite_{$request->invite_token}");
 
         return response()->json([
             'message' => 'Account created successfully. You can login now.',
-            'user'    => $user,
+            'user'    => $user->fresh(),
         ]);
     }
 
