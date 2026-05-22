@@ -11,20 +11,40 @@ use Illuminate\Support\Facades\Mail;
 class OrderController extends Controller
 {
     public function index()
-    {
-        $user = auth()->user();
+{
+    $user = auth()->user();
 
-        $orders = Order::with(['members'])
-            ->when($user && !in_array($user->role, ['super_admin']), function ($q) use ($user) {
-                $q->whereHas('members', function ($m) use ($user) {
-                    $m->where('users.id', $user->id);
-                });
-            })
-            ->latest()
-            ->get();
+    $orders = Order::with([
+            'members',
+            'reads.user:id,name,email,profile_photo'
+        ])
+        ->when($user && !in_array($user->role, ['super_admin']), function ($q) use ($user) {
+            $q->whereHas('members', function ($m) use ($user) {
+                $m->where('users.id', $user->id);
+            });
+        })
+        ->latest()
+        ->get()
+        ->map(function ($order) use ($user) {
+            $read = $order->reads->firstWhere('user_id', $user?->id);
 
-        return response()->json($orders);
-    }
+            $order->user_has_seen = $read && $read->read_at;
+            $order->read_at = $read?->read_at;
+
+            $order->read_info = $order->reads->map(function ($read) {
+                return [
+                    'user_id' => $read->user_id,
+                    'name' => $read->user?->name,
+                    'email' => $read->user?->email,
+                    'read_at' => $read->read_at,
+                ];
+            })->values();
+
+            return $order;
+        });
+
+    return response()->json($orders);
+}
 
     public function store(Request $request)
     {
@@ -254,4 +274,44 @@ class OrderController extends Controller
             Mail::to($member->email)->send(new NewOrderAssignedMail($order, $member));
         }
     }
+    public function markRead(Order $order)
+{
+    $this->checkAccess($order);
+
+    OrderRead::updateOrCreate(
+        [
+            'order_id' => $order->id,
+            'user_id' => auth()->id(),
+        ],
+        [
+            'read_at' => now(),
+        ]
+    );
+
+    return response()->json([
+        'success' => true,
+        'read_at' => now(),
+    ]);
+}
+
+public function readInfo(Order $order)
+{
+    $this->checkAccess($order);
+
+    $reads = OrderRead::with('user:id,name,email')
+        ->where('order_id', $order->id)
+        ->latest('read_at')
+        ->get()
+        ->map(function ($read) {
+            return [
+                'name' => $read->user?->name,
+                'email' => $read->user?->email,
+                'read_at' => $read->read_at?->format('M d, Y h:i A'),
+            ];
+        });
+
+    return response()->json([
+        'reads' => $reads,
+    ]);
+}
 }

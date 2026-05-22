@@ -224,78 +224,78 @@ export default {
             this.showInviteModal = false
         },
 
-        async fetchMembers() {
-            try {
-                const res = await axios.get('/api/members', {
-                    headers: this.headers()
-                })
+     async fetchMembers() {
+    try {
+        const res = await axios.get('/api/members', {
+            headers: this.headers()
+        })
 
-                this.members = Array.isArray(res.data)
-                    ? res.data
-                    : (res.data?.data || [])
-            } catch (e) {
-                console.error(e)
-                this.showToast('Members load nahi hue', 'error')
-            }
-        },
+        this.members = Array.isArray(res.data)
+            ? res.data
+            : (res.data?.data || [])
+    } catch (e) {
+        console.error(e)
+        this.showToast('Failed to load members', 'error')
+    }
+},
 
-        async inviteMember() {
-            if (!this.inviteForm.name.trim() || !this.inviteForm.email.trim()) {
-                this.showToast('Name aur Email zaroori hain', 'error')
-                return
-            }
+async inviteMember() {
+    if (!this.inviteForm.name.trim() || !this.inviteForm.email.trim()) {
+        this.showToast('Name and email are required', 'error')
+        return
+    }
 
-            this.loading = true
+    this.loading = true
 
-            try {
-                const res = await axios.post('/api/members/invite', this.inviteForm, {
-                    headers: this.headers()
-                })
+    try {
+        const res = await axios.post('/api/members/invite', this.inviteForm, {
+            headers: this.headers()
+        })
 
-                if (res.data.user) {
-                    this.members.push(res.data.user)
-                }
+        if (res.data.user) {
+            this.members.push(res.data.user)
+        }
 
-                this.showToast('Member successfully invited ✅')
-                this.closeInviteModal()
-            } catch (e) {
-                console.error(e)
-                this.showToast(e.response?.data?.message || 'Invite nahi hua', 'error')
-            } finally {
-                this.loading = false
-            }
-        },
+        this.showToast('Member invited successfully')
+        this.closeInviteModal()
+    } catch (e) {
+        console.error(e)
+        this.showToast(e.response?.data?.message || 'Failed to send invite', 'error')
+    } finally {
+        this.loading = false
+    }
+},
 
-        async toggleStatus(member) {
-            try {
-                const res = await axios.post(`/api/members/${member.id}/toggle`, {}, {
-                    headers: this.headers()
-                })
+async toggleStatus(member) {
+    try {
+        const res = await axios.post(`/api/members/${member.id}/toggle`, {}, {
+            headers: this.headers()
+        })
 
-                member.is_active = res.data.is_active
+        member.is_active = res.data.is_active
 
-                this.showToast(`Member ${res.data.is_active ? 'activated' : 'deactivated'} ho gaya`)
-            } catch (e) {
-                console.error(e)
-                this.showToast('Status change nahi hua', 'error')
-            }
-        },
+        this.showToast(`Member ${res.data.is_active ? 'activated' : 'deactivated'} successfully`)
+    } catch (e) {
+        console.error(e)
+        this.showToast('Failed to update member status', 'error')
+    }
+},
 
-        async deleteMember(id) {
-            if (!confirm('Delete this member?')) return
+async deleteMember(id) {
+    if (!confirm('Delete this member?')) return
 
-            try {
-                await axios.delete(`/api/members/${id}`, {
-                    headers: this.headers()
-                })
+    try {
+        await axios.delete(`/api/members/${id}`, {
+            headers: this.headers()
+        })
 
-                this.members = this.members.filter(m => m.id !== id)
-                this.showToast('Member delete ho gaya')
-            } catch (e) {
-                console.error(e)
-                this.showToast('Delete nahi hua', 'error')
-            }
-        },
+        this.members = this.members.filter(m => m.id !== id)
+        this.showToast('Member deleted successfully')
+    } catch (e) {
+        console.error(e)
+        this.showToast('Failed to delete member', 'error')
+    }
+},
 
         roleBadge(role) {
             const badges = {

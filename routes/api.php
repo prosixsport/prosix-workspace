@@ -30,6 +30,11 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::put('/orders/{order}', [OrderController::class, 'update']);
     Route::delete('/orders/{order}', [OrderController::class, 'destroy']);
 
+
+    Route::post('/orders/{order}/mark-read', [OrderController::class, 'markRead']);
+Route::get('/orders/{order}/read-info', [OrderController::class, 'readInfo']);
+
+
     // Order Members
     Route::post('/orders/{order}/members', [OrderController::class, 'addMember']);
     Route::delete('/orders/{order}/members/{user}', [OrderController::class, 'removeMember']);

@@ -49,5 +49,9 @@ public function files()
     {
         return $this->belongsTo(User::class, 'created_by');
     }
+    public function reads()
+{
+    return $this->hasMany(\App\Models\OrderRead::class);
+}
 }
 

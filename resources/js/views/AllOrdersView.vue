@@ -6,8 +6,15 @@
       <div class="resize-bar" @mousedown="startResize"></div>
 
       <div class="orders-left-header">
+        <button class="back-btn" type="button" title="Back to dashboard" @click.stop="$router.push('/dashboard')">
+          <i class="fa-solid fa-arrow-left"></i>
+        </button>
+
         <span class="orders-title">All Orders</span>
-        <i class="fa-solid fa-caret-down ms-1" style="color:#8d93a8;font-size:12px"></i>
+
+        <span v-if="unreadOrdersCount > 0" class="order-notify-pill">
+          {{ unreadOrdersCount }} new
+        </span>
       </div>
 
       <div class="orders-tabs">
@@ -41,12 +48,17 @@
         v-for="order in filteredOrders"
         :key="order.id"
         class="list-row"
-        :class="{ active: selectedOrder?.id === order.id }"
+        :class="{
+          active: selectedOrder?.id === order.id,
+          unread: !order.user_has_seen,
+          seen: order.user_has_seen
+        }"
         @click="selectOrder(order)"
       >
         <div class="col-chk"><input type="checkbox" @click.stop /></div>
 
         <div class="col-task">
+          <span v-if="!order.user_has_seen" class="unread-dot"></span>
           <i v-if="order.hasChildren" class="fa-solid fa-chevron-right row-arrow"></i>
           <span>{{ order.name }}</span>
         </div>
@@ -71,25 +83,29 @@
           </div>
         </div>
 
-        <div v-if="isSuperAdmin" class="order-actions-wrap" @click.stop>
+        <div class="order-actions-wrap" @click.stop>
           <button class="order-dots-btn" @click="toggleOrderMenu(order.id)">
             <i class="fa-solid fa-ellipsis"></i>
           </button>
 
           <div v-if="openOrderMenuId === order.id" class="order-menu">
-            <div class="order-menu-item" @click="openEditOrder(order)">
-              <i class="fa-solid fa-pen"></i> Edit
+            <div class="order-menu-item" @click="openOrderInfo(order)">
+              <i class="fa-solid fa-circle-info"></i> Info
             </div>
-            <div class="order-menu-item" @click="duplicateOrder(order)">
-              <i class="fa-solid fa-copy"></i> Duplicate
-            </div>
-            <div class="order-menu-item danger" @click="deleteOrder(order)">
-              <i class="fa-solid fa-trash"></i> Delete
-            </div>
+
+            <template v-if="isSuperAdmin">
+              <div class="order-menu-item" @click="openEditOrder(order)">
+                <i class="fa-solid fa-pen"></i> Edit
+              </div>
+              <div class="order-menu-item" @click="duplicateOrder(order)">
+                <i class="fa-solid fa-copy"></i> Duplicate
+              </div>
+              <div class="order-menu-item danger" @click="deleteOrder(order)">
+                <i class="fa-solid fa-trash"></i> Delete
+              </div>
+            </template>
           </div>
         </div>
-
-        <div v-else class="order-actions-wrap"></div>
       </div>
 
 <div v-if="isSuperAdmin" class="add-row" @click="addNewOrder">
@@ -723,6 +739,55 @@
     </div>
 
 
+    <!-- ORDER READ INFO MODAL -->
+    <div v-if="orderInfoModal" class="modal-overlay" @click.self="closeOrderInfo">
+      <div class="order-info-modal" @click.stop>
+        <div class="view-all-header">
+          <h5>Order Info</h5>
+          <button class="modal-close" @click="closeOrderInfo">
+            <i class="fa-solid fa-xmark"></i>
+          </button>
+        </div>
+
+        <div class="order-info-body">
+          <div class="order-info-title">
+            <strong>{{ infoOrder?.name || 'Order' }}</strong>
+            <span>{{ infoOrder?.po || 'N/A' }}</span>
+          </div>
+
+          <div class="read-info-section">
+            <h6>Seen by</h6>
+
+            <div v-if="orderReadInfo.length" class="read-info-list">
+              <div
+                v-for="read in orderReadInfo"
+                :key="read.user_id || read.email || read.name"
+                class="read-info-row"
+              >
+                <div class="read-user">
+                  <div class="read-user-avatar">
+                    {{ initial(read.name || read.email || 'U') }}
+                  </div>
+                  <div>
+                    <strong>{{ read.name || 'User' }}</strong>
+                    <small>{{ read.email || '' }}</small>
+                  </div>
+                </div>
+
+                <span class="read-time">
+                  {{ formatReadDate(read.read_at) }}
+                </span>
+              </div>
+            </div>
+
+            <div v-else class="read-info-empty">
+              No one has seen this order yet.
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
     <!-- IMAGE / FILE PREVIEW MODAL -->
     <div v-if="previewFile" class="image-preview-overlay" @click.self="previewFile = null">
       <div class="image-preview-modal">
@@ -794,6 +859,10 @@ showChat: false,
       chatMessages: [],
       unreadChatCount: 0,
       unreadTimer: null,
+
+      orderInfoModal: false,
+      infoOrder: null,
+      orderReadInfo: [],
 
       profileModal: false,
       profileUser: null,
@@ -886,6 +955,10 @@ computed: {
 
   filteredOrders() {
     return this.orders.filter(o => o.group === this.activeGroup)
+  },
+
+  unreadOrdersCount() {
+    return this.orders.filter(o => !o.user_has_seen).length
   }
 },
 
@@ -1389,6 +1462,9 @@ async toggleChat() {
 
       return {
         id: order.id,
+        user_has_seen: Boolean(order.user_has_seen),
+        read_at: order.read_at || null,
+        read_info: order.read_info || [],
         group: this.statusToGroup(status),
         name: order.name,
         hasChildren: false,
@@ -1461,6 +1537,8 @@ async toggleChat() {
       this.selectedOrder = order
       this.closeAllMenus()
 
+      await this.markOrderRead(order)
+
       this.paymentEdit = {
         percent: order.payment ? order.payment.replace(' % Paid', '').replace('%', '').trim() : '',
         received: order.paymentReceived || '',
@@ -1490,6 +1568,67 @@ async toggleChat() {
       } else {
         await this.fetchUnreadCount()
       }
+    },
+
+    async markOrderRead(order) {
+      if (!order?.id || order.user_has_seen) return
+
+      try {
+        const res = await axios.post(`/api/orders/${order.id}/mark-read`, {}, {
+          headers: this.headers()
+        })
+
+        order.user_has_seen = true
+        order.read_at = res.data?.read_at || new Date().toISOString()
+
+        const idx = this.orders.findIndex(o => Number(o.id) === Number(order.id))
+        if (idx !== -1) {
+          this.orders[idx].user_has_seen = true
+          this.orders[idx].read_at = order.read_at
+        }
+      } catch (e) {
+        console.error('markOrderRead error:', e)
+      }
+    },
+
+    async openOrderInfo(order) {
+      if (!order?.id) return
+
+      this.infoOrder = order
+      this.orderReadInfo = order.read_info || []
+      this.openOrderMenuId = null
+      this.orderInfoModal = true
+
+      try {
+        const res = await axios.get(`/api/orders/${order.id}/read-info`, {
+          headers: this.headers()
+        })
+
+        this.orderReadInfo = res.data?.reads || []
+      } catch (e) {
+        console.error('openOrderInfo error:', e)
+      }
+    },
+
+    closeOrderInfo() {
+      this.orderInfoModal = false
+      this.infoOrder = null
+      this.orderReadInfo = []
+    },
+
+    formatReadDate(date) {
+      if (!date) return 'Not seen yet'
+
+      const d = new Date(date)
+      if (Number.isNaN(d.getTime())) return date
+
+      return d.toLocaleString('en-US', {
+        month: 'short',
+        day: 'numeric',
+        year: 'numeric',
+        hour: '2-digit',
+        minute: '2-digit'
+      })
     },
 
  async fetchMessages(orderId) {
@@ -2088,6 +2227,7 @@ syncChatFileMessages(chatFiles) {
       this.showPaymentMenu = false
       this.showTrackingMenu = false
       this.showDatePicker = false
+      this.openOrderMenuId = null
     },
 
     startResize() {
@@ -2160,6 +2300,41 @@ syncChatFileMessages(chatFiles) {
   align-items:center;
 }
 
+.back-btn {
+  width:32px;
+  height:32px;
+  border:none;
+  border-radius:8px;
+  background:rgba(255,255,255,0.08);
+  color:#fff;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  margin-right:8px;
+  cursor:pointer;
+  transition:all .15s;
+  flex-shrink:0;
+}
+
+.back-btn:hover {
+  background:#fff;
+  color:#000;
+}
+
+.orders-title {
+  flex:1;
+}
+
+.order-notify-pill {
+  background:#fff;
+  color:#000;
+  border-radius:999px;
+  padding:4px 8px;
+  font-size:10px;
+  font-weight:900;
+  margin-left:auto;
+}
+
 .orders-tabs {
   display:flex;
   padding:0 10px;
@@ -2221,6 +2396,38 @@ syncChatFileMessages(chatFiles) {
 
 .list-row.active {
   background:rgba(97,97,255,0.15);
+}
+
+.list-row.unread {
+  background:rgba(255,255,255,0.075);
+  border-left:4px solid #fff;
+}
+
+.list-row.seen {
+  background:rgba(255,255,255,0.02);
+  opacity:.72;
+}
+
+.list-row.unread .col-task span:not(.unread-dot) {
+  color:#fff;
+  font-weight:900;
+}
+
+.list-row.seen .col-task span {
+  color:#8d93a8;
+}
+
+.list-row.seen:hover {
+  opacity:1;
+}
+
+.unread-dot {
+  width:8px;
+  height:8px;
+  border-radius:50%;
+  background:#fff;
+  flex-shrink:0;
+  box-shadow:0 0 0 3px rgba(255,255,255,.08);
 }
 
 .list-row > div {
@@ -3881,6 +4088,124 @@ syncChatFileMessages(chatFiles) {
 
 .invoice-view-btn:hover{
   background:#e0e7ff;
+}
+
+
+.order-info-modal {
+  width:480px;
+  max-width:calc(100vw - 30px);
+  background:#fff;
+  border-radius:16px;
+  overflow:hidden;
+  box-shadow:0 30px 90px rgba(0,0,0,.35);
+}
+
+.order-info-body {
+  padding:18px;
+}
+
+.order-info-title {
+  display:flex;
+  flex-direction:column;
+  gap:4px;
+  padding:14px;
+  border:1px solid #e5e7eb;
+  border-radius:12px;
+  background:#f9fafb;
+  margin-bottom:14px;
+}
+
+.order-info-title strong {
+  color:#111;
+  font-size:15px;
+}
+
+.order-info-title span {
+  color:#6b7280;
+  font-size:12px;
+  font-weight:700;
+}
+
+.read-info-section h6 {
+  margin:0 0 10px;
+  font-size:14px;
+  font-weight:900;
+  color:#111;
+}
+
+.read-info-list {
+  display:flex;
+  flex-direction:column;
+  gap:8px;
+  max-height:320px;
+  overflow:auto;
+}
+
+.read-info-row {
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  gap:12px;
+  border:1px solid #eef0f4;
+  border-radius:12px;
+  padding:10px;
+}
+
+.read-user {
+  display:flex;
+  align-items:center;
+  gap:10px;
+  min-width:0;
+}
+
+.read-user-avatar {
+  width:34px;
+  height:34px;
+  border-radius:50%;
+  background:#000;
+  color:#fff;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  font-size:12px;
+  font-weight:900;
+  flex-shrink:0;
+}
+
+.read-user strong {
+  display:block;
+  color:#111;
+  font-size:13px;
+  font-weight:900;
+}
+
+.read-user small {
+  display:block;
+  color:#6b7280;
+  font-size:11px;
+  max-width:170px;
+  overflow:hidden;
+  text-overflow:ellipsis;
+  white-space:nowrap;
+}
+
+.read-time {
+  color:#111;
+  background:#f3f4f6;
+  border-radius:999px;
+  padding:5px 9px;
+  font-size:11px;
+  font-weight:800;
+  white-space:nowrap;
+}
+
+.read-info-empty {
+  color:#6b7280;
+  font-size:13px;
+  padding:20px;
+  text-align:center;
+  border:1px dashed #d1d5db;
+  border-radius:12px;
 }
 
 </style>
