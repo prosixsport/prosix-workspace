@@ -177,11 +177,12 @@ export default {
             members: [],
             showInviteModal: false,
             loading: false,
-            inviteForm: {
-                name: '',
-                email: '',
-                role: 'member'
-            },
+           inviteForm: {
+    name: '',
+    email: '',
+    role: 'member',
+    is_active: true
+},
             toast: {
                 show: false,
                 text: '',
@@ -219,10 +220,11 @@ export default {
             this.showInviteModal = true
         },
 
-        closeInviteModal() {
-            if (this.loading) return
-            this.showInviteModal = false
-        },
+    closeInviteModal() {
+    if (this.loading) return
+    this.showInviteModal = false
+    this.inviteForm = { name: '', email: '', role: 'member' }
+},
 
      async fetchMembers() {
     try {
@@ -248,16 +250,19 @@ async inviteMember() {
     this.loading = true
 
     try {
-        const res = await axios.post('/api/members/invite', this.inviteForm, {
+        const res = await axios.post('/api/members/invite', {
+            ...this.inviteForm,
+            is_active: true
+        }, {
             headers: this.headers()
         })
 
         if (res.data.user) {
-            this.members.push(res.data.user)
+            this.members.push({ ...res.data.user, is_active: true })
         }
 
         this.showToast('Member invited successfully')
-        this.closeInviteModal()
+        this.showInviteModal = false
     } catch (e) {
         console.error(e)
         this.showToast(e.response?.data?.message || 'Failed to send invite', 'error')
@@ -389,10 +394,7 @@ async deleteMember(id) {
     font-weight: 700;
 }
 
-.outline-btn:hover {
-    background: #000;
-    color: #fff;
-}
+.outline-btn:hover { background: #000; color: #fff; }
 
 .danger-btn {
     height: 34px;
@@ -405,10 +407,7 @@ async deleteMember(id) {
     font-weight: 700;
 }
 
-.danger-btn:hover {
-    background: #dc2626;
-    color: #fff;
-}
+.danger-btn:hover { background: #dc2626; color: #fff; }
 
 .cancel-btn {
     height: 42px;
@@ -421,9 +420,7 @@ async deleteMember(id) {
     font-weight: 700;
 }
 
-.cancel-btn:hover {
-    background: #f3f4f6;
-}
+.cancel-btn:hover { background: #f3f4f6; }
 
 /* Card */
 .members-card {
@@ -476,7 +473,9 @@ async deleteMember(id) {
     display: flex;
     align-items: center;
     justify-content: center;
+    flex-shrink: 0;
 }
+
 .member-avatar.has-photo {
     background: #fff;
     overflow: hidden;
@@ -489,6 +488,7 @@ async deleteMember(id) {
     object-fit: cover;
     border-radius: 50%;
 }
+
 /* Badges */
 .role-badge,
 .status-badge {
@@ -503,33 +503,11 @@ async deleteMember(id) {
     text-transform: capitalize;
 }
 
-.role-badge.super-admin {
-    background: #000;
-    color: #fff;
-}
-
-.role-badge.admin {
-    background: #fff;
-    color: #000;
-    border: 1px solid #000;
-}
-
-.role-badge.member {
-    background: #f3f4f6;
-    color: #111;
-    border: 1px solid #d1d5db;
-}
-
-.status-badge.active {
-    background: #000;
-    color: #fff;
-}
-
-.status-badge.inactive {
-    background: #fff;
-    color: #000;
-    border: 1px solid #000;
-}
+.role-badge.super-admin { background: #000; color: #fff; }
+.role-badge.admin { background: #fff; color: #000; border: 1px solid #000; }
+.role-badge.member { background: #f3f4f6; color: #111; border: 1px solid #d1d5db; }
+.status-badge.active { background: #000; color: #fff; }
+.status-badge.inactive { background: #fff; color: #000; border: 1px solid #000; }
 
 /* Modal */
 .modal-overlay {
@@ -540,11 +518,12 @@ async deleteMember(id) {
     align-items: center;
     justify-content: center;
     z-index: 9999;
+    padding: 16px;
 }
 
 .invite-modal {
     width: 450px;
-    max-width: calc(100vw - 30px);
+    max-width: 100%;
     background: #fff;
     border-radius: 18px;
     box-shadow: 0 35px 100px rgba(0,0,0,0.35);
@@ -560,17 +539,8 @@ async deleteMember(id) {
     justify-content: space-between;
 }
 
-.modal-header-custom h5 {
-    margin: 0;
-    font-size: 20px;
-    font-weight: 900;
-}
-
-.modal-header-custom p {
-    margin: 4px 0 0;
-    color: #d1d5db;
-    font-size: 13px;
-}
+.modal-header-custom h5 { margin: 0; font-size: 20px; font-weight: 900; }
+.modal-header-custom p { margin: 4px 0 0; color: #d1d5db; font-size: 13px; }
 
 .close-btn {
     width: 32px;
@@ -584,18 +554,11 @@ async deleteMember(id) {
     justify-content: center;
 }
 
-.close-btn:hover {
-    background: #fff;
-    color: #000;
-}
+.close-btn:hover { background: #fff; color: #000; }
 
-.modal-body-custom {
-    padding: 24px;
-}
+.modal-body-custom { padding: 24px; }
 
-.field-group {
-    margin-bottom: 16px;
-}
+.field-group { margin-bottom: 16px; }
 
 .field-group label {
     display: block;
@@ -651,43 +614,99 @@ async deleteMember(id) {
     animation: slideIn 0.3s ease;
 }
 
-.toast-msg.success {
-    background: #000;
-    color: #fff;
-}
-
-.toast-msg.error {
-    background: #fff;
-    color: #000;
-    border: 1px solid #000;
-}
+.toast-msg.success { background: #000; color: #fff; }
+.toast-msg.error { background: #fff; color: #000; border: 1px solid #000; }
 
 @keyframes slideIn {
-    from {
-        opacity: 0;
-        transform: translateY(-10px);
-    }
-
-    to {
-        opacity: 1;
-        transform: translateY(0);
-    }
+    from { opacity: 0; transform: translateY(-10px); }
+    to { opacity: 1; transform: translateY(0); }
 }
 
-/* Responsive */
+/* ===========================
+   MOBILE RESPONSIVE
+   =========================== */
 @media (max-width: 768px) {
-    .members-page {
-        padding: 18px;
-    }
+    .members-page { padding: 16px; }
 
     .members-header {
-        align-items: flex-start;
         flex-direction: column;
-        gap: 14px;
+        align-items: flex-start;
+        gap: 12px;
     }
 
-    .primary-btn {
-        width: 100%;
+    .members-header h4 { font-size: 20px; }
+    .primary-btn { width: 100%; }
+
+    /* TABLE hide karo, cards dikhao */
+    .members-card { background: transparent; border: none; box-shadow: none; overflow: visible; }
+
+    .table-responsive { overflow: visible; }
+
+    /* thead hide */
+    .table thead { display: none; }
+
+    /* tbody rows ko cards banao */
+    .table tbody { display: flex; flex-direction: column; gap: 12px; }
+
+    .table tbody tr {
+        display: flex;
+        flex-direction: column;
+        background: #fff;
+        border-radius: 14px;
+        border: 1px solid #e5e7eb;
+        box-shadow: 0 2px 10px rgba(0,0,0,0.06);
+        padding: 16px;
+        gap: 10px;
     }
+
+    /* Empty row */
+    .table tbody tr td[colspan] {
+        text-align: center;
+        padding: 30px !important;
+        color: #6b7280;
+        background: #fff;
+        border-radius: 14px;
+    }
+
+    /* Har td ko row banao */
+    .table tbody td {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        padding: 0 !important;
+        border: none !important;
+        font-size: 13px;
+    }
+
+    /* Member info top par full width */
+    .table tbody td:first-child {
+        border-bottom: 1px solid #f0f1f3 !important;
+        padding-bottom: 12px !important;
+        margin-bottom: 2px;
+        justify-content: flex-start;
+    }
+
+    .member-info { font-size: 14px; }
+
+    /* Label add karo har td ke liye data-label se */
+    .table tbody td:nth-child(2)::before { content: 'Email:'; font-weight: 800; color: #6b7280; font-size: 11px; }
+    .table tbody td:nth-child(3)::before { content: 'Role:'; font-weight: 800; color: #6b7280; font-size: 11px; }
+    .table tbody td:nth-child(4)::before { content: 'Status:'; font-weight: 800; color: #6b7280; font-size: 11px; }
+    .table tbody td:nth-child(5)::before { content: 'Joined:'; font-weight: 800; color: #6b7280; font-size: 11px; }
+    .table tbody td:nth-child(6)::before { content: 'Actions:'; font-weight: 800; color: #6b7280; font-size: 11px; }
+
+    /* Actions buttons */
+    .table tbody td:last-child { margin-top: 4px; }
+    .outline-btn, .danger-btn { height: 32px; font-size: 11px; padding: 0 10px; }
+
+    /* Modal mobile */
+    .modal-overlay { align-items: flex-end; padding: 0; }
+    .invite-modal { border-radius: 18px 18px 0 0; width: 100%; max-width: 100%; }
+    .modal-body-custom { padding: 20px 16px; }
+    .modal-footer-custom { padding: 14px 16px; }
+    .cancel-btn, .primary-btn { flex: 1; }
+
+    /* Toast mobile */
+    .toast-msg { right: 12px; left: 12px; top: 12px; }
 }
 </style>
