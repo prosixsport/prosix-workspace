@@ -174,10 +174,27 @@
           rows="1"
           ref="chatInput"
         ></textarea>
-        <button class="chat-attach-btn" type="button" title="Attach files" @click="$refs.chatFileInput.click()">
-          <i class="fa-solid fa-paperclip"></i>
-        </button>
-        <input ref="chatFileInput" type="file" multiple class="hidden-file-input" @change="uploadChatFiles" />
+      <button class="chat-attach-btn" type="button" title="Attach files" @click="$refs.chatFileInput.click()">
+  <i class="fa-solid fa-paperclip"></i>
+</button>
+<input ref="chatFileInput" type="file" multiple class="hidden-file-input" @change="uploadChatFiles" />
+
+<!-- Voice button -->
+<button
+  class="chat-attach-btn"
+  type="button"
+  :class="{ recording: isRecording }"
+  :title="isRecording ? 'Stop recording' : 'Record voice message'"
+  @click="toggleRecording"
+>
+  <i :class="isRecording ? 'fa-solid fa-stop' : 'fa-solid fa-microphone'"></i>
+</button>
+
+<!-- Recording indicator -->
+<div v-if="isRecording" class="recording-indicator">
+  <span class="rec-dot"></span> Recording...
+</div>
+
         <button class="chat-send-btn" @click="sendMessage">
           <i class="fa-solid fa-paper-plane"></i>
         </button>
@@ -284,7 +301,10 @@ export default {
       profileModal: false,
       profileUser: null,
       profileForm: { name: '', about: '', profile_photo: null, preview: '' },
-      windowWidth: typeof window !== 'undefined' ? window.innerWidth : 1200
+windowWidth: typeof window !== 'undefined' ? window.innerWidth : 1200,
+isRecording: false,
+mediaRecorder: null,
+audioChunks: []
     }
   },
 
@@ -331,6 +351,95 @@ export default {
   },
 
   methods: {
+    async toggleRecording() {
+  if (this.isRecording) {
+    this.stopRecording()
+  } else {
+    await this.startRecording()
+  }
+},
+
+async startRecording() {
+  try {
+    const stream = await navigator.mediaDevices.getUserMedia({ audio: true })
+    this.audioChunks = []
+    this.mediaRecorder = new MediaRecorder(stream)
+    this.mediaRecorder.ondataavailable = (e) => {
+      if (e.data.size > 0) this.audioChunks.push(e.data)
+    }
+    this.mediaRecorder.onstop = async () => {
+      const blob = new Blob(this.audioChunks, { type: 'audio/webm' })
+      const file = new File([blob], `voice-${Date.now()}.webm`, { type: 'audio/webm' })
+      stream.getTracks().forEach(t => t.stop())
+      await this.uploadVoiceMessage(file)
+    }
+    this.mediaRecorder.start()
+    this.isRecording = true
+  } catch (e) {
+  console.error('MIC ERROR:', e)
+  console.log('ERROR NAME:', e.name)
+
+  if (e.name === 'NotAllowedError') {
+    alert('Microphone permission denied')
+  }
+  else if (e.name === 'NotFoundError') {
+    alert('Microphone device not found')
+  }
+  else if (e.name === 'NotReadableError') {
+    alert('Microphone busy hai kisi aur app me')
+  }
+  else if (e.name === 'AbortError') {
+    alert('Microphone aborted')
+  }
+  else {
+    alert('Error: ' + e.name)
+  }
+}
+},
+
+stopRecording() {
+  if (this.mediaRecorder && this.isRecording) {
+    this.mediaRecorder.stop()
+    this.isRecording = false
+  }
+},
+
+async uploadVoiceMessage(file) {
+  if (!this.selectedOrder) return
+  const formData = new FormData()
+  formData.append('files[]', file)
+  try {
+    const res = await axios.post(
+      `/api/orders/${this.selectedOrder.id}/chat-files`,
+      formData,
+      { headers: { ...this.headers(), 'Content-Type': 'multipart/form-data' } }
+    )
+    const savedFilesRaw = res.data?.files || res.data?.data || []
+    const me = this.currentUser || {}
+    const savedFiles = savedFilesRaw.map(f => ({
+      ...this.normalizeOrderFile(f), cardType: 'chat_files',
+      senderId: f.user?.id || me.id || null
+    }))
+    const savedMessages = savedFiles.map(f => {
+      const createdDate = f.createdAt ? new Date(f.createdAt) : new Date()
+      return {
+        localKey: `file-${f.id}`, fileMessageId: f.id,
+        senderId: f.senderId || me.id || null,
+        sender: f.sender || me.name || 'You',
+        senderInitial: this.initial(f.sender || me.name || 'You'),
+        senderColor: this.memberColor(f.senderId || me.id || 0),
+        senderPhoto: me.profile_photo_url || null,
+        time: createdDate.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+        sortAt: createdDate.getTime(), text: '', files: [f]
+      }
+    })
+    this.$emit('update-chat-messages', [...this.chatMessages, ...savedMessages])
+    this.scrollChatBottom()
+  } catch (e) {
+    console.error('uploadVoiceMessage error:', e)
+    alert('Voice message upload nahi hui')
+  }
+},
     async openProfile(member) {
       if (!member?.id) return
       try {
@@ -632,6 +741,41 @@ export default {
 </script>
 
 <style scoped>
+.chat-attach-btn.recording {
+  background: #ff3d71 !important;
+  color: #fff !important;
+  animation: pulse 1s infinite;
+}
+
+@keyframes pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.6; }
+}
+
+.recording-indicator {
+  position: absolute;
+  bottom: 70px;
+  left: 10px;
+  right: 10px;
+  background: #ff3d71;
+  color: #fff;
+  border-radius: 8px;
+  padding: 6px 12px;
+  font-size: 12px;
+  font-weight: 800;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  z-index: 100;
+}
+
+.rec-dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: #fff;
+  animation: pulse 1s infinite;
+}
 .chat-panel {
   width: 340px;
   min-width: 260px;
