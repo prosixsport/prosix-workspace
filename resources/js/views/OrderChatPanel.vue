@@ -360,41 +360,58 @@ audioChunks: []
 },
 
 async startRecording() {
+  if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+    alert('Is mobile browser me microphone support nahi hai. Chrome use karo.')
+    return
+  }
+
+  if (!window.MediaRecorder) {
+    alert('Is mobile browser me voice recording support nahi hai. Chrome use karo.')
+    return
+  }
+
   try {
     const stream = await navigator.mediaDevices.getUserMedia({ audio: true })
+
     this.audioChunks = []
-    this.mediaRecorder = new MediaRecorder(stream)
+
+    let options = {}
+    if (MediaRecorder.isTypeSupported('audio/webm')) {
+      options = { mimeType: 'audio/webm' }
+    } else if (MediaRecorder.isTypeSupported('audio/mp4')) {
+      options = { mimeType: 'audio/mp4' }
+    }
+
+    this.mediaRecorder = new MediaRecorder(stream, options)
+
     this.mediaRecorder.ondataavailable = (e) => {
       if (e.data.size > 0) this.audioChunks.push(e.data)
     }
+
     this.mediaRecorder.onstop = async () => {
-      const blob = new Blob(this.audioChunks, { type: 'audio/webm' })
-      const file = new File([blob], `voice-${Date.now()}.webm`, { type: 'audio/webm' })
+      const mimeType = this.mediaRecorder.mimeType || 'audio/webm'
+      const ext = mimeType.includes('mp4') ? 'mp4' : 'webm'
+
+      const blob = new Blob(this.audioChunks, { type: mimeType })
+      const file = new File([blob], `voice-${Date.now()}.${ext}`, { type: mimeType })
+
       stream.getTracks().forEach(t => t.stop())
       await this.uploadVoiceMessage(file)
     }
+
     this.mediaRecorder.start()
     this.isRecording = true
   } catch (e) {
-  console.error('MIC ERROR:', e)
-  console.log('ERROR NAME:', e.name)
+    console.error('MIC ERROR:', e)
 
-  if (e.name === 'NotAllowedError') {
-    alert('Microphone permission denied')
+    if (e.name === 'NotAllowedError') {
+      alert('Mic permission deny hai. Browser settings me Allow karo.')
+    } else if (e.name === 'NotFoundError') {
+      alert('Microphone device nahi mila.')
+    } else {
+      alert('Error: ' + e.name)
+    }
   }
-  else if (e.name === 'NotFoundError') {
-    alert('Microphone device not found')
-  }
-  else if (e.name === 'NotReadableError') {
-    alert('Microphone busy hai kisi aur app me')
-  }
-  else if (e.name === 'AbortError') {
-    alert('Microphone aborted')
-  }
-  else {
-    alert('Error: ' + e.name)
-  }
-}
 },
 
 stopRecording() {
