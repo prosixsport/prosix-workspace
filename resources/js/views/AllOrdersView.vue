@@ -272,10 +272,10 @@
                   <div v-if="card.files && card.files.length" class="card-files-preview">
                     <div v-for="(file, fi) in card.files" :key="fi" class="file-thumb">
                       <img v-if="file.isImage && !file.imageError" :src="file.url" class="file-img" @click.stop="openPreviewFile(file)" @error="file.imageError = true" />
-                      <div v-else class="file-icon-box">
-                        <i :class="getFileIcon(file.name)" class="file-type-icon"></i>
-                        <span class="file-name-small">{{ file.name }}</span>
-                      </div>
+                   <div v-else class="file-icon-box" @click.stop="openPreviewFile(file)" style="cursor:pointer;">
+  <i :class="getFileIcon(file.name)" class="file-type-icon"></i>
+  <span class="file-name-small">{{ file.name }}</span>
+</div>
                       <span v-if="file.uploading" class="uploading-label">Uploading...</span>
                       <button v-if="isSuperAdmin && !file.uploading" class="file-remove-btn" @click.stop="removeFile(card, fi)">
                         <i class="fa-solid fa-xmark"></i>
@@ -498,11 +498,16 @@
       <div class="image-preview-modal">
         <button class="image-preview-close" @click="previewFile = null"><i class="fa-solid fa-xmark"></i></button>
         <img v-if="previewFile.isImage" :src="previewFile.url" class="image-preview-full" :alt="previewFile.name" />
-        <div v-else class="file-preview-doc">
-          <i :class="getFileIcon(previewFile.name)"></i>
-          <strong>{{ previewFile.name }}</strong>
-          <a :href="previewFile.url" target="_blank" :download="previewFile.name" class="download-all-btn mt-3">Download File</a>
-        </div>
+       <div v-else class="file-preview-doc">
+  <i :class="getFileIcon(previewFile.name)"></i>
+  <strong>{{ previewFile.name }}</strong>
+  <a :href="previewFile.url" target="_blank" class="download-all-btn mt-3">
+    <i class="fa-solid fa-arrow-up-right-from-square me-1"></i>Open File
+  </a>
+  <a :href="previewFile.url" :download="previewFile.name" class="download-all-btn mt-3" style="background:#374151">
+    <i class="fa-solid fa-download me-1"></i>Download
+  </a>
+</div>
       </div>
     </div>
 
@@ -754,7 +759,29 @@ export default {
       } catch (e) { console.error('saveTracking error:', e); alert(e.response?.data?.message || 'Tracking save nahi hua') }
     },
 
-    openPreviewFile(file) { if (!file?.url) return; this.previewFile = file },
+openPreviewFile(file) {
+  if (!file?.url) return
+  const ext = (file.name || '').split('.').pop().toLowerCase()
+  const officeExts = ['doc', 'docx', 'xls', 'xlsx', 'ppt', 'pptx']
+  const browserExts = ['pdf', 'csv', 'txt']
+
+  if (officeExts.includes(ext)) {
+    // Google Docs Viewer se open karo — download nahi hoga
+    const fullUrl = file.url.startsWith('http')
+      ? file.url
+      : window.location.origin + file.url
+    const viewerUrl = `https://docs.google.com/viewer?url=${encodeURIComponent(fullUrl)}&embedded=false`
+    window.open(viewerUrl, '_blank')
+    return
+  }
+
+  if (browserExts.includes(ext)) {
+    window.open(file.url, '_blank')
+    return
+  }
+
+  this.previewFile = file
+},
     safeFileName(name) { return String(name || 'file').replace(/[^a-z0-9_.-]/gi, '_') },
 
     zipBaseName() {
