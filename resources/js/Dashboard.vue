@@ -5,7 +5,7 @@
             <!-- HERO -->
             <div class="hero">
                 <div>
-                    <h2>Good morning, {{ user?.name || 'User' }}! 👋</h2>
+                    <h2>{{ user?.name || 'User' }}! </h2>
                     <p>Here is your Prosix orders overview.</p>
                 </div>
                 <router-link to="/orders" class="hero-btn">

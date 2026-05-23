@@ -783,7 +783,6 @@ openPreviewFile(file) {
   this.previewFile = file
 },
     safeFileName(name) { return String(name || 'file').replace(/[^a-z0-9_.-]/gi, '_') },
-
     zipBaseName() {
       const d = new Date()
       const month = d.toLocaleString('en-US', { month: 'long' }).toLowerCase()
@@ -1117,6 +1116,7 @@ openPreviewFile(file) {
         status_color: status?.color || '#fdab3d', trk: this.newOrder.trk || 'N/A',
         payment: this.newOrder.payment || '0 % Paid'
       }
+      
       try {
         let res
         if (this.editingOrderId) res = await axios.put(`/api/orders/${this.editingOrderId}`, payload, { headers: this.headers() })
