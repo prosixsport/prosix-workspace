@@ -180,7 +180,7 @@
 <input ref="chatFileInput" type="file" multiple class="hidden-file-input" @change="uploadChatFiles" />
 
 <!-- Voice button -->
-<button
+<!-- <button
   class="chat-attach-btn"
   type="button"
   :class="{ recording: isRecording }"
@@ -188,7 +188,7 @@
   @click="toggleRecording"
 >
   <i :class="isRecording ? 'fa-solid fa-stop' : 'fa-solid fa-microphone'"></i>
-</button>
+</button> -->
 
 <!-- Recording indicator -->
 <div v-if="isRecording" class="recording-indicator">
