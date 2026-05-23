@@ -1,113 +1,90 @@
 <template>
     <div class="prosix-layout">
 
-        <!-- SIDEBAR -->
-        <aside class="prosix-sidebar">
+        <!-- MOBILE TOPBAR -->
+        <div class="mobile-topbar">
+            <div class="mobile-logo">
+                <div class="logo-icon">P</div>
+                <span>Prosixflow</span>
+            </div>
+            <button class="hamburger-btn" @click="sidebarOpen = true">
+                <i class="fa-solid fa-bars"></i>
+            </button>
+        </div>
 
-            <!-- LOGO -->
+        <!-- OVERLAY -->
+        <div
+            class="sidebar-overlay"
+            :class="{ open: sidebarOpen }"
+            @click="sidebarOpen = false"
+        ></div>
+
+        <!-- SIDEBAR -->
+        <aside class="prosix-sidebar" :class="{ 'sidebar-open': sidebarOpen }">
+
+            <button class="sidebar-close-btn" @click="sidebarOpen = false">
+                <i class="fa-solid fa-xmark"></i>
+            </button>
+
             <div class="sidebar-logo">
                 <div class="logo-icon">P</div>
-
                 <div>
                     <h5>Prosixflow</h5>
                     <small>Work Management</small>
                 </div>
             </div>
 
-            <!-- USER -->
             <div class="user-card" @click="openProfile">
-
                 <div class="user-avatar" :class="{ 'has-photo': userPhoto }">
-
-                    <img
-                        v-if="userPhoto"
-                        :src="userPhoto"
-                        class="user-avatar-img"
-                        alt="Profile"
-                    />
-
-                    <span v-else>
-                        {{ userInitial }}
-                    </span>
+                    <img v-if="userPhoto" :src="userPhoto" class="user-avatar-img" alt="Profile" />
+                    <span v-else>{{ userInitial }}</span>
                 </div>
-
                 <div class="user-info">
-                    <div class="user-name">
-                        {{ user?.name || 'User' }}
-                    </div>
-
-                    <div class="user-role">
-                        {{ formatRole(user?.role) }}
-                    </div>
+                    <div class="user-name">{{ user?.name || 'User' }}</div>
+                    <div class="user-role">{{ formatRole(user?.role) }}</div>
                 </div>
-
                 <i class="fa-solid fa-pen edit-profile-icon"></i>
             </div>
 
-            <!-- NAV -->
             <nav class="sidebar-nav">
-
-                <!-- DASHBOARD -->
                 <router-link
                     to="/dashboard"
                     class="nav-link-custom"
                     :class="{ active: $route.path === '/dashboard' }"
+                    @click="sidebarOpen = false"
                 >
-                    <span class="nav-icon">
-                        <i class="fa-solid fa-house"></i>
-                    </span>
-
+                    <span class="nav-icon"><i class="fa-solid fa-house"></i></span>
                     <span>Home</span>
                 </router-link>
 
-                <!-- ORDERS -->
                 <router-link
                     to="/orders"
                     class="nav-link-custom"
                     :class="{ active: $route.path.startsWith('/orders') }"
-                    @click="clearOrderBadge"
+                    @click="clearOrderBadge(); sidebarOpen = false"
                 >
-                    <span class="nav-icon">
-                        <i class="fa-solid fa-clipboard-list"></i>
-                    </span>
-
+                    <span class="nav-icon"><i class="fa-solid fa-clipboard-list"></i></span>
                     <span>All Orders</span>
-
-                    <!-- NOTIFICATION -->
-                    <span
-                        v-if="showOrderBadge"
-                        class="order-badge"
-                    >
-                        {{ orderNotificationCount }}
-                    </span>
+                    <span v-if="showOrderBadge" class="order-badge">{{ orderNotificationCount }}</span>
                 </router-link>
 
-                <!-- MEMBERS -->
                 <router-link
                     v-if="isSuperAdmin || isAdmin"
                     to="/members"
                     class="nav-link-custom"
                     :class="{ active: $route.path === '/members' }"
+                    @click="sidebarOpen = false"
                 >
-                    <span class="nav-icon">
-                        <i class="fa-solid fa-users"></i>
-                    </span>
-
+                    <span class="nav-icon"><i class="fa-solid fa-users"></i></span>
                     <span>Members</span>
                 </router-link>
-
             </nav>
 
-            <!-- LOGOUT -->
             <div class="sidebar-bottom">
-
                 <button @click="logout" class="logout-btn">
-
                     <i class="fa-solid fa-right-from-bracket"></i>
-
                     Logout
                 </button>
-
             </div>
 
         </aside>
@@ -118,113 +95,39 @@
         </main>
 
         <!-- PROFILE MODAL -->
-        <div
-            v-if="profileModal"
-            class="profile-modal-overlay"
-            @click.self="closeProfile"
-        >
-
+        <div v-if="profileModal" class="profile-modal-overlay" @click.self="closeProfile">
             <div class="profile-modal">
-
-                <button
-                    class="profile-close"
-                    @click="closeProfile"
-                >
+                <button class="profile-close" @click="closeProfile">
                     <i class="fa-solid fa-xmark"></i>
                 </button>
-
                 <h4>Edit Profile</h4>
-
-                <p class="profile-subtitle">
-                    Update your Prosix profile
-                </p>
-
-                <!-- PHOTO -->
+                <p class="profile-subtitle">Update your Prosix profile</p>
                 <div class="profile-photo-wrap">
-
-                    <img
-                        v-if="profileForm.preview"
-                        :src="profileForm.preview"
-                        class="profile-photo"
-                    />
-
-                    <div
-                        v-else
-                        class="profile-photo-empty"
-                    >
-                        {{ userInitial }}
-                    </div>
-
+                    <img v-if="profileForm.preview" :src="profileForm.preview" class="profile-photo" />
+                    <div v-else class="profile-photo-empty">{{ userInitial }}</div>
                 </div>
-
-                <input
-                    type="file"
-                    accept="image/*"
-                    class="profile-file"
-                    @change="onProfilePhotoChange"
-                />
-
-                <!-- NAME -->
+                <input type="file" accept="image/*" class="profile-file" @change="onProfilePhotoChange" />
                 <div class="profile-field">
                     <label>Name</label>
-
-                    <input
-                        v-model="profileForm.name"
-                        type="text"
-                    />
+                    <input v-model="profileForm.name" type="text" />
                 </div>
-
-                <!-- EMAIL -->
                 <div class="profile-field">
                     <label>Email</label>
-
-                    <input
-                        :value="user?.email || ''"
-                        readonly
-                    />
+                    <input :value="user?.email || ''" readonly />
                 </div>
-
-                <!-- ROLE -->
                 <div class="profile-field">
                     <label>Role</label>
-
-                    <input
-                        :value="formatRole(user?.role)"
-                        readonly
-                    />
+                    <input :value="formatRole(user?.role)" readonly />
                 </div>
-
-                <!-- ABOUT -->
                 <div class="profile-field">
                     <label>About</label>
-
-                    <textarea
-                        v-model="profileForm.about"
-                        rows="4"
-                        placeholder="Write something about yourself..."
-                    ></textarea>
+                    <textarea v-model="profileForm.about" rows="4" placeholder="Write something about yourself..."></textarea>
                 </div>
-
-                <!-- SAVE -->
-                <button
-                    class="profile-save-btn"
-                    @click="saveProfile"
-                    :disabled="savingProfile"
-                >
-
-                    <span v-if="savingProfile">
-                        <i class="fa-solid fa-spinner fa-spin"></i>
-                        Saving...
-                    </span>
-
-                    <span v-else>
-                        Save Profile
-                    </span>
-
+                <button class="profile-save-btn" @click="saveProfile" :disabled="savingProfile">
+                    <span v-if="savingProfile"><i class="fa-solid fa-spinner fa-spin"></i> Saving...</span>
+                    <span v-else>Save Profile</span>
                 </button>
-
             </div>
-
         </div>
 
     </div>
@@ -234,19 +137,14 @@
 import axios from 'axios'
 
 export default {
-
     name: 'AppLayout',
 
     data() {
-
         return {
-
+            sidebarOpen: false,
             profileModal: false,
-
             savingProfile: false,
-
             orderNotificationCount: 0,
-
             profileForm: {
                 name: '',
                 about: '',
@@ -257,247 +155,117 @@ export default {
     },
 
     computed: {
-
         user() {
-
             try {
-
-                const user = localStorage.getItem('user')
-
-                return user
-                    ? JSON.parse(user)
-                    : null
-
-            } catch (e) {
-
-                return null
-            }
+                return JSON.parse(localStorage.getItem('user'))
+            } catch { return null }
         },
-
         userInitial() {
             return this.user?.name?.charAt(0).toUpperCase() || 'U'
         },
-
         userPhoto() {
             return this.user?.profile_photo_url || null
         },
-
         isSuperAdmin() {
             return this.user?.role === 'super_admin'
         },
-
         isAdmin() {
             return this.user?.role === 'admin'
         },
-
-        // ONLY MEMBERS SEE BADGE
         showOrderBadge() {
-
-            return !this.isSuperAdmin
-                && !this.isAdmin
-                && this.orderNotificationCount > 0
+            return !this.isSuperAdmin && !this.isAdmin && this.orderNotificationCount > 0
         }
     },
 
     mounted() {
-
         this.loadOrderNotificationCount()
     },
 
     watch: {
-
         '$route.path'(newPath) {
-
+            this.sidebarOpen = false
             if (newPath.startsWith('/orders')) {
-
                 this.clearOrderBadge()
-
             } else {
-
                 this.loadOrderNotificationCount()
             }
         }
     },
 
     methods: {
-
         headers() {
-
             return {
-
                 Authorization: `Bearer ${localStorage.getItem('token')}`,
-
                 Accept: 'application/json'
             }
         },
 
-        // LOAD ORDER BADGE
         async loadOrderNotificationCount() {
-
-            // ADMIN NO BADGE
-            if (this.isSuperAdmin || this.isAdmin) {
-
-                this.orderNotificationCount = 0
-
-                return
-            }
-
-            // OPENED ORDERS PAGE
-            if (this.$route.path.startsWith('/orders')) {
-
-                this.orderNotificationCount = 0
-
-                return
-            }
-
+            if (this.isSuperAdmin || this.isAdmin) { this.orderNotificationCount = 0; return }
+            if (this.$route.path.startsWith('/orders')) { this.orderNotificationCount = 0; return }
             try {
-
-                const res = await axios.get('/api/orders', {
-                    headers: this.headers()
-                })
-
-                const orders = Array.isArray(res.data)
-                    ? res.data
-                    : (res.data?.data || [])
-
-                // UNREAD ORDERS
-                this.orderNotificationCount = orders.filter(order => {
-                    return !order.user_has_seen
-                }).length
-
-            } catch (e) {
-
-                console.error('Order badge error:', e)
-            }
+                const res = await axios.get('/api/orders', { headers: this.headers() })
+                const orders = Array.isArray(res.data) ? res.data : (res.data?.data || [])
+                this.orderNotificationCount = orders.filter(o => !o.user_has_seen).length
+            } catch (e) { console.error(e) }
         },
 
-        // CLEAR BADGE
-        clearOrderBadge() {
-
-            this.orderNotificationCount = 0
-        },
+        clearOrderBadge() { this.orderNotificationCount = 0 },
 
         formatRole(role) {
-
             if (!role) return 'Member'
-
-            return role
-                .replace('_', ' ')
-                .replace(/\b\w/g, c => c.toUpperCase())
+            return role.replace('_', ' ').replace(/\b\w/g, c => c.toUpperCase())
         },
 
         openProfile() {
-
             this.profileForm = {
-
                 name: this.user?.name || '',
-
                 about: this.user?.about || '',
-
                 profile_photo: null,
-
                 preview: this.user?.profile_photo_url || ''
             }
-
             this.profileModal = true
         },
 
-        closeProfile() {
-
-            this.profileModal = false
-        },
+        closeProfile() { this.profileModal = false },
 
         onProfilePhotoChange(event) {
-
             const file = event.target.files?.[0]
-
             if (!file) return
-
             this.profileForm.profile_photo = file
-
             this.profileForm.preview = URL.createObjectURL(file)
         },
 
         async saveProfile() {
-
             this.savingProfile = true
-
             const form = new FormData()
-
             form.append('name', this.profileForm.name || '')
-
             form.append('about', this.profileForm.about || '')
-
             if (this.profileForm.profile_photo) {
-
-                form.append(
-                    'profile_photo',
-                    this.profileForm.profile_photo
-                )
+                form.append('profile_photo', this.profileForm.profile_photo)
             }
-
             try {
-
-                const res = await axios.post(
-                    '/api/me/profile',
-                    form,
-                    {
-                        headers: {
-                            ...this.headers(),
-                            'Content-Type': 'multipart/form-data'
-                        }
-                    }
-                )
-
+                const res = await axios.post('/api/me/profile', form, {
+                    headers: { ...this.headers(), 'Content-Type': 'multipart/form-data' }
+                })
                 const updatedUser = res.data?.user || res.data
-
-                if (updatedUser) {
-
-                    localStorage.setItem(
-                        'user',
-                        JSON.stringify(updatedUser)
-                    )
-                }
-
+                if (updatedUser) localStorage.setItem('user', JSON.stringify(updatedUser))
                 this.closeProfile()
-
                 window.location.reload()
-
             } catch (e) {
-
                 console.error(e)
-
-                alert(
-                    e.response?.data?.message
-                    || 'Profile save failed'
-                )
-
+                alert(e.response?.data?.message || 'Profile save failed')
             } finally {
-
                 this.savingProfile = false
             }
         },
 
         async logout() {
-
             try {
-
-                await axios.post(
-                    '/api/logout',
-                    {},
-                    {
-                        headers: this.headers()
-                    }
-                )
-
-            } catch (e) {
-
-                console.error(e)
-            }
-
+                await axios.post('/api/logout', {}, { headers: this.headers() })
+            } catch (e) { console.error(e) }
             localStorage.removeItem('token')
             localStorage.removeItem('user')
-
             this.$router.push('/login')
         }
     }
@@ -505,12 +273,15 @@ export default {
 </script>
 
 <style scoped>
+*, *::before, *::after { box-sizing: border-box; }
+
 .prosix-layout {
     min-height: 100vh;
     display: flex;
     background: #f6f7fb;
 }
 
+/* ─── SIDEBAR ─── */
 .prosix-sidebar {
     width: 250px;
     min-height: 100vh;
@@ -522,8 +293,8 @@ export default {
     display: flex;
     flex-direction: column;
     border-right: 1px solid rgba(255,255,255,0.08);
-    box-shadow: 8px 0 24px rgba(0,0,0,0.15);
     z-index: 1000;
+    transition: left 0.25s ease;
 }
 
 .sidebar-logo {
@@ -547,19 +318,11 @@ export default {
     justify-content: center;
     font-size: 18px;
     font-weight: 900;
+    flex-shrink: 0;
 }
 
-.sidebar-logo h5 {
-    margin: 0;
-    font-size: 18px;
-    font-weight: 900;
-    color: #fff;
-}
-
-.sidebar-logo small {
-    color: #9aa0b8;
-    font-size: 11px;
-}
+.sidebar-logo h5 { margin: 0; font-size: 18px; font-weight: 900; color: #fff; }
+.sidebar-logo small { color: #9aa0b8; font-size: 11px; }
 
 .user-card {
     margin: 16px;
@@ -572,65 +335,25 @@ export default {
     gap: 10px;
     cursor: pointer;
 }
-
-.user-card:hover {
-    background: rgba(255,255,255,0.1);
-}
+.user-card:hover { background: rgba(255,255,255,0.1); }
 
 .user-avatar {
-    width: 42px;
-    height: 42px;
+    width: 42px; height: 42px;
     border-radius: 50%;
-    background: #fff;
-    color: #000;
-    font-size: 15px;
-    font-weight: 900;
-    display: flex;
-    align-items: center;
-    justify-content: center;
+    background: #fff; color: #000;
+    font-size: 15px; font-weight: 900;
+    display: flex; align-items: center; justify-content: center;
     flex-shrink: 0;
 }
+.user-avatar.has-photo { overflow: hidden; }
+.user-avatar-img { width: 100%; height: 100%; object-fit: cover; border-radius: 50%; }
 
-.user-avatar.has-photo {
-    overflow: hidden;
-}
+.user-info { overflow: hidden; flex: 1; }
+.user-name { font-size: 14px; font-weight: 800; color: #fff; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.user-role { font-size: 11px; color: #9aa0b8; margin-top: 2px; }
+.edit-profile-icon { font-size: 12px; color: #9aa0b8; }
 
-.user-avatar-img {
-    width: 100%;
-    height: 100%;
-    object-fit: cover;
-    border-radius: 50%;
-}
-
-.user-info {
-    overflow: hidden;
-    flex: 1;
-}
-
-.user-name {
-    font-size: 14px;
-    font-weight: 800;
-    color: #fff;
-    white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
-}
-
-.user-role {
-    font-size: 11px;
-    color: #9aa0b8;
-    margin-top: 2px;
-}
-
-.edit-profile-icon {
-    font-size: 12px;
-    color: #9aa0b8;
-}
-
-.sidebar-nav {
-    padding: 4px 12px;
-    flex: 1;
-}
+.sidebar-nav { padding: 4px 12px; flex: 1; }
 
 .nav-link-custom {
     height: 46px;
@@ -647,22 +370,16 @@ export default {
     transition: 0.18s ease;
     position: relative;
 }
+.nav-link-custom:hover { background: rgba(255,255,255,0.08); color: #fff; }
+.nav-link-custom.active { background: #fff; color: #000; }
+.nav-icon { width: 22px; display: inline-flex; justify-content: center; }
 
-.nav-link-custom:hover {
-    background: rgba(255,255,255,0.08);
-    color: #fff;
-    transform: translateX(3px);
-}
-
-.nav-link-custom.active {
-    background: #fff;
-    color: #000;
-}
-
-.nav-icon {
-    width: 22px;
-    display: inline-flex;
-    justify-content: center;
+.order-badge {
+    margin-left: auto;
+    background: #fff; color: #000;
+    border-radius: 999px;
+    font-size: 11px; font-weight: 900;
+    padding: 2px 8px;
 }
 
 .sidebar-bottom {
@@ -671,162 +388,149 @@ export default {
 }
 
 .logout-btn {
-    width: 100%;
-    height: 44px;
+    width: 100%; height: 44px;
     border: 1px solid rgba(255,255,255,0.12);
     background: rgba(255,255,255,0.05);
+    color: #fff; border-radius: 12px;
+    font-size: 14px; font-weight: 800;
+    display: flex; align-items: center; justify-content: center;
+    gap: 8px; cursor: pointer;
+}
+.logout-btn:hover { background: #fff; color: #000; }
+
+.sidebar-close-btn {
+    display: none;
+    position: absolute;
+    top: 12px; right: 12px;
+    background: rgba(255,255,255,0.1);
+    border: 1px solid rgba(255,255,255,0.15);
     color: #fff;
-    border-radius: 12px;
-    font-size: 14px;
-    font-weight: 800;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    gap: 8px;
-    cursor: pointer;
+    width: 32px; height: 32px;
+    border-radius: 8px;
+    font-size: 14px; cursor: pointer;
+    align-items: center; justify-content: center;
+    z-index: 10;
 }
 
-.logout-btn:hover {
-    background: #fff;
-    color: #000;
-}
-
+/* ─── MAIN ─── */
 .prosix-main {
     margin-left: 250px;
     flex: 1;
     min-height: 100vh;
     background: #f6f7fb;
+    min-width: 0;
 }
 
-/* Profile Modal */
-.profile-modal-overlay {
+/* ─── MOBILE TOPBAR ─── */
+.mobile-topbar {
+    display: none;
     position: fixed;
-    inset: 0;
+    top: 0; left: 0; right: 0;
+    height: 56px;
+    background: linear-gradient(180deg, #0f1117 0%, #181b25 100%);
+    color: #fff;
+    z-index: 999;
+    align-items: center;
+    justify-content: space-between;
+    padding: 0 16px;
+    border-bottom: 1px solid rgba(255,255,255,0.08);
+}
+
+.mobile-logo {
+    display: flex; align-items: center; gap: 10px;
+    font-size: 16px; font-weight: 900;
+}
+
+.hamburger-btn {
+    background: rgba(255,255,255,0.1);
+    border: 1px solid rgba(255,255,255,0.15);
+    color: #fff;
+    width: 38px; height: 38px;
+    border-radius: 10px;
+    font-size: 16px; cursor: pointer;
+    display: flex; align-items: center; justify-content: center;
+}
+
+.sidebar-overlay {
+    display: none;
+    position: fixed; inset: 0;
+    background: rgba(0,0,0,0.55);
+    z-index: 999;
+}
+.sidebar-overlay.open { display: block; }
+
+/* ─── PROFILE MODAL ─── */
+.profile-modal-overlay {
+    position: fixed; inset: 0;
     background: rgba(0,0,0,0.55);
     z-index: 99999;
-    display: flex;
-    align-items: center;
-    justify-content: center;
+    display: flex; align-items: center; justify-content: center;
+    padding: 16px;
 }
 
 .profile-modal {
-    width: 430px;
-    max-width: calc(100vw - 30px);
-    background: #fff;
-    border-radius: 20px;
-    padding: 26px;
-    position: relative;
+    width: 430px; max-width: 100%;
+    max-height: 90vh; overflow-y: auto;
+    background: #fff; border-radius: 20px;
+    padding: 26px; position: relative;
     box-shadow: 0 30px 90px rgba(0,0,0,0.35);
 }
 
-.profile-modal h4 {
-    margin: 0;
-    font-size: 24px;
-    font-weight: 900;
-    color: #000;
-    text-align: center;
-}
-
-.profile-subtitle {
-    margin: 6px 0 18px;
-    color: #6b7280;
-    text-align: center;
-    font-size: 13px;
-}
+.profile-modal h4 { margin: 0; font-size: 24px; font-weight: 900; color: #000; text-align: center; }
+.profile-subtitle { margin: 6px 0 18px; color: #6b7280; text-align: center; font-size: 13px; }
 
 .profile-close {
-    position: absolute;
-    right: 16px;
-    top: 16px;
-    border: none;
-    background: #f3f4f6;
-    width: 34px;
-    height: 34px;
-    border-radius: 10px;
+    position: absolute; right: 16px; top: 16px;
+    border: none; background: #f3f4f6;
+    width: 34px; height: 34px; border-radius: 10px; cursor: pointer;
 }
 
-.profile-photo-wrap {
-    display: flex;
-    justify-content: center;
-    margin-bottom: 12px;
-}
+.profile-photo-wrap { display: flex; justify-content: center; margin-bottom: 12px; }
 
 .profile-photo,
 .profile-photo-empty {
-    width: 92px;
-    height: 92px;
-    border-radius: 50%;
-    object-fit: cover;
-    background: #000;
-    color: #fff;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    font-size: 30px;
-    font-weight: 900;
+    width: 92px; height: 92px; border-radius: 50%;
+    object-fit: cover; background: #000; color: #fff;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 30px; font-weight: 900;
 }
 
-.profile-file {
-    width: 100%;
-    margin-bottom: 16px;
-}
+.profile-file { width: 100%; margin-bottom: 16px; }
 
-.profile-field {
-    margin-bottom: 14px;
-}
-
-.profile-field label {
-    display: block;
-    margin-bottom: 6px;
-    color: #111;
-    font-size: 13px;
-    font-weight: 900;
-}
-
+.profile-field { margin-bottom: 14px; }
+.profile-field label { display: block; margin-bottom: 6px; color: #111; font-size: 13px; font-weight: 900; }
 .profile-field input,
 .profile-field textarea {
-    width: 100%;
-    border: 1.5px solid #d1d5db;
-    border-radius: 10px;
-    padding: 10px 12px;
-    color: #111;
-    font-size: 14px;
-    font-weight: 600;
-    outline: none;
+    width: 100%; border: 1.5px solid #d1d5db; border-radius: 10px;
+    padding: 10px 12px; color: #111; font-size: 14px; font-weight: 600; outline: none;
 }
-
 .profile-field input:focus,
-.profile-field textarea:focus {
-    border-color: #000;
-    box-shadow: 0 0 0 4px rgba(0,0,0,0.08);
-}
-
-.profile-field input[readonly] {
-    background: #f3f4f6;
-}
+.profile-field textarea:focus { border-color: #000; box-shadow: 0 0 0 4px rgba(0,0,0,0.08); }
+.profile-field input[readonly] { background: #f3f4f6; }
 
 .profile-save-btn {
-    width: 100%;
-    height: 46px;
-    border: none;
-    background: #000;
-    color: #fff;
-    border-radius: 12px;
-    font-size: 14px;
-    font-weight: 900;
+    width: 100%; height: 46px; border: none;
+    background: #000; color: #fff; border-radius: 12px;
+    font-size: 14px; font-weight: 900; cursor: pointer;
 }
+.profile-save-btn:disabled { opacity: 0.65; }
 
-.profile-save-btn:disabled {
-    opacity: 0.65;
-}
-
+/* ─── RESPONSIVE ─── */
 @media (max-width: 768px) {
+    .mobile-topbar { display: flex; }
+    .sidebar-close-btn { display: flex; }
+
     .prosix-sidebar {
-        width: 220px;
+        left: -260px;
+        width: 250px;
+        z-index: 1001;
     }
+    .prosix-sidebar.sidebar-open { left: 0; }
 
     .prosix-main {
-        margin-left: 220px;
+        margin-left: 0;
+        width: 100%;
+        padding-top: 56px;
     }
 }
 </style>
