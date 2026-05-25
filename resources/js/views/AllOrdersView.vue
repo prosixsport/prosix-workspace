@@ -140,11 +140,20 @@
               {{ selectedOrder.shipDate }}
               <i class="fa-solid fa-calendar-days" style="font-size:11px;margin-left:4px;color:black"></i>
             </span>
-            <div v-if="showDatePicker" class="date-dropdown">
-              <div class="date-dropdown-header">Select Ship Date</div>
-              <input type="date" class="date-input" :value="selectedOrder.shipDateRaw" @change="updateShipDate($event)" />
-              <button class="date-clear-btn" @click="showDatePicker = false">Close</button>
-            </div>
+         <div v-if="showDatePicker" class="date-dropdown">
+  <div class="date-dropdown-header">Select Ship Date</div>
+
+  <input
+    type="date"
+    class="date-input"
+    :value="selectedOrder.shipDateRaw"
+    @change="updateShipDate($event)"
+  />
+
+  <button class="date-clear-btn" @click="showDatePicker = false">
+    Close
+  </button>
+</div>
           </div>
           <div class="detail-info-item" style="position:relative" @click.stop>
             <span class="info-label">Status :</span>
@@ -1388,15 +1397,25 @@ openPreviewFile(file) {
 .date-dropdown {
   z-index: 99999 !important;
 }
+.date-dropdown {
+  width: 260px !important;
+}
 
+.date-clear-btn {
+  width: 100% !important;
+  margin-top: 10px;
+  display: block;
+}
 .detail-body,
 .cards-area,
 .cards-grid {
   overflow: visible !important;
 }
+
 /* ===========================
    MOBILE TOPBAR
    =========================== */
+
 .mobile-topbar {
   display: none;
   position: fixed;
