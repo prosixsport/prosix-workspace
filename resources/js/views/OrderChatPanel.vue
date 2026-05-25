@@ -201,9 +201,8 @@
       </div>
       <div class="chat-input-hint">Enter to send · @ to tag · Click member to auto-tag</div>
     </div>
-
-    <!-- DELETE MODAL -->
-    <div v-if="deleteTarget" class="delete-modal-overlay" @click.self="deleteTarget = null">
+            <!-- DELETE MODAL -->
+    <div v-if="deleteTarget" class="delete-modal-overlay" @click.sel   f="deleteTarget = null">
       <div class="delete-modal">
         <div class="delete-modal-title">Delete message?</div>
         <button class="delete-modal-option" @click="deleteForMe">Delete for me</button>

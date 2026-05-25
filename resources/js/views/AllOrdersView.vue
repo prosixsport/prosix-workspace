@@ -127,10 +127,9 @@
         </div>
       </div>
 
-      <!-- INFO BAR -->
  <!-- INFO BAR -->
-<div class="detail-topbar-wrapper" style="overflow-x:auto; -webkit-overflow-scrolling:touch; background:#fff; width:100%; display:block;">
-  <div class="detail-topbar table-border" style="display:flex; flex-wrap:nowrap; width:max-content; min-width:100%;">
+<div class="detail-topbar-wrapper">
+      <div class="detail-topbar table-border" style="display:flex; flex-wrap:nowrap; width:max-content; min-width:100%;">
           <div class="detail-info-item">
             <span class="info-label">P.o #</span>
             <span class="info-value">{{ selectedOrder.po }}</span>
@@ -1116,7 +1115,7 @@ openPreviewFile(file) {
         status_color: status?.color || '#fdab3d', trk: this.newOrder.trk || 'N/A',
         payment: this.newOrder.payment || '0 % Paid'
       }
-      
+
       try {
         let res
         if (this.editingOrderId) res = await axios.put(`/api/orders/${this.editingOrderId}`, payload, { headers: this.headers() })
@@ -1370,6 +1369,31 @@ openPreviewFile(file) {
 </script>
 
 <style scoped>
+.detail-topbar-wrapper {
+  overflow: visible !important;
+  position: relative;
+  z-index: 9999;
+  background: #fff;
+  width: 100%;
+}
+
+.detail-topbar,
+.detail-info-item {
+  overflow: visible !important;
+}
+
+.status-dropdown,
+.tracking-dropdown,
+.payment-dropdown,
+.date-dropdown {
+  z-index: 99999 !important;
+}
+
+.detail-body,
+.cards-area,
+.cards-grid {
+  overflow: visible !important;
+}
 /* ===========================
    MOBILE TOPBAR
    =========================== */
