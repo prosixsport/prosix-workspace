@@ -11,10 +11,13 @@ return Application::configure(basePath: dirname(__DIR__))
         commands: __DIR__.'/../routes/console.php',
         health: '/up',
     )
-    ->withMiddleware(function (Middleware $middleware) {
-        // ✅ Sanctum middleware hata do — simple token auth use hoga
-        $middleware->validateCsrfTokens(except: ['api/*']);
-    })
+   ->withMiddleware(function (Middleware $middleware) {
+    $middleware->validateCsrfTokens(except: ['api/*']);
+
+    $middleware->alias([
+        'superadmin' => \App\Http\Middleware\SuperAdminMiddleware::class,
+    ]);
+})
     ->withExceptions(function (Exceptions $exceptions) {
         //
     })->create();

@@ -78,6 +78,30 @@
                     <span class="nav-icon"><i class="fa-solid fa-users"></i></span>
                     <span>Members</span>
                 </router-link>
+
+
+                <router-link
+    v-if="isSuperAdmin"
+    to="/clients"
+    class="nav-link-custom"
+    :class="{ active: $route.path.startsWith('/clients') }"
+    @click="sidebarOpen = false"
+>
+    <span class="nav-icon"><i class="fa-solid fa-user-tie"></i></span>
+    <span>Clients</span>
+</router-link>
+
+<router-link
+    v-if="isSuperAdmin"
+    to="/invoices"
+    class="nav-link-custom"
+    :class="{ active: $route.path.startsWith('/invoices') }"
+    @click="sidebarOpen = false"
+>
+    <span class="nav-icon"><i class="fa-solid fa-file-invoice-dollar"></i></span>
+    <span>Invoices</span>
+</router-link>
+
             </nav>
 
             <div class="sidebar-bottom">

@@ -7,6 +7,8 @@ use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\OrderController;
 use App\Http\Controllers\OrderChatController;
 use App\Http\Controllers\OrderFileController;
+use App\Http\Controllers\ClientController;
+use App\Http\Controllers\InvoiceController;
 use Illuminate\Support\Facades\Route;
 
 Route::get('/dashboard', [DashboardController::class, 'index']);
@@ -64,4 +66,11 @@ Route::get('/orders/{order}/read-info', [OrderController::class, 'readInfo']);
     Route::post('/orders/{order}/files', [OrderFileController::class, 'store']);
     Route::post('/orders/{order}/chat-files', [OrderFileController::class, 'storeChatFile']);
     Route::delete('/order-files/{file}', [OrderFileController::class, 'destroy']);
+
+
+
+    Route::middleware('superadmin')->group(function () {
+    Route::apiResource('clients', ClientController::class);
+    Route::apiResource('invoices', InvoiceController::class);
+});
 });
