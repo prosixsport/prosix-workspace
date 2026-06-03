@@ -29,12 +29,12 @@
                         </thead>
                         <tbody>
                             <tr v-for="client in clients" :key="client.id">
-                                <td>{{ client.name }}</td>
-                                <td>{{ client.email || '-' }}</td>
-                                <td>{{ client.phone || '-' }}</td>
-                                <td>{{ client.company || '-' }}</td>
-                                <td><span class="badge">{{ client.status }}</span></td>
-                                <td>
+                                <td data-label="Name">{{ client.name }}</td>
+                                <td data-label="Email">{{ client.email || '-' }}</td>
+                                <td data-label="Phone">{{ client.phone || '-' }}</td>
+                                <td data-label="Company">{{ client.company || '-' }}</td>
+                                <td data-label="Status"><span class="badge">{{ client.status }}</span></td>
+                                <td data-label="Action">
                                     <button class="icon-btn" @click="openModal(client)">
                                         <i class="fa-solid fa-pen"></i>
                                     </button>
@@ -240,4 +240,26 @@ textarea { min-height: 80px; resize: vertical; }
     .head { flex-direction: column; align-items: stretch; }
     .add-btn { width: 100%; }
 }
+
+/* MOBILE RESPONSIVE TABLE CARDS */
+@media (max-width: 768px) {
+    .page { padding: 14px; }
+    .head { flex-direction: column; align-items: stretch; gap: 12px; }
+    .head h2 { font-size: 24px; }
+    .add-btn { width: 100%; display: flex; justify-content: center; align-items: center; gap: 8px; }
+    .card { background: transparent; border: none; border-radius: 0; overflow: visible; }
+    .table-wrap { overflow: visible; }
+    table, thead, tbody, tr, th, td { display: block; width: 100%; min-width: 0; }
+    table { min-width: 0; }
+    thead { display: none; }
+    tr { background: #fff; border: 1px solid #e5e7eb; border-radius: 16px; padding: 14px; margin-bottom: 12px; box-shadow: 0 8px 22px rgba(0,0,0,.04); }
+    td { border-bottom: none; padding: 9px 0; display: flex; justify-content: space-between; align-items: flex-start; gap: 12px; font-size: 13px; word-break: break-word; }
+    td::before { content: attr(data-label); font-weight: 900; color: #6b7280; flex-shrink: 0; min-width: 84px; }
+    td[data-label="Action"] { justify-content: flex-end; padding-top: 14px; border-top: 1px solid #f1f1f1; margin-top: 6px; }
+    td[data-label="Action"]::before { display: none; }
+    .icon-btn { width: 40px; height: 40px; }
+    .modal-overlay { align-items: flex-start; overflow-y: auto; padding: 12px; }
+    .client-modal-box { width: 100%; max-width: 100%; margin-top: 10px; border-radius: 18px; padding: 18px; }
+}
+
 </style>
