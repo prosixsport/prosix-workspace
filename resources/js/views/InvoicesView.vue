@@ -12,6 +12,19 @@
                 </button>
             </div>
 
+            <!-- MONTH WISE INVOICE CARDS -->
+            <div v-if="monthlyCards.length" class="month-cards">
+                <div v-for="m in monthlyCards" :key="m.key" class="month-card">
+                    <div class="month-top">
+                        <span>{{ m.label }}</span>
+                        <i class="fa-solid fa-dollar-sign"></i>
+                    </div>
+
+                    <strong>Rs {{ money(m.total) }}</strong>
+                    <small>{{ m.count }} invoices</small>
+                </div>
+            </div>
+
             <div class="card">
                 <div v-if="loading" class="empty">Loading...</div>
                 <div v-else-if="invoices.length === 0" class="empty">No invoices yet.</div>
@@ -398,6 +411,34 @@ export default {
         total() {
             return this.subtotal + Number(this.form.tax || 0) - Number(this.form.discount || 0)
         },
+
+        monthlyCards() {
+            const groups = {}
+
+            this.invoices.forEach(inv => {
+                const d = new Date(inv.created_at || inv.due_date)
+                if (isNaN(d)) return
+
+                const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`
+
+                if (!groups[key]) {
+                    groups[key] = {
+                        key,
+                        label: d.toLocaleString('en-US', {
+                            month: 'short',
+                            year: 'numeric',
+                        }),
+                        total: 0,
+                        count: 0,
+                    }
+                }
+
+                groups[key].total += Number(inv.total || 0)
+                groups[key].count += 1
+            })
+
+            return Object.values(groups).sort((a, b) => b.key.localeCompare(a.key))
+        },
     },
 
     mounted() {
@@ -663,6 +704,59 @@ th { background:#fafafa; color:#6b7280; font-size:12px; text-transform:uppercase
 .badge { background:#111; color:#fff; border-radius:999px; padding:5px 10px; font-size:11px; font-weight:800; }
 .empty { padding:40px; text-align:center; color:#6b7280; }
 .actions { display:flex; justify-content:flex-end; gap:8px; }
+
+/* MONTH WISE CARDS */
+.month-cards {
+    display: flex;
+    gap: 14px;
+    overflow-x: auto;
+    padding-bottom: 14px;
+    margin-bottom: 16px;
+    scrollbar-width: thin;
+}
+
+.month-card {
+    min-width: 170px;
+    background: #fff;
+    border: 1.5px solid #2563eb;
+    border-radius: 14px;
+    padding: 14px;
+    box-shadow: 0 12px 28px rgba(0,0,0,.08);
+    flex-shrink: 0;
+}
+
+.month-top {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    color: #4b5563;
+    font-size: 14px;
+}
+
+.month-top i {
+    width: 34px;
+    height: 34px;
+    border-radius: 50%;
+    border: 1px solid #e5e7eb;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: #2563eb;
+}
+
+.month-card strong {
+    display: block;
+    margin-top: 10px;
+    font-size: 24px;
+    color: #111;
+}
+
+.month-card small {
+    display: block;
+    margin-top: 4px;
+    color: #9ca3af;
+}
+
 .text-end { text-align:right; }
 .action-btn { width:34px; height:34px; border:none; border-radius:10px; display:inline-flex; align-items:center; justify-content:center; cursor:pointer; font-size:13px; }
 .action-btn.edit { background:#dcfce7; color:#15803d; }
@@ -774,6 +868,8 @@ textarea { min-height:80px; resize:vertical; }
     .invoice-title,.invoice-meta,.signature { text-align:left; }
     .summary { width:100%; }
     .invoice-title h1 { font-size:36px; }
+    .month-card { min-width:145px; }
+    .month-card strong { font-size:20px; }
 }
 
 /* MOBILE RESPONSIVE TABLE CARDS */
