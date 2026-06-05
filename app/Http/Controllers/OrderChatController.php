@@ -14,12 +14,59 @@ class OrderChatController extends Controller
 
         $userId = auth()->id();
 
-        $messages = OrderMessage::with('user')
+        $messages = OrderMessage::with([
+                'user:id,name,email,profile_photo',
+                'reads.user:id,name,email,profile_photo'
+            ])
             ->where('order_id', $order->id)
             ->oldest()
             ->get()
             ->filter(function ($msg) use ($userId) {
                 return !in_array($userId, $msg->deleted_for ?? []);
+            })
+            ->map(function ($msg) use ($userId) {
+
+                $reads = $msg->reads
+                    ->filter(function ($read) use ($msg) {
+                        return (int) $read->user_id !== (int) $msg->user_id;
+                    })
+                    ->map(function ($read) {
+                        return [
+                            'user_id' => $read->user_id,
+                            'name' => $read->user?->name,
+                            'email' => $read->user?->email,
+                            'profile_photo_url' => $read->user?->profile_photo_url,
+                            'read_at' => $read->read_at
+                                ? $read->read_at->format('M d, Y h:i A')
+                                : null,
+                        ];
+                    })
+                    ->values();
+
+                return [
+                    'id' => $msg->id,
+                    'order_id' => $msg->order_id,
+                    'user_id' => $msg->user_id,
+                    'message' => $msg->message,
+                    'deleted_for' => $msg->deleted_for,
+                    'deleted_everyone_at' => $msg->deleted_everyone_at,
+                    'edited_at' => $msg->edited_at,
+                    'created_at' => $msg->created_at,
+                    'updated_at' => $msg->updated_at,
+
+                    'user' => [
+                        'id' => $msg->user?->id,
+                        'name' => $msg->user?->name,
+                        'email' => $msg->user?->email,
+                        'profile_photo_url' => $msg->user?->profile_photo_url,
+                    ],
+
+                    // grey tick agar false, blue tick agar true
+                    'is_seen' => $reads->count() > 0,
+
+                    // info screen ke liye
+                    'reads' => $reads,
+                ];
             })
             ->values();
 
@@ -50,7 +97,9 @@ class OrderChatController extends Controller
     {
         $this->checkAccess($order);
 
-        if ($message->order_id !== $order->id) abort(404);
+        if ($message->order_id !== $order->id) {
+            abort(404);
+        }
 
         if ($message->user_id !== auth()->id()) {
             abort(403, 'You can edit only your own message.');
@@ -79,7 +128,9 @@ class OrderChatController extends Controller
     {
         $this->checkAccess($order);
 
-        if ($message->order_id !== $order->id) abort(404);
+        if ($message->order_id !== $order->id) {
+            abort(404);
+        }
 
         $deletedFor = $message->deleted_for ?? [];
         $deletedFor[] = auth()->id();
@@ -88,14 +139,18 @@ class OrderChatController extends Controller
             'deleted_for' => array_values(array_unique($deletedFor)),
         ]);
 
-        return response()->json(['success' => true]);
+        return response()->json([
+            'success' => true,
+        ]);
     }
 
     public function deleteForEveryone(Order $order, OrderMessage $message)
     {
         $this->checkAccess($order);
 
-        if ($message->order_id !== $order->id) abort(404);
+        if ($message->order_id !== $order->id) {
+            abort(404);
+        }
 
         if ($message->user_id !== auth()->id()) {
             abort(403, 'You can delete only your own message.');
@@ -109,6 +164,52 @@ class OrderChatController extends Controller
         return response()->json([
             'success' => true,
             'message' => $message->load('user'),
+        ]);
+    }
+
+    public function unreadCount(Order $order)
+    {
+        $this->checkAccess($order);
+
+        $count = OrderMessage::where('order_id', $order->id)
+            ->where('user_id', '!=', auth()->id())
+            ->whereDoesntHave('reads', function ($q) {
+                $q->where('user_id', auth()->id());
+            })
+            ->count();
+
+        return response()->json([
+            'count' => $count,
+        ]);
+    }
+
+    public function markRead(Order $order)
+    {
+        $this->checkAccess($order);
+
+        $messages = OrderMessage::where('order_id', $order->id)
+            ->where('user_id', '!=', auth()->id())
+            ->get();
+
+        foreach ($messages as $msg) {
+            $read = $msg->reads()->firstOrCreate(
+                [
+                    'user_id' => auth()->id(),
+                ],
+                [
+                    'read_at' => now(),
+                ]
+            );
+
+            if (!$read->read_at) {
+                $read->update([
+                    'read_at' => now(),
+                ]);
+            }
+        }
+
+        return response()->json([
+            'success' => true,
         ]);
     }
 
@@ -130,40 +231,4 @@ class OrderChatController extends Controller
 
         return true;
     }
-
-
-
-public function unreadCount(Order $order)
-{
-    $count = OrderMessage::where('order_id', $order->id)
-        ->where('user_id', '!=', auth()->id())
-        ->whereDoesntHave('reads', function ($q) {
-            $q->where('user_id', auth()->id());
-        })
-        ->count();
-
-    return response()->json([
-        'count' => $count
-    ]);
-}
-
-public function markRead(Order $order)
-{
-    $messages = OrderMessage::where('order_id', $order->id)
-        ->where('user_id', '!=', auth()->id())
-        ->get();
-
-    foreach ($messages as $msg) {
-
-        $msg->reads()->firstOrCreate([
-            'user_id' => auth()->id()
-        ], [
-            'read_at' => now()
-        ]);
-    }
-
-    return response()->json([
-        'success' => true
-    ]);
-}
 }
