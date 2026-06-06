@@ -88,8 +88,7 @@ class OrderChatController extends Controller
             'message'  => $request->message,
         ]);
 
-        broadcast(new OrderMessageSent($message))->toOthers();
-
+broadcast(new OrderMessageSent($message));
         $this->sendChatNotifications($order, $sender, $request->message);
 
         return response()->json([
