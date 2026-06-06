@@ -4,6 +4,8 @@ namespace App\Http\Controllers;
 
 use App\Models\Order;
 use App\Models\OrderMessage;
+use App\Models\User;
+use App\Services\FcmService;
 use Illuminate\Http\Request;
 
 class OrderChatController extends Controller
@@ -24,8 +26,7 @@ class OrderChatController extends Controller
             ->filter(function ($msg) use ($userId) {
                 return !in_array($userId, $msg->deleted_for ?? []);
             })
-            ->map(function ($msg) use ($userId) {
-
+            ->map(function ($msg) {
                 $reads = $msg->reads
                     ->filter(function ($read) use ($msg) {
                         return (int) $read->user_id !== (int) $msg->user_id;
@@ -61,10 +62,7 @@ class OrderChatController extends Controller
                         'profile_photo_url' => $msg->user?->profile_photo_url,
                     ],
 
-                    // grey tick agar false, blue tick agar true
                     'is_seen' => $reads->count() > 0,
-
-                    // info screen ke liye
                     'reads' => $reads,
                 ];
             })
@@ -78,14 +76,18 @@ class OrderChatController extends Controller
         $this->checkAccess($order);
 
         $request->validate([
-            'message' => 'required|string',
+            'message' => 'required|string|max:5000',
         ]);
+
+        $sender = auth()->user();
 
         $message = OrderMessage::create([
             'order_id' => $order->id,
-            'user_id'  => auth()->id(),
+            'user_id'  => $sender->id,
             'message'  => $request->message,
         ]);
+
+        $this->sendChatNotifications($order, $sender, $request->message);
 
         return response()->json([
             'success' => true,
@@ -211,6 +213,37 @@ class OrderChatController extends Controller
         return response()->json([
             'success' => true,
         ]);
+    }
+
+    private function sendChatNotifications(Order $order, User $sender, string $messageText)
+    {
+        $users = $order->members()
+            ->where('users.id', '!=', $sender->id)
+            ->get();
+
+        if ($sender->role !== 'super_admin') {
+            $admins = User::whereIn('role', ['super_admin', 'admin'])
+                ->where('id', '!=', $sender->id)
+                ->get();
+
+            $users = $users->merge($admins)->unique('id');
+        }
+
+        $shortMessage = mb_strlen($messageText) > 80
+            ? mb_substr($messageText, 0, 80) . '...'
+            : $messageText;
+
+        foreach ($users as $user) {
+            FcmService::send(
+                $user->fcm_token,
+                'New Chat Message',
+                $sender->name . ': ' . $shortMessage,
+                [
+                    'type' => 'chat',
+                    'order_id' => $order->id,
+                ]
+            );
+        }
     }
 
     private function checkAccess($order)

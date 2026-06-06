@@ -4,37 +4,39 @@ namespace App\Http\Controllers;
 
 use App\Models\Order;
 use App\Models\OrderRead;
-use Illuminate\Support\Facades\DB;
 use App\Models\User;
 use App\Mail\NewOrderAssignedMail;
+use App\Services\FcmService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Mail;
+use Illuminate\Support\Facades\DB;
 
 class OrderController extends Controller
 {
-public function index()
-{
-    $user = auth()->user();
+    public function index()
+    {
+        $user = auth()->user();
 
-    $orders = Order::with(['members', 'reads.user:id,name,email,profile_photo'])
-        ->when($user && !in_array($user->role, ['super_admin', 'admin']), function ($q) use ($user) {
-            $q->whereHas('members', function ($m) use ($user) {
-                $m->where('users.id', $user->id);
+        $orders = Order::with(['members', 'reads.user:id,name,email,profile_photo'])
+            ->when($user && !in_array($user->role, ['super_admin', 'admin']), function ($q) use ($user) {
+                $q->whereHas('members', function ($m) use ($user) {
+                    $m->where('users.id', $user->id);
+                });
+            })
+            ->latest()
+            ->get()
+            ->map(function ($order) use ($user) {
+                $read = $order->reads->firstWhere('user_id', $user?->id);
+
+                $order->user_has_seen = !empty($read?->read_at);
+                $order->read_at = $read?->read_at;
+
+                return $order;
             });
-        })
-        ->latest()
-        ->get()
-        ->map(function ($order) use ($user) {
-            $read = $order->reads->firstWhere('user_id', $user?->id);
 
-            $order->user_has_seen = !empty($read?->read_at);
-            $order->read_at = $read?->read_at;
+        return response()->json($orders);
+    }
 
-            return $order;
-        });
-
-    return response()->json($orders);
-}
     public function store(Request $request)
     {
         $request->validate([
@@ -49,6 +51,12 @@ public function index()
             return response()->json([
                 'message' => 'Unauthenticated. Please login again.'
             ], 401);
+        }
+
+        if ($user->role !== 'super_admin') {
+            return response()->json([
+                'message' => 'Only super admin can create orders.'
+            ], 403);
         }
 
         $order = Order::create([
@@ -67,7 +75,7 @@ public function index()
 
         $order->members()->syncWithoutDetaching([
             $user->id => [
-                'role' => $user->role === 'super_admin' ? 'admin' : 'member'
+                'role' => 'admin'
             ]
         ]);
 
@@ -79,7 +87,7 @@ public function index()
             ]);
         }
 
-        $this->sendNewOrderEmails($order, $request->member_ids ?? [], $user->id);
+        $this->sendNewOrderNotifications($order, $request->member_ids ?? [], $user->id);
 
         return response()->json([
             'success' => true,
@@ -118,7 +126,10 @@ public function index()
             'member_ids.*' => 'exists:users,id',
         ]);
 
-        $oldMemberIds = $order->members()->pluck('users.id')->map(fn ($id) => (int) $id)->toArray();
+        $oldMemberIds = $order->members()
+            ->pluck('users.id')
+            ->map(fn ($id) => (int) $id)
+            ->toArray();
 
         if ($isSuperAdmin) {
             $order->update($request->only([
@@ -147,7 +158,7 @@ public function index()
 
                 if (auth()->id()) {
                     $syncData[auth()->id()] = [
-                        'role' => auth()->user()?->role === 'super_admin' ? 'admin' : 'member'
+                        'role' => 'admin'
                     ];
                 }
 
@@ -160,14 +171,14 @@ public function index()
                     ->unique()
                     ->values();
 
-                $this->sendNewOrderEmails($order, $newMemberIds, auth()->id());
+                $this->sendNewOrderNotifications($order, $newMemberIds, auth()->id());
             }
         } else {
-            // Members can update only status + tracking number.
             $order->update($request->only([
                 'status',
                 'status_color',
                 'trk',
+                'payment',
             ]));
         }
 
@@ -181,6 +192,12 @@ public function index()
     {
         $this->checkAccess($order);
 
+        if (auth()->user()?->role !== 'super_admin') {
+            return response()->json([
+                'message' => 'Only super admin can delete orders.'
+            ], 403);
+        }
+
         $order->delete();
 
         return response()->json([
@@ -191,6 +208,12 @@ public function index()
     public function addMember(Request $request, Order $order)
     {
         $this->checkAccess($order);
+
+        if (auth()->user()?->role !== 'super_admin') {
+            return response()->json([
+                'message' => 'Only super admin can add members.'
+            ], 403);
+        }
 
         $request->validate([
             'user_id' => 'required|exists:users,id',
@@ -205,7 +228,7 @@ public function index()
                 'role' => 'member'
             ]);
 
-            $this->sendNewOrderEmails($order, [$request->user_id], auth()->id());
+            $this->sendNewOrderNotifications($order, [$request->user_id], auth()->id());
         }
 
         return response()->json([
@@ -218,10 +241,65 @@ public function index()
     {
         $this->checkAccess($order);
 
+        if (auth()->user()?->role !== 'super_admin') {
+            return response()->json([
+                'message' => 'Only super admin can remove members.'
+            ], 403);
+        }
+
         $order->members()->detach($user->id);
 
         return response()->json([
             'success' => true
+        ]);
+    }
+
+    public function markRead($orderId)
+    {
+        $user = auth()->user();
+        $order = Order::findOrFail($orderId);
+
+        if (in_array($user->role, ['super_admin', 'admin'])) {
+            return response()->json([
+                'success' => true
+            ]);
+        }
+
+        DB::table('order_reads')->updateOrInsert(
+            [
+                'order_id' => $order->id,
+                'user_id'  => $user->id,
+            ],
+            [
+                'read_at'    => now(),
+                'created_at' => now(),
+                'updated_at' => now(),
+            ]
+        );
+
+        return response()->json([
+            'success' => true
+        ]);
+    }
+
+    public function readInfo(Order $order)
+    {
+        $this->checkAccess($order);
+
+        $reads = OrderRead::with('user:id,name,email')
+            ->where('order_id', $order->id)
+            ->latest('read_at')
+            ->get()
+            ->map(function ($read) {
+                return [
+                    'name' => $read->user?->name,
+                    'email' => $read->user?->email,
+                    'read_at' => $read->read_at?->format('M d, Y h:i A'),
+                ];
+            });
+
+        return response()->json([
+            'reads' => $reads,
         ]);
     }
 
@@ -244,7 +322,7 @@ public function index()
         return true;
     }
 
-    private function sendNewOrderEmails(Order $order, $memberIds, $skipUserId = null)
+    private function sendNewOrderNotifications(Order $order, $memberIds, $skipUserId = null)
     {
         $ids = collect($memberIds ?? [])
             ->map(fn ($id) => (int) $id)
@@ -260,57 +338,21 @@ public function index()
         $members = User::whereIn('id', $ids)->get();
 
         foreach ($members as $member) {
-            Mail::to($member->email)->send(new NewOrderAssignedMail($order, $member));
+            try {
+                Mail::to($member->email)->send(new NewOrderAssignedMail($order, $member));
+            } catch (\Throwable $e) {
+                report($e);
+            }
+
+            FcmService::send(
+                $member->fcm_token,
+                'New Order Assigned',
+                'You have been added to order: ' . $order->name,
+                [
+                    'type' => 'order',
+                    'order_id' => $order->id,
+                ]
+            );
         }
     }
-public function markRead($orderId)
-{
-    $user = auth()->user();
-
-    $order = \App\Models\Order::findOrFail($orderId);
-
-    // super admin ko save nahi karna
-    if (in_array($user->role, ['super_admin', 'admin'])) {
-        return response()->json([
-            'success' => true
-        ]);
-    }
-
-    \DB::table('order_reads')->updateOrInsert(
-        [
-            'order_id' => $order->id,
-            'user_id'  => $user->id,
-        ],
-        [
-            'read_at'   => now(),
-            'created_at'=> now(),
-            'updated_at'=> now(),
-        ]
-    );
-
-    return response()->json([
-        'success' => true
-    ]);
-}
-
-public function readInfo(Order $order)
-{
-    $this->checkAccess($order);
-
-    $reads = OrderRead::with('user:id,name,email')
-        ->where('order_id', $order->id)
-        ->latest('read_at')
-        ->get()
-        ->map(function ($read) {
-            return [
-                'name' => $read->user?->name,
-                'email' => $read->user?->email,
-                'read_at' => $read->read_at?->format('M d, Y h:i A'),
-            ];
-        });
-
-    return response()->json([
-        'reads' => $reads,
-    ]);
-}
 }

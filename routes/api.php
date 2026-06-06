@@ -9,6 +9,7 @@ use App\Http\Controllers\OrderChatController;
 use App\Http\Controllers\OrderFileController;
 use App\Http\Controllers\ClientController;
 use App\Http\Controllers\InvoiceController;
+use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
 
 Route::get('/dashboard', [DashboardController::class, 'index']);
@@ -21,6 +22,22 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::post('/logout', [AuthController::class, 'logout']);
     Route::get('/me', [AuthController::class, 'me']);
 
+    // FCM Token Save
+    Route::post('/save-fcm-token', function (Request $request) {
+        $request->validate([
+            'fcm_token' => 'required|string',
+        ]);
+
+        $request->user()->update([
+            'fcm_token' => $request->fcm_token,
+        ]);
+
+        return response()->json([
+            'success' => true,
+            'message' => 'FCM token saved',
+        ]);
+    });
+
     // Profile
     Route::get('/users/{user}/profile', [MemberController::class, 'profile']);
     Route::post('/me/profile', [MemberController::class, 'updateProfile']);
@@ -32,10 +49,8 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::put('/orders/{order}', [OrderController::class, 'update']);
     Route::delete('/orders/{order}', [OrderController::class, 'destroy']);
 
-
     Route::post('/orders/{order}/mark-read', [OrderController::class, 'markRead']);
-Route::get('/orders/{order}/read-info', [OrderController::class, 'readInfo']);
-
+    Route::get('/orders/{order}/read-info', [OrderController::class, 'readInfo']);
 
     // Order Members
     Route::post('/orders/{order}/members', [OrderController::class, 'addMember']);
@@ -67,10 +82,8 @@ Route::get('/orders/{order}/read-info', [OrderController::class, 'readInfo']);
     Route::post('/orders/{order}/chat-files', [OrderFileController::class, 'storeChatFile']);
     Route::delete('/order-files/{file}', [OrderFileController::class, 'destroy']);
 
-
-
     Route::middleware('superadmin')->group(function () {
-    Route::apiResource('clients', ClientController::class);
-    Route::apiResource('invoices', InvoiceController::class);
-});
+        Route::apiResource('clients', ClientController::class);
+        Route::apiResource('invoices', InvoiceController::class);
+    });
 });
