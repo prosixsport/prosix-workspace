@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Events\OrderMessageSent;
 use App\Models\Order;
 use App\Models\OrderMessage;
 use App\Models\User;
@@ -86,6 +87,8 @@ class OrderChatController extends Controller
             'user_id'  => $sender->id,
             'message'  => $request->message,
         ]);
+
+        broadcast(new OrderMessageSent($message))->toOthers();
 
         $this->sendChatNotifications($order, $sender, $request->message);
 
