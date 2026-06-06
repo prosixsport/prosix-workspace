@@ -24,6 +24,7 @@ class User extends Authenticatable
         // ✅ PROFILE
         'profile_photo',
         'about',
+        'fcm_token',
     ];
 
     protected $hidden = [
