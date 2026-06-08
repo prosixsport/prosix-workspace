@@ -240,10 +240,11 @@ broadcast(new OrderMessageSent($message));
                 $user->fcm_token,
                 'New Chat Message',
                 $sender->name . ': ' . $shortMessage,
-                [
-                    'type' => 'chat',
-                    'order_id' => $order->id,
-                ]
+               [
+    'type' => 'chat',
+    'order_id' => (string) $order->id,
+    'order_name' => $order->name ?? $order->title ?? ('Order #' . $order->id),
+]
             );
         }
     }
