@@ -173,14 +173,13 @@ class OrderController extends Controller
 
                 $this->sendNewOrderNotifications($order, $newMemberIds, auth()->id());
             }
-        } else {
-            $order->update($request->only([
-                'status',
-                'status_color',
-                'trk',
-                'payment',
-            ]));
-        }
+       } else {
+    $order->update($request->only([
+        'status',
+        'status_color',
+        'trk',
+    ]));
+}
 
         return response()->json([
             'success' => true,
