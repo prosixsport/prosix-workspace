@@ -811,10 +811,20 @@ async uploadVoiceMessage(file) {
 /* Mobile: full width overlay */
 .chat-panel.mobile-fullscreen {
   position: fixed;
-  inset: 52px 0 0 0;
+  top: 52px;
+  left: 0;
+  right: 0;
+  bottom: 0;
+
   width: 100% !important;
+  height: calc(100vh - 52px);
+
+  display: flex;
+  flex-direction: column;
+
   min-width: unset;
   max-width: unset;
+
   z-index: 997;
   border-left: none;
 }
@@ -931,6 +941,7 @@ async uploadVoiceMessage(file) {
 .chat-messages {
   flex: 1;
   overflow-y: auto;
+  min-height: 0;
   padding: 10px 12px;
   display: flex;
   flex-direction: column;
