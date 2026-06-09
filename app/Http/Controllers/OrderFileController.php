@@ -59,7 +59,7 @@ public function store(Request $request, Order $order)
 
 public function storeChatFile(Request $request, Order $order)
 {
-    
+
     $user = auth()->user();
     $this->checkAccess($order);
 
@@ -92,19 +92,25 @@ public function storeChatFile(Request $request, Order $order)
     ]);
 }
 
-    public function destroy(OrderFile $file)
-    {
-        $user = auth()->user();
+public function destroy(OrderFile $file)
+{
+    $user = auth()->user();
 
-        if ($user->role !== 'super_admin') {
-            abort(403, 'Only admin can delete files.');
-        }
+    $order = Order::findOrFail($file->order_id);
+    $this->checkAccess($order);
 
-        Storage::disk('public')->delete($file->file_path);
-        $file->delete();
+    $isOwner = (int) $file->user_id === (int) $user->id;
+    $isSuperAdmin = $user->role === 'super_admin';
 
-        return response()->json(['success' => true]);
+    if (!$isOwner && !$isSuperAdmin) {
+        abort(403, 'You can delete only your own file.');
     }
+
+    Storage::disk('public')->delete($file->file_path);
+    $file->delete();
+
+    return response()->json(['success' => true]);
+}
 
     private function checkAccess(Order $order)
     {

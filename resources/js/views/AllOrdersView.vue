@@ -68,7 +68,7 @@
         <div class="col-owner">
           <div class="avatar-stack">
             <div
-              v-for="(av, i) in order.owners.slice(0, 2)"
+v-for="(av, i) in order.owners.slice(0, 4)"
               :key="i"
               class="av"
               :class="{ 'has-photo': av.profile_photo_url }"
@@ -79,7 +79,7 @@
               <img v-if="av.profile_photo_url" :src="av.profile_photo_url" class="avatar-img" />
               <span v-else>{{ av.initial }}</span>
             </div>
-            <div v-if="order.owners.length > 2" class="av av-count">+{{ order.owners.length - 2 }}</div>
+<div v-if="order.owners.length > 4" class="av av-count">+{{ order.owners.length - 4 }}</div>
           </div>
         </div>
         <div class="order-actions-wrap" @click.stop>
@@ -1566,7 +1566,7 @@ openPreviewFile(file) {
 
 .list-head {
   display: grid;
-  grid-template-columns: 32px 1fr 70px 38px;
+grid-template-columns: 32px 1fr 118px 38px;
   padding: 6px 0;
   font-size: 11px;
   font-weight: 700;
@@ -1580,7 +1580,7 @@ openPreviewFile(file) {
 
 .list-row {
   display: grid;
-  grid-template-columns: 32px 1fr 70px 38px;
+grid-template-columns: 32px 1fr 118px 38px;
   align-items: center;
   min-height: 44px;
   cursor: pointer;
