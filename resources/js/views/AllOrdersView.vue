@@ -39,11 +39,37 @@
       </div>
 
       <div class="list-head">
-        <div class="col-chk"><input type="checkbox" /></div>
+<div class="col-chk">
+  <input
+    type="checkbox"
+    v-model="selectAll"
+    @change="toggleSelectAll"
+    @click.stop
+  />
+</div>
         <div class="col-task">Task</div>
         <div class="col-owner">OWNER</div>
         <div class="col-actions"></div>
       </div>
+
+<div v-if="isSuperAdmin && selectedOrders.length > 1" class="bulk-actions" @click.stop>
+      <strong>{{ selectedOrders.length }} Select</strong>
+
+  <button class="bulk-btn" @click="openBulkMembersModal" :disabled="bulkActionLoading">
+    <i class="fa-solid fa-users"></i> Edit Members
+  </button>
+
+  <button class="bulk-btn" @click="bulkDuplicateOrders" :disabled="bulkActionLoading">
+    <i class="fa-solid fa-copy"></i> Duplicate
+  </button>
+
+  <button class="bulk-btn danger" @click="bulkDeleteOrders" :disabled="bulkActionLoading">
+    <i class="fa-solid fa-trash"></i> Delete
+  </button>
+</div>
+
+
+
 
       <div v-if="loadingOrders" class="orders-loading">Loading orders...</div>
       <div v-else-if="filteredOrders.length === 0" class="orders-empty-list">No orders found</div>
@@ -59,7 +85,14 @@
         }"
         @click="selectOrderAndClose(order)"
       >
-        <div class="col-chk"><input type="checkbox" @click.stop /></div>
+<div class="col-chk">
+  <input
+    type="checkbox"
+    :value="order.id"
+    v-model="selectedOrders"
+    @click.stop
+  />
+</div>
         <div class="col-task">
           <span v-if="!order.user_has_seen" class="unread-dot"></span>
           <i v-if="order.hasChildren" class="fa-solid fa-chevron-right row-arrow"></i>
@@ -398,7 +431,58 @@ v-for="(av, i) in order.owners.slice(0, 4)"
         </div>
       </div>
     </div>
+<!-- BULK MEMBERS MODAL -->
+<div v-if="bulkMembersModal" class="modal-overlay" @click.self="closeBulkMembersModal">
+  <div class="add-order-modal">
+    <div class="view-all-header">
+      <h5>Edit Members For {{ selectedOrders.length }} Orders</h5>
+      <button class="modal-close" @click="closeBulkMembersModal">
+        <i class="fa-solid fa-xmark"></i>
+      </button>
+    </div>
 
+    <div class="add-order-body">
+      <div class="field-group">
+        <label>Select Members</label>
+
+        <div class="member-select-actions">
+          <button type="button" class="select-all-members-btn" @click="bulkSelectedMembers = [...availableMembers]">
+            <i class="fa-solid fa-check-double me-1"></i>Select All
+          </button>
+          <button type="button" class="select-all-members-btn clear" @click="bulkSelectedMembers = []">
+            Clear
+          </button>
+        </div>
+
+        <Multiselect
+          v-model="bulkSelectedMembers"
+          :options="availableMembers"
+          :multiple="true"
+          placeholder="Select members"
+          label="name"
+          track-by="id"
+        />
+
+        <small style="color:#6b7280;font-weight:700;margin-top:6px;">
+          Save karne par selected members selected orders me update ho jayen gy.
+        </small>
+      </div>
+    </div>
+
+    <div class="add-order-footer">
+      <button class="btn-cancel" @click="closeBulkMembersModal">Cancel</button>
+
+      <button class="btn-create" @click="bulkUpdateMembers" :disabled="bulkSaving">
+        <span v-if="bulkSaving">
+          <i class="fa-solid fa-spinner fa-spin me-1"></i>Saving...
+        </span>
+        <span v-else>
+          <i class="fa-solid fa-floppy-disk me-1"></i>Save Members
+        </span>
+      </button>
+    </div>
+  </div>
+</div>
     <!-- PROFILE MODAL -->
     <div v-if="profileModal" class="modal-overlay" @click.self="closeProfile">
       <div class="profile-modal" @click.stop>
@@ -563,7 +647,12 @@ export default {
       chatMessages: [],
       unreadChatCount: 0,
       unreadTimer: null,
-
+selectedOrders: [],
+selectAll: false,
+bulkMembersModal: false,
+bulkSelectedMembers: [],
+bulkSaving: false,
+bulkActionLoading: false,
       orderInfoModal: false,
       infoOrder: null,
       orderReadInfo: [],
@@ -645,6 +734,102 @@ export default {
   },
 
   methods: {
+  toggleSelectAll() {
+  this.selectedOrders = this.selectAll
+    ? this.filteredOrders.map(o => o.id)
+    : []
+},
+
+clearBulkSelection() {
+  this.selectedOrders = []
+  this.selectAll = false
+},
+
+openBulkMembersModal() {
+  if (!this.selectedOrders.length) return
+  this.bulkSelectedMembers = []
+  this.bulkMembersModal = true
+},
+
+closeBulkMembersModal() {
+  this.bulkMembersModal = false
+  this.bulkSelectedMembers = []
+  this.bulkSaving = false
+},
+
+async bulkUpdateMembers() {
+  if (!this.selectedOrders.length) return
+
+  this.bulkSaving = true
+
+  try {
+    await axios.post('/api/orders/bulk-members', {
+      order_ids: this.selectedOrders,
+      member_ids: this.bulkSelectedMembers.map(m => m.id)
+    }, { headers: this.headers() })
+
+    this.closeBulkMembersModal()
+    this.clearBulkSelection()
+    await this.fetchOrders()
+
+    if (this.selectedOrder) {
+      const fresh = this.orders.find(o => Number(o.id) === Number(this.selectedOrder.id))
+      if (fresh) await this.selectOrder(fresh)
+    }
+  } catch (e) {
+    console.error('bulkUpdateMembers error:', e)
+    alert(e.response?.data?.message || 'Members update nahi huay')
+  } finally {
+    this.bulkSaving = false
+  }
+},
+
+async bulkDuplicateOrders() {
+  if (!this.selectedOrders.length || this.bulkActionLoading) return
+
+  this.bulkActionLoading = true
+
+  try {
+    await axios.post('/api/orders/bulk-duplicate', {
+      order_ids: this.selectedOrders
+    }, { headers: this.headers() })
+
+    this.clearBulkSelection()
+    await this.fetchOrders()
+  } catch (e) {
+    console.error('bulkDuplicateOrders error:', e)
+    alert(e.response?.data?.message || 'Orders duplicate nahi huay')
+  } finally {
+    this.bulkActionLoading = false
+  }
+},
+
+async bulkDeleteOrders() {
+  if (!this.selectedOrders.length || this.bulkActionLoading) return
+  if (!confirm('Selected orders delete karne hain?')) return
+
+  this.bulkActionLoading = true
+
+  try {
+    await axios.post('/api/orders/bulk-delete', {
+      order_ids: this.selectedOrders
+    }, { headers: this.headers() })
+
+    const deletedIds = [...this.selectedOrders].map(id => Number(id))
+    this.clearBulkSelection()
+    await this.fetchOrders()
+
+    if (this.selectedOrder && deletedIds.includes(Number(this.selectedOrder.id))) {
+      this.selectedOrder = this.filteredOrders[0] || this.orders[0] || null
+      if (this.selectedOrder) await this.selectOrder(this.selectedOrder)
+    }
+  } catch (e) {
+    console.error('bulkDeleteOrders error:', e)
+    alert(e.response?.data?.message || 'Orders delete nahi huay')
+  } finally {
+    this.bulkActionLoading = false
+  }
+},
     generatePoNumber() {
       const d = new Date()
       const y = d.getFullYear()
@@ -2660,7 +2845,46 @@ grid-template-columns: 32px 1fr 118px 38px;
 .read-time { color: #111; background: #f3f4f6; border-radius: 999px; padding: 4px 8px; font-size: 11px; font-weight: 800; white-space: nowrap; }
 
 .read-info-empty { color: #6b7280; font-size: 13px; padding: 16px; text-align: center; border: 1px dashed #d1d5db; border-radius: 12px; }
+.bulk-actions {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  background: #1f2235;
+  padding: 8px 10px;
+  border-bottom: 1px solid rgba(255,255,255,0.08);
+  flex-wrap: nowrap;
+}
 
+.bulk-actions strong {
+  color: #fff;
+  font-size: 11px;
+  font-weight: 900;
+  white-space: nowrap;
+}
+
+.bulk-btn {
+  border: none;
+  background: #6161ff;
+  color: #fff;
+  border-radius: 7px;
+  padding: 6px 8px;
+  font-size: 10px;
+  font-weight: 900;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  white-space: nowrap;
+}
+
+.bulk-btn.danger {
+  background: #e2445c;
+}
+
+.bulk-btn:disabled {
+  opacity: .6;
+  cursor: not-allowed;
+}
 /* ===========================
    RESPONSIVE — TABLET (768px)
    =========================== */

@@ -354,4 +354,60 @@ class OrderController extends Controller
             );
         }
     }
+    public function bulkMembers(Request $request)
+{
+    $request->validate([
+        'order_ids' => 'required|array',
+        'member_ids' => 'required|array',
+    ]);
+
+    $orders = Order::whereIn('id', $request->order_ids)->get();
+
+    foreach ($orders as $order) {
+        $order->members()->sync($request->member_ids);
+    }
+
+    return response()->json([
+        'success' => true,
+        'message' => 'Members updated successfully'
+    ]);
+}
+
+public function bulkDuplicate(Request $request)
+{
+    $request->validate([
+        'order_ids' => 'required|array',
+    ]);
+
+    $orders = Order::with('members')->whereIn('id', $request->order_ids)->get();
+
+    foreach ($orders as $order) {
+        $newOrder = $order->replicate();
+        $newOrder->name = $order->name . ' Copy';
+        $newOrder->save();
+
+        $newOrder->members()->sync(
+            $order->members->pluck('id')->toArray()
+        );
+    }
+
+    return response()->json([
+        'success' => true,
+        'message' => 'Orders duplicated successfully'
+    ]);
+}
+
+public function bulkDelete(Request $request)
+{
+    $request->validate([
+        'order_ids' => 'required|array',
+    ]);
+
+    Order::whereIn('id', $request->order_ids)->delete();
+
+    return response()->json([
+        'success' => true,
+        'message' => 'Orders deleted successfully'
+    ]);
+}
 }

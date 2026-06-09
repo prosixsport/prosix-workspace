@@ -52,6 +52,10 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::post('/orders/{order}/mark-read', [OrderController::class, 'markRead']);
     Route::get('/orders/{order}/read-info', [OrderController::class, 'readInfo']);
 
+    Route::post('/orders/bulk-members', [OrderController::class, 'bulkMembers']);
+Route::post('/orders/bulk-duplicate', [OrderController::class, 'bulkDuplicate']);
+Route::post('/orders/bulk-delete', [OrderController::class, 'bulkDelete']);
+
     // Order Members
     Route::post('/orders/{order}/members', [OrderController::class, 'addMember']);
     Route::delete('/orders/{order}/members/{user}', [OrderController::class, 'removeMember']);
