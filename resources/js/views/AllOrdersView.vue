@@ -53,7 +53,7 @@
       </div>
 
 <div v-if="isSuperAdmin && selectedOrders.length > 1" class="bulk-actions" @click.stop>
-      <strong>{{ selectedOrders.length }} Select</strong>
+      <strong>{{ selectedOrders.length }}</strong>
 
   <button class="bulk-btn" @click="openBulkMembersModal" :disabled="bulkActionLoading">
     <i class="fa-solid fa-users"></i> Edit Members
