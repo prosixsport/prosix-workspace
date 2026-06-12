@@ -51,7 +51,6 @@
         <div class="col-owner">OWNER</div>
         <div class="col-actions"></div>
       </div>
-
 <div v-if="isSuperAdmin && selectedOrders.length > 1" class="bulk-actions" @click.stop>
       <strong>{{ selectedOrders.length }}</strong>
 
@@ -132,8 +131,8 @@ v-for="(av, i) in order.owners.slice(0, 4)"
         </div>
       </div>
 
-      <div v-if="isSuperAdmin" class="add-row" @click="addNewOrder">
-        <i class="fa-solid fa-plus me-1"></i> Add New Order
+<div v-if="canCreateOrder" class="add-row" @click="addNewOrder">
+            <i class="fa-solid fa-plus me-1"></i> Add New Order
       </div>
     </div>
 
@@ -691,6 +690,9 @@ bulkActionLoading: false,
       try { return JSON.parse(localStorage.getItem('user')) || null } catch { return null }
     },
     isSuperAdmin() { return this.currentUser?.role === 'super_admin' },
+     canCreateOrder() {
+    return this.currentUser?.role === 'super_admin' || this.currentUser?.can_create_orders === true
+  },
     userInitial() {
       const raw = localStorage.getItem('user')
       if (!raw) return 'A'
@@ -1240,7 +1242,9 @@ openPreviewFile(file) {
     },
 
     addNewOrder() {
-      this.editingOrderId = null
+  if (!this.canCreateOrder) return
+
+  this.editingOrderId = null
       this.openOrderMenuId = null
       this.newOrder = { name: '', po: this.generatePoNumber(), selectedMembers: [], shipDate: '', status: 'Pending', payment: '0 % Paid', trk: 'N/A' }
       this.showAddModal = true
@@ -1299,7 +1303,8 @@ openPreviewFile(file) {
     },
 
     async confirmAddOrder() {
-      if (!this.newOrder.name.trim() || this.savingOrder) return
+  if (!this.canCreateOrder && !this.editingOrderId) return
+  if (!this.newOrder.name.trim() || this.savingOrder) return
       this.savingOrder = true
       const status = this.statusOptions.find(s => s.label === this.newOrder.status)
       const payload = {

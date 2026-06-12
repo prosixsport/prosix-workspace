@@ -18,7 +18,7 @@ class OrderController extends Controller
         $user = auth()->user();
 
         $orders = Order::with(['members', 'reads.user:id,name,email,profile_photo'])
-            ->when($user && !in_array($user->role, ['super_admin', 'admin']), function ($q) use ($user) {
+            ->when($user && $user->role !== 'super_admin' && $user->role !== 'admin', function ($q) use ($user) {
                 $q->whereHas('members', function ($m) use ($user) {
                     $m->where('users.id', $user->id);
                 });
@@ -53,11 +53,11 @@ class OrderController extends Controller
             ], 401);
         }
 
-        if ($user->role !== 'super_admin') {
-            return response()->json([
-                'message' => 'Only super admin can create orders.'
-            ], 403);
-        }
+        if ($user->role !== 'super_admin' && !$user->can_create_orders) {
+    return response()->json([
+        'message' => 'You do not have permission to create orders.'
+    ], 403);
+}
 
         $order = Order::create([
             'name'             => $request->name,

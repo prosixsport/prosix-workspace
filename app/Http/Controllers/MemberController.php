@@ -208,4 +208,26 @@ class MemberController extends Controller
             'message' => 'Member deleted'
         ]);
     }
+    public function toggleOrderCreatePermission(User $user)
+{
+    if (auth()->user()?->role !== 'super_admin') {
+        return response()->json([
+            'message' => 'Only super admin can change this permission.'
+        ], 403);
+    }
+
+    if ($user->role === 'super_admin') {
+        return response()->json([
+            'message' => 'Super admin permission cannot be changed.'
+        ], 403);
+    }
+
+    $user->can_create_orders = !$user->can_create_orders;
+    $user->save();
+
+    return response()->json([
+        'success' => true,
+        'user' => $user->fresh()
+    ]);
+}
 }

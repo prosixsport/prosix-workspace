@@ -84,8 +84,17 @@
                                         <span class="text-muted small">—</span>
                                     </template>
 
-                                    <template v-else>
-                                        <button @click="toggleStatus(member)" class="outline-btn me-1">
+                                  <template v-else>
+    <button
+        @click="toggleOrderCreatePermission(member)"
+        class="permission-btn me-1"
+        :class="member.can_create_orders ? 'allowed' : 'blocked'"
+    >
+        {{ member.can_create_orders ? 'Can Add Orders' : 'No Order Access' }}
+    </button>
+
+    <button @click="toggleStatus(member)" class="outline-btn me-1">
+
                                             {{ member.is_active ? 'Deactivate' : 'Activate' }}
                                         </button>
 
@@ -270,7 +279,24 @@ async inviteMember() {
         this.loading = false
     }
 },
+async toggleOrderCreatePermission(member) {
+    try {
+        const res = await axios.post(`/api/members/${member.id}/order-create-permission`, {}, {
+            headers: this.headers()
+        })
 
+        member.can_create_orders = res.data.user.can_create_orders
+
+        this.showToast(
+            member.can_create_orders
+                ? 'Order create access enabled'
+                : 'Order create access disabled'
+        )
+    } catch (e) {
+        console.error(e)
+        this.showToast(e.response?.data?.message || 'Permission update nahi hui', 'error')
+    }
+},
 async toggleStatus(member) {
     try {
         const res = await axios.post(`/api/members/${member.id}/toggle`, {}, {
@@ -405,6 +431,28 @@ async deleteMember(id) {
     padding: 0 12px;
     font-size: 12px;
     font-weight: 700;
+}
+.permission-btn {
+    height: 34px;
+    border: 1px solid #111;
+    background: #fff;
+    color: #111;
+    border-radius: 8px;
+    padding: 0 12px;
+    font-size: 12px;
+    font-weight: 800;
+}
+
+.permission-btn.allowed {
+    background: #16a34a;
+    border-color: #16a34a;
+    color: #fff;
+}
+
+.permission-btn.blocked {
+    background: #fff;
+    border-color: #111;
+    color: #111;
 }
 
 .danger-btn:hover { background: #dc2626; color: #fff; }

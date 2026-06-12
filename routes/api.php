@@ -73,6 +73,7 @@ Route::post('/orders/bulk-delete', [OrderController::class, 'bulkDelete']);
     Route::get('/members', [MemberController::class, 'index']);
     Route::post('/members/invite', [MemberController::class, 'invite']);
     Route::post('/members/{id}/toggle', [MemberController::class, 'toggle']);
+    Route::post('/members/{user}/order-create-permission', [MemberController::class, 'toggleOrderCreatePermission']);
     Route::delete('/members/{id}', [MemberController::class, 'destroy']);
 
     // Board Members

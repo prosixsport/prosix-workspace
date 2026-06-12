@@ -21,10 +21,13 @@ class User extends Authenticatable
         'is_active',
         'created_by',
 
-        // ✅ PROFILE
+        // PROFILE
         'profile_photo',
         'about',
         'fcm_token',
+
+        // ORDER PERMISSION
+        'can_create_orders',
     ];
 
     protected $hidden = [
@@ -34,14 +37,13 @@ class User extends Authenticatable
 
     protected $casts = [
         'is_active' => 'boolean',
+        'can_create_orders' => 'boolean',
     ];
 
-    // ✅ PROFILE IMAGE URL
     protected $appends = [
         'profile_photo_url',
     ];
 
-    // ✅ PROFILE IMAGE ACCESSOR
     public function getProfilePhotoUrlAttribute()
     {
         return $this->profile_photo
@@ -62,5 +64,10 @@ class User extends Authenticatable
     public function isMember(): bool
     {
         return $this->role === 'member';
+    }
+
+    public function canCreateOrders(): bool
+    {
+        return $this->role === 'super_admin' || $this->can_create_orders;
     }
 }
