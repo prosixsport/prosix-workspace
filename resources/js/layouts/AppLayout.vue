@@ -5,7 +5,7 @@
         <div class="mobile-topbar">
             <div class="mobile-logo">
                 <div class="logo-icon">P</div>
-                <span>Prosixflow</span>
+                <span>Prosix Sports</span>
             </div>
             <button class="hamburger-btn" @click="sidebarOpen = true">
                 <i class="fa-solid fa-bars"></i>
@@ -29,7 +29,7 @@
             <div class="sidebar-logo">
                 <div class="logo-icon">P</div>
                 <div>
-                    <h5>Prosixflow</h5>
+                    <h5>Prosix Sports</h5>
                     <small>Work Management</small>
                 </div>
             </div>
