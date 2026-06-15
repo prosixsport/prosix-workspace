@@ -23,9 +23,9 @@ public function store(Request $request, Order $order)
     $user = auth()->user();
     $this->checkAccess($order);
 
-    if ($user->role !== 'super_admin') {
-        abort(403, 'Only admin can upload files.');
-    }
+   if ($user->role !== 'super_admin' && !$user->can_create_orders) {
+    abort(403, 'You do not have permission to upload files.');
+}
 
     $request->validate([
         'card_type' => 'required|string',

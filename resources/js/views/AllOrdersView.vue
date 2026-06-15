@@ -329,8 +329,8 @@ v-for="(av, i) in order.owners.slice(0, 4)"
                 </div>
                 <div class="card-footer-inner">
                   <div class="card-footer-left">
-                    <button v-if="isSuperAdmin && card.type !== 'notes'" class="card-add-btn" @click="triggerUpload(card)">
-                      <i class="fa-solid fa-plus"></i><i class="fa-regular fa-file"></i>
+<button v-if="canUploadFiles && card.type !== 'notes'" class="card-add-btn" @click="triggerUpload(card)">
+                          <i class="fa-solid fa-plus"></i><i class="fa-regular fa-file"></i>
                     </button>
                     <input type="file" multiple :ref="'fileInput_' + card.title" class="hidden-file-input" @change="onFileChange($event, card)" />
                   </div>
@@ -520,10 +520,10 @@ v-for="(av, i) in order.owners.slice(0, 4)"
             <button v-if="viewAllCard.files && viewAllCard.files.length" class="download-all-btn" @click="downloadAllFiles(viewAllCard)">
               <i class="fa-solid fa-file-zipper me-1"></i> Download All
             </button>
-            <button v-if="isSuperAdmin && viewAllCard.type !== 'notes'" class="upload-small-btn" @click="triggerUpload(viewAllCard)">
-              <i class="fa-solid fa-upload me-1"></i> Upload
+<button v-if="canUploadFiles && viewAllCard.type !== 'notes'" class="upload-small-btn" @click="triggerUpload(viewAllCard)">
+                  <i class="fa-solid fa-upload me-1"></i> Upload
             </button>
-            <input v-if="isSuperAdmin && viewAllCard.type !== 'notes'" type="file" multiple :ref="'fileInput_modal_' + viewAllCard.title" class="hidden-file-input" @change="onFileChange($event, viewAllCard)" />
+<input v-if="canUploadFiles && viewAllCard.type !== 'notes'" type="file" multiple :ref="'fileInput_modal_' + viewAllCard.title" class="hidden-file-input" @change="onFileChange($event, viewAllCard)" />
             <button class="modal-close" @click="viewAllCard = null"><i class="fa-solid fa-xmark"></i></button>
           </div>
         </div>
@@ -544,8 +544,8 @@ v-for="(av, i) in order.owners.slice(0, 4)"
           <div v-else class="view-all-empty">
             <i class="fa-solid fa-inbox" style="font-size:40px;opacity:0.3"></i>
             <p>No files uploaded yet</p>
-            <button v-if="isSuperAdmin && viewAllCard.type !== 'notes'" class="upload-btn-big" @click="triggerUpload(viewAllCard)">
-              <i class="fa-solid fa-upload me-2"></i>Upload Files
+<button v-if="canUploadFiles && viewAllCard.type !== 'notes'" class="upload-btn-big" @click="triggerUpload(viewAllCard)">
+                  <i class="fa-solid fa-upload me-2"></i>Upload Files
             </button>
           </div>
         </div>
@@ -686,6 +686,10 @@ bulkActionLoading: false,
   },
 
   computed: {
+  canUploadFiles() {
+  return this.currentUser?.role === 'super_admin'
+    || this.currentUser?.can_create_orders === true
+},
     currentUser() {
       try { return JSON.parse(localStorage.getItem('user')) || null } catch { return null }
     },
@@ -1448,7 +1452,7 @@ openPreviewFile(file) {
     },
 
     triggerUpload(card) {
-      if (!this.isSuperAdmin || !card || card.type === 'notes') return
+if (!this.canUploadFiles || !card || card.type === 'notes') return
       const refKey = this.viewAllCard ? 'fileInput_modal_' + card.title : 'fileInput_' + card.title
       const input = this.$refs[refKey]
       if (input) { const el = Array.isArray(input) ? input[0] : input; el.click() }
@@ -1487,7 +1491,7 @@ openPreviewFile(file) {
 
     async onDrop(event, card) {
       const files = Array.from(event.dataTransfer.files || [])
-      if (!files.length || !this.isSuperAdmin || !card || card.type === 'notes') return
+if (!files.length || !this.canUploadFiles || !card || card.type === 'notes') return
       try { await this.uploadFilesToOrder(files, card.type) }
       catch (e) { console.error('onDrop error:', e); alert(e.response?.data?.message || 'File upload nahi hui') }
     },
