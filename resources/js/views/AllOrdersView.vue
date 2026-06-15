@@ -317,7 +317,7 @@ v-for="(av, i) in order.owners.slice(0, 4)"
   <span class="file-name-small">{{ file.name }}</span>
 </div>
                       <span v-if="file.uploading" class="uploading-label">Uploading...</span>
-                      <button v-if="isSuperAdmin && !file.uploading" class="file-remove-btn" @click.stop="removeFile(card, fi)">
+                <button v-if="canDeleteFile(file) && !file.uploading" class="file-remove-btn" @click.stop="removeFile(card, fi)">
                         <i class="fa-solid fa-xmark"></i>
                       </button>
                     </div>
@@ -537,7 +537,9 @@ v-for="(av, i) in order.owners.slice(0, 4)"
               <span class="view-file-name">{{ file.name }}</span>
               <div class="view-file-actions">
                 <a :href="file.url" :download="file.name" class="vf-btn download-btn"><i class="fa-solid fa-download"></i></a>
-                <button v-if="isSuperAdmin" class="vf-btn remove-btn" @click="removeFile(viewAllCard, fi)"><i class="fa-solid fa-trash"></i></button>
+             <button v-if="canDeleteFile(file)"
+class="vf-btn remove-btn"
+@click="removeFile(viewAllCard, fi)"><i class="fa-solid fa-trash"></i></button>
               </div>
             </div>
           </div>
@@ -739,7 +741,11 @@ bulkActionLoading: false,
     if (this.unreadTimer) { clearInterval(this.unreadTimer); this.unreadTimer = null }
   },
 
-  methods: {
+ methods: {
+  canDeleteFile(file) {
+    return this.isSuperAdmin || Number(file?.senderId) === Number(this.currentUser?.id)
+  },
+
   toggleSelectAll() {
   this.selectedOrders = this.selectAll
     ? this.filteredOrders.map(o => o.id)
@@ -1480,12 +1486,17 @@ if (!this.canUploadFiles || !card || card.type === 'notes') return
       } catch (e) { card.files = (card.files || []).filter(file => !file.uploading); throw e }
     },
 
-    async onFileChange(event, card) {
-      const files = Array.from(event.target.files || [])
-      event.target.value = ''
-      if (!files.length) return
-      if (!this.isSuperAdmin || !card || card.type === 'notes') return
-      try { await this.uploadFilesToOrder(files, card.type) }
+async onFileChange(event, card) {
+  const files = Array.from(event.target.files || [])
+  event.target.value = ''
+
+  if (!files.length) return
+
+  if (!this.canUploadFiles || !card || card.type === 'notes') return
+
+  try {
+    await this.uploadFilesToOrder(files, card.type)
+  }
       catch (e) { console.error('onFileChange error:', e); alert(e.response?.data?.message || 'File upload nahi hui') }
     },
 
@@ -1496,16 +1507,23 @@ if (!files.length || !this.canUploadFiles || !card || card.type === 'notes') ret
       catch (e) { console.error('onDrop error:', e); alert(e.response?.data?.message || 'File upload nahi hui') }
     },
 
-    async removeFile(card, index) {
-      if (!this.isSuperAdmin) return
-      const file = card.files[index]
-      if (!file?.id) return
-      if (!confirm('Delete this file?')) return
-      try {
-        await axios.delete(`/api/order-files/${file.id}`, { headers: this.headers() })
-        card.files.splice(index, 1)
-      } catch (e) { console.error('removeFile error:', e); alert(e.response?.data?.message || 'File delete nahi hui') }
-    },
+  async removeFile(card, index) {
+  const file = card.files[index]
+
+  if (!this.canDeleteFile(file)) return
+
+  if (!file?.id) return
+
+  if (!confirm('Delete this file?')) return
+
+  try {
+    await axios.delete(`/api/order-files/${file.id}`, { headers: this.headers() })
+    card.files.splice(index, 1)
+  } catch (e) {
+    console.error('removeFile error:', e)
+    alert(e.response?.data?.message || 'File delete nahi hui')
+  }
+},
 
     openViewAll(card) { this.viewAllCard = card },
 
