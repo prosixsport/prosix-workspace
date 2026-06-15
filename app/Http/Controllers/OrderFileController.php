@@ -29,14 +29,14 @@ public function store(Request $request, Order $order)
 
     $request->validate([
         'card_type' => 'required|string',
-        'files' => 'required',
-        'files.*' => 'file|max:51200',
+      'files' => 'required|array',
+'files.*' => 'required|file|max:51200',
     ]);
 
     $saved = [];
 
-    foreach ((array) $request->file('files') as $file) {
-        if (!$file) continue;
+foreach ($request->file('files', []) as $file) {
+            if (!$file) continue;
 
         $path = $file->store("order-files/{$order->id}/{$request->card_type}", 'public');
 
