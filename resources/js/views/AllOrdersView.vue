@@ -297,14 +297,21 @@ v-for="(av, i) in order.owners.slice(0, 4)"
                   <i class="fa-solid fa-pen-to-square notes-icon"></i>
                   <span class="text-dark">Notes</span>
                 </div>
-                <textarea v-model="card.noteText" class="notes-textarea text-dark" placeholder="Type your notes here..." :readonly="!isSuperAdmin"></textarea>
-                <div class="notes-footer">
-                  <span class="notes-count text-dark">{{ card.noteText ? card.noteText.length : 0 }} chars</span>
-                  <span v-if="card.saved" class="notes-saved-msg">✅ Saved!</span>
-                  <button v-if="isSuperAdmin" class="notes-save-btn" @click="saveNote(card)">
-                    <i class="fa-solid fa-floppy-disk me-1"></i>Save
-                  </button>
-                </div>
+              <textarea
+  v-model="card.noteText"
+  class="notes-textarea text-dark"
+  placeholder="Type your notes here..."
+  :readonly="!canEditNotes"
+></textarea>
+
+<div class="notes-footer">
+  <span class="notes-count text-dark">{{ card.noteText ? card.noteText.length : 0 }} chars</span>
+  <span v-if="card.saved" class="notes-saved-msg">✅ Saved!</span>
+
+  <button v-if="canEditNotes" class="notes-save-btn" @click="saveNote(card)">
+    <i class="fa-solid fa-floppy-disk me-1"></i>Save
+  </button>
+</div>
               </div>
 
               <template v-else>
@@ -379,7 +386,7 @@ v-for="(av, i) in order.owners.slice(0, 4)"
         <div class="add-order-body">
           <div class="field-group">
             <label>Order Name <span class="req">*</span></label>
-<input v-model="newOrder.name" class="field-input" placeholder="e.g. DUNBAR FOOTBALL UNIFORMS PO" @keyup.enter="confirmAddOrder" @input="newOrder.name = $event.target.value.toUpperCase()" ref="orderNameInput" />
+            <input v-model="newOrder.name" class="field-input" placeholder="e.g. DUNBAR FOOTBALL UNIFORMS PO" @keyup.enter="confirmAddOrder" @input="newOrder.name = $event.target.value.toUpperCase()" ref="orderNameInput" />
           </div>
           <div class="field-row">
             <div class="field-group">
@@ -622,15 +629,12 @@ export default {
       leftWidth: 320,
       isResizing: false,
       mobileLeftOpen: false,
-
       loadingOrders: false,
       savingOrder: false,
       openOrderMenuId: null,
       editingOrderId: null,
-
       activeGroup: 'in_production',
       selectedOrder: null,
-
       showChat: false,
       viewAllCard: null,
       showAddModal: false,
@@ -641,23 +645,21 @@ export default {
       previewFile: null,
       customStatusLabel: '',
       customStatusColor: '#6161ff',
-
       orders: [],
       availableMembers: [],
       teamMembers: [],
       chatMessages: [],
       unreadChatCount: 0,
       unreadTimer: null,
-selectedOrders: [],
-selectAll: false,
-bulkMembersModal: false,
-bulkSelectedMembers: [],
-bulkSaving: false,
-bulkActionLoading: false,
+      selectedOrders: [],
+      selectAll: false,
+      bulkMembersModal: false,
+      bulkSelectedMembers: [],
+      bulkSaving: false,
+      bulkActionLoading: false,
       orderInfoModal: false,
       infoOrder: null,
       orderReadInfo: [],
-
       profileModal: false,
       profileUser: null,
       profileForm: { name: '', about: '', profile_photo: null, preview: '' },
@@ -688,6 +690,11 @@ bulkActionLoading: false,
   },
 
   computed: {
+  canEditNotes() {
+  return this.currentUser?.role === 'super_admin'
+    || this.currentUser?.role === 'admin'
+    || this.currentUser?.role === 'member'
+},
   canUploadFiles() {
   return this.currentUser?.role === 'super_admin'
     || this.currentUser?.can_create_orders === true
@@ -1392,14 +1399,21 @@ openPreviewFile(file) {
       } catch (e) { console.error('savePayment error:', e) }
     },
 
-    async saveNote(card) {
-      if (!this.selectedOrder || !this.isSuperAdmin) return
-      try {
-        await axios.put(`/api/orders/${this.selectedOrder.id}`, { notes: card.noteText }, { headers: this.headers() })
-        card.saved = true
-        setTimeout(() => { card.saved = false }, 2500)
-      } catch (e) { alert('Note save nahi hua') }
-    },
+   async saveNote(card) {
+  if (!this.selectedOrder || !this.canEditNotes) return
+
+  try {
+    await axios.put(`/api/orders/${this.selectedOrder.id}`, {
+      notes: card.noteText
+    }, { headers: this.headers() })
+
+    card.saved = true
+    setTimeout(() => { card.saved = false }, 2500)
+  } catch (e) {
+    console.error('saveNote error:', e)
+    alert(e.response?.data?.message || 'Note save nahi hua')
+  }
+},
 
     normalizeOrderFile(file) {
       const mime = file.mime_type || file.type || ''
