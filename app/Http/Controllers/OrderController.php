@@ -173,11 +173,12 @@ class OrderController extends Controller
 
                 $this->sendNewOrderNotifications($order, $newMemberIds, auth()->id());
             }
-       } else {
+   } else {
     $order->update($request->only([
         'status',
         'status_color',
         'trk',
+        'notes',
     ]));
 }
 
