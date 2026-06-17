@@ -15,14 +15,16 @@
 
     <!-- OVERLAY for mobile left panel -->
     <div class="mobile-overlay" v-if="mobileLeftOpen" @click="mobileLeftOpen = false"></div>
-
-    <!-- LEFT PANEL -->
-    <div class="orders-left" :style="desktopLeftStyle">
-<div class="resize-bar" @mousedown="startResize">
+<div class="resize-bar"
+     :style="{ left: leftWidth + 'px' }"
+     @mousedown.stop="startResize">
   <div class="resize-handle">
     <i class="fa-solid fa-angles-right"></i>
   </div>
 </div>
+    <!-- LEFT PANEL -->
+    <div class="orders-left" :style="desktopLeftStyle">
+
       <div class="orders-left-header">
         <button class="back-btn" type="button" title="Back to dashboard" @click.stop="$router.push('/dashboard')">
           <i class="fa-solid fa-arrow-left"></i>
@@ -1783,7 +1785,7 @@ showDesktopNotification(notification) {
 }
 
 /* LEFT PANEL */
-.orders-left {
+.orders-left{
   position: relative;
   width: 320px;
   min-width: 240px;
@@ -1793,41 +1795,33 @@ showDesktopNotification(notification) {
   flex-direction: column;
   border-right: 1px solid rgba(255,255,255,0.08);
   overflow-y: auto;
+  overflow-x: hidden !important;
   flex-shrink: 0;
 }
 
 .resize-bar{
-  position: sticky;
-  top: 50%;
-  right: 0;
-  margin-left: auto;
-  width: 22px;
-  height: 90px;
-  cursor: col-resize;
-  z-index: 9999;
-  display:flex;
-  align-items:center;
-  justify-content:center;
-  transform: translateY(-50%);
+  position:fixed;
+  top:50%;
+  transform:translate(-50%,-50%);
+  z-index:99999;
+  width:28px;
+  height:90px;
+  cursor:col-resize;
 }
 
 .resize-handle{
   width:22px;
-  height:80px;
+  height:90px;
   background:#6161ff;
-  color:#fff;
-  border-radius:12px 0 0 12px;
+  border-radius:0 14px 14px 0;
   display:flex;
   align-items:center;
   justify-content:center;
-  box-shadow:0 4px 14px rgba(0,0,0,.25);
 }
 
 .resize-handle i{
-  font-size:18px;
-  pointer-events:none;
+  color:#fff;
 }
-
 .resize-bar:hover .resize-handle{
   background:rgba(97,97,255,.15);
   transform:scale(1.05);
