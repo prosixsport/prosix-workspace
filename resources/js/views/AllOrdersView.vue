@@ -651,6 +651,12 @@ export default {
       chatMessages: [],
       unreadChatCount: 0,
       unreadTimer: null,
+
+notificationTimer: null,
+notifications: [],
+notificationCount: 0,
+lastNotificationId: null,
+
       selectedOrders: [],
       selectAll: false,
       bulkMembersModal: false,
@@ -723,12 +729,23 @@ export default {
     }
   },
 
-  async mounted() {
-    this.loadCustomStatuses()
-    await this.fetchOrders()
-    await this.fetchMembers()
+async mounted() {
+  this.loadCustomStatuses()
+  await this.fetchOrders()
+  await this.fetchMembers()
 
-    const orderId = this.$route.query.order_id
+  if ('Notification' in window) {
+    Notification.requestPermission()
+  }
+
+  await this.fetchNotifications(false)
+
+  this.notificationTimer = setInterval(() => {
+    this.fetchNotifications(true)
+  }, 5000)
+
+  const orderId = this.$route.query.order_id
+  
     if (orderId) {
       const foundOrder = this.orders.find(o => Number(o.id) === Number(orderId))
       if (foundOrder) {
@@ -742,11 +759,18 @@ export default {
     this.unreadTimer = setInterval(() => { this.fetchUnreadCount() }, 5000)
   },
 
-  beforeUnmount() {
-    document.removeEventListener('mousemove', this.resizeSidebar)
-    document.removeEventListener('mouseup', this.stopResize)
-    if (this.unreadTimer) { clearInterval(this.unreadTimer); this.unreadTimer = null }
-  },
+beforeUnmount() {
+  document.removeEventListener('mousemove', this.resizeSidebar)
+  document.removeEventListener('mouseup', this.stopResize)
+
+  if (this.unreadTimer) {
+    clearInterval(this.unreadTimer)
+  }
+
+  if (this.notificationTimer) {
+    clearInterval(this.notificationTimer)
+  }
+},
 
  methods: {
   canDeleteFile(file) {
@@ -1593,12 +1617,64 @@ if (!files.length || !this.canUploadFiles || !card || card.type === 'notes') ret
       this.leftWidth = newWidth
     },
 
-    stopResize() {
-      this.isResizing = false
-      document.removeEventListener('mousemove', this.resizeSidebar)
-      document.removeEventListener('mouseup', this.stopResize)
+   stopResize() {
+  this.isResizing = false
+  document.removeEventListener('mousemove', this.resizeSidebar)
+  document.removeEventListener('mouseup', this.stopResize)
+},
+
+async fetchNotifications(showPopup = false) {
+  try {
+    const res = await axios.get('/api/notifications', {
+      headers: this.headers()
+    })
+
+    const list = Array.isArray(res.data) ? res.data : []
+
+    this.notifications = list
+    this.notificationCount = list.filter(n => !n.is_read).length
+
+    const latest = list[0]
+
+    if (
+      showPopup &&
+      latest &&
+      this.lastNotificationId &&
+      Number(latest.id) !== Number(this.lastNotificationId)
+    ) {
+      this.showDesktopNotification(latest)
     }
+
+    if (latest) {
+      this.lastNotificationId = latest.id
+    }
+
+  } catch (e) {
+    console.error('Notification Error:', e)
   }
+},
+
+showDesktopNotification(notification) {
+  if (!('Notification' in window)) return
+
+  if (Notification.permission === 'granted') {
+    new Notification(notification.title || 'Order Notification', {
+      body: notification.message || 'New order update received'
+    })
+  }
+}
+
+
+
+
+
+
+
+
+  }
+
+
+
 }
 </script>
 

@@ -9,6 +9,7 @@ use App\Http\Controllers\OrderChatController;
 use App\Http\Controllers\OrderFileController;
 use App\Http\Controllers\ClientController;
 use App\Http\Controllers\InvoiceController;
+use App\Http\Controllers\NotificationController;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
 
@@ -16,7 +17,9 @@ Route::get('/dashboard', [DashboardController::class, 'index']);
 
 Route::post('/login', [AuthController::class, 'login']);
 Route::post('/register', [AuthController::class, 'register']);
-
+Route::get('/notifications-test', function () {
+    return \App\Models\OrderNotification::latest()->get();
+});
 Route::middleware('auth:sanctum')->group(function () {
 
     Route::post('/logout', [AuthController::class, 'logout']);
@@ -53,8 +56,8 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::get('/orders/{order}/read-info', [OrderController::class, 'readInfo']);
 
     Route::post('/orders/bulk-members', [OrderController::class, 'bulkMembers']);
-Route::post('/orders/bulk-duplicate', [OrderController::class, 'bulkDuplicate']);
-Route::post('/orders/bulk-delete', [OrderController::class, 'bulkDelete']);
+  Route::post('/orders/bulk-duplicate', [OrderController::class, 'bulkDuplicate']);
+  Route::post('/orders/bulk-delete', [OrderController::class, 'bulkDelete']);
 
     // Order Members
     Route::post('/orders/{order}/members', [OrderController::class, 'addMember']);
@@ -91,4 +94,9 @@ Route::post('/orders/bulk-delete', [OrderController::class, 'bulkDelete']);
         Route::apiResource('clients', ClientController::class);
         Route::apiResource('invoices', InvoiceController::class);
     });
+
+    Route::get('/notifications', [NotificationController::class, 'index']);
+    Route::post('/notifications/{id}/read', [NotificationController::class, 'markRead']);
+    Route::post('/notifications/mark-all-read', [NotificationController::class, 'markAllRead']);
+
 });
