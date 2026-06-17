@@ -1,15 +1,15 @@
 <?php
 
 namespace App\Http\Controllers;
-
 use App\Models\OrderNotification;
 
 class NotificationController extends Controller
 {
-   public function index()
+public function index()
 {
     return response()->json(
-        \App\Models\OrderNotification::with('order:id,name')
+        OrderNotification::with('order:id,name')
+            ->where('user_id', auth()->id())
             ->latest()
             ->limit(30)
             ->get()
