@@ -1893,7 +1893,17 @@ grid-template-columns: 32px 1fr 118px 38px;
 .list-row:hover { background: rgba(255,255,255,0.04); }
 .list-row.active { background: rgba(97,97,255,0.15); }
 .list-row.unread { background: rgba(255,255,255,0.075); border-left: 4px solid #fff; }
-.list-row.seen { background: rgba(255,255,255,0.02); opacity: .72; }
+.list-row.seen {
+  background: rgba(255,255,255,0.02);
+  opacity: 1;
+}
+
+.list-row.seen .col-task span:not(.unread-dot),
+.list-row.unread .col-task span:not(.unread-dot),
+.list-row .col-task span:not(.unread-dot) {
+  color: #ffffff;
+  font-weight: 900;
+}
 .list-row.unread .col-task span:not(.unread-dot) { color: #fff; font-weight: 900; }
 .list-row.seen .col-task span {
   color: #c5cae0;
