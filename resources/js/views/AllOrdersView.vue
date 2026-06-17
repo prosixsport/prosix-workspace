@@ -18,7 +18,7 @@
 
     <!-- LEFT PANEL -->
     <div class="orders-left" :style="desktopLeftStyle">
-<div class="resize-bar" @mousedown="startResize"></div>
+      <div class="resize-bar" @mousedown="startResize"></div>
 
       <div class="orders-left-header">
         <button class="back-btn" type="button" title="Back to dashboard" @click.stop="$router.push('/dashboard')">
@@ -1793,38 +1793,25 @@ showDesktopNotification(notification) {
   flex-shrink: 0;
 }
 
-.resize-bar{
-  position:absolute;
-  top:0;
-  right:0;
-  width:8px;
-  height:100%;
-  cursor:ew-resize;
-  z-index:9999;
-  background:transparent;
+.resize-bar {
+  position: absolute;
+  top: 0;
+  right: 0;
+  width: 6px;
+  height: 100%;
+  cursor: col-resize;
+  z-index: 100;
 }
 
-.resize-bar::after{
-  content:"↔";
-  position:absolute;
-  top:50%;
-  right:-15px;
-  transform:translateY(-50%);
-  width:30px;
-  height:70px;
-  background:#6161ff;
-  color:#fff;
-  border-radius:20px;
-  display:flex;
-  align-items:center;
-  justify-content:center;
-  font-size:18px;
-  font-weight:900;
-  box-shadow:0 4px 12px rgba(0,0,0,.25);
-}
+.resize-bar:hover { background: #6161ff; }
 
-.resize-bar:hover::after{
-  background:#4f46e5;
+.orders-left-header {
+  padding: 16px 16px 8px;
+  font-size: 15px;
+  font-weight: 800;
+  color: #fff;
+  display: flex;
+  align-items: center;
 }
 
 .back-btn {
