@@ -1,7 +1,7 @@
 <?php
 
 namespace App\Http\Controllers;
-
+use App\Models\OrderNotification;
 use App\Models\Order;
 use App\Models\OrderRead;
 use App\Models\User;
@@ -355,40 +355,49 @@ class OrderController extends Controller
         return true;
     }
 
-    private function sendNewOrderNotifications(Order $order, $memberIds, $skipUserId = null)
-    {
-        $ids = collect($memberIds ?? [])
-            ->map(fn ($id) => (int) $id)
-            ->filter(fn ($id) => $id > 0)
-            ->filter(fn ($id) => (int) $id !== (int) $skipUserId)
-            ->unique()
-            ->values();
+  private function sendNewOrderNotifications(Order $order, $memberIds, $skipUserId = null)
+{
+    $ids = collect($memberIds ?? [])
+        ->map(fn ($id) => (int) $id)
+        ->filter(fn ($id) => $id > 0)
+        ->filter(fn ($id) => (int) $id !== (int) $skipUserId)
+        ->unique()
+        ->values();
 
-        if ($ids->isEmpty()) {
-            return;
-        }
-
-        $members = User::whereIn('id', $ids)->get();
-
-        foreach ($members as $member) {
-            try {
-                Mail::to($member->email)->send(new NewOrderAssignedMail($order, $member));
-            } catch (\Throwable $e) {
-                report($e);
-            }
-
-            FcmService::send(
-                $member->fcm_token,
-                'New Order Assigned',
-                'You have been added to order: ' . $order->name,
-                [
-                    'type' => 'order',
-                    'order_id' => (string) $order->id,
-                    'order_name' => (string) $order->name,
-                ]
-            );
-        }
+    if ($ids->isEmpty()) {
+        return;
     }
+
+    $members = User::whereIn('id', $ids)->get();
+
+    foreach ($members as $member) {
+
+        OrderNotification::create([
+            'user_id' => $member->id,
+            'order_id' => $order->id,
+            'title' => 'New Order Assigned',
+            'message' => 'You have been added to order: ' . $order->name,
+            'is_read' => 0,
+        ]);
+
+        try {
+            Mail::to($member->email)->send(new NewOrderAssignedMail($order, $member));
+        } catch (\Throwable $e) {
+            report($e);
+        }
+
+        FcmService::send(
+            $member->fcm_token,
+            'New Order Assigned',
+            'You have been added to order: ' . $order->name,
+            [
+                'type' => 'order',
+                'order_id' => (string) $order->id,
+                'order_name' => (string) $order->name,
+            ]
+        );
+    }
+}
 
     private function sendOrderActivityNotification(Order $order, $skipUserId, $title, $body)
     {
