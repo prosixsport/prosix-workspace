@@ -400,24 +400,33 @@ class OrderController extends Controller
 }
 
     private function sendOrderActivityNotification(Order $order, $skipUserId, $title, $body)
-    {
-        $members = $order->members()
-            ->where('users.id', '!=', $skipUserId)
-            ->get();
+{
+    $members = $order->members()
+        ->where('users.id', '!=', $skipUserId)
+        ->get();
 
-        foreach ($members as $member) {
-            FcmService::send(
-                $member->fcm_token,
-                $title,
-                $body,
-                [
-                    'type' => 'order_activity',
-                    'order_id' => (string) $order->id,
-                    'order_name' => (string) $order->name,
-                ]
-            );
-        }
+    foreach ($members as $member) {
+
+        OrderNotification::create([
+            'user_id' => $member->id,
+            'order_id' => $order->id,
+            'title' => $title,
+            'message' => $body,
+            'is_read' => 0,
+        ]);
+
+        FcmService::send(
+            $member->fcm_token,
+            $title,
+            $body,
+            [
+                'type' => 'order_activity',
+                'order_id' => (string) $order->id,
+                'order_name' => (string) $order->name,
+            ]
+        );
     }
+}
 
     public function bulkMembers(Request $request)
     {
