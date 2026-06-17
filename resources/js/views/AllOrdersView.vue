@@ -20,10 +20,9 @@
     <div class="orders-left" :style="desktopLeftStyle">
 <div class="resize-bar" @mousedown="startResize">
   <div class="resize-handle">
-    <i class="fa-solid fa-grip-lines-vertical"></i>
+    <i class="fa-solid fa-angles-right"></i>
   </div>
 </div>
-
       <div class="orders-left-header">
         <button class="back-btn" type="button" title="Back to dashboard" @click.stop="$router.push('/dashboard')">
           <i class="fa-solid fa-arrow-left"></i>
@@ -1797,45 +1796,39 @@ showDesktopNotification(notification) {
   flex-shrink: 0;
 }
 
-.resize-bar {
-  position: absolute;
-  top: 0;
-  right: 0;
-  width: 14px;
-  height: 100%;
-  cursor: col-resize;
-  z-index: 100;
-  display: flex;
-  align-items: center;
-  justify-content: center;
+.resize-bar{
+  position:absolute;
+  top:0;
+  right:0;
+  width:18px;
+  height:100%;
+  cursor:col-resize;
+  z-index:100;
+  display:flex;
+  align-items:center;
+  justify-content:center;
 }
 
-.resize-bar:hover {
-  background: rgba(97,97,255,.15);
+.resize-handle{
+  width:18px;
+  height:90px;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  border-radius:20px;
+  background:rgba(255,255,255,0.06);
+  transition:.2s;
 }
 
-.resize-handle {
-  width: 10px;
-  height: 70px;
-  border-radius: 20px;
-  background: rgba(255,255,255,.08);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  color: rgba(255,255,255,.5);
-  transition: all .2s ease;
+.resize-handle i{
+  font-size:18px;
+  color:#6161ff;
 }
 
-.resize-bar:hover .resize-handle {
-  background: rgba(97,97,255,.35);
-  color: #fff;
+.resize-bar:hover .resize-handle{
+  background:rgba(97,97,255,.15);
+  transform:scale(1.05);
 }
-
-.resize-handle i {
-  font-size: 12px;
-  pointer-events: none;
-}
-
 .resize-bar:hover { background: #6161ff; }
 
 .orders-left-header {
