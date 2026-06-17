@@ -18,7 +18,11 @@
 
     <!-- LEFT PANEL -->
     <div class="orders-left" :style="desktopLeftStyle">
-      <div class="resize-bar" @mousedown="startResize"></div>
+<div class="resize-bar" @mousedown="startResize">
+  <div class="resize-handle">
+    <i class="fa-solid fa-grip-lines-vertical"></i>
+  </div>
+</div>
 
       <div class="orders-left-header">
         <button class="back-btn" type="button" title="Back to dashboard" @click.stop="$router.push('/dashboard')">
@@ -1797,10 +1801,39 @@ showDesktopNotification(notification) {
   position: absolute;
   top: 0;
   right: 0;
-  width: 6px;
+  width: 14px;
   height: 100%;
   cursor: col-resize;
   z-index: 100;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.resize-bar:hover {
+  background: rgba(97,97,255,.15);
+}
+
+.resize-handle {
+  width: 10px;
+  height: 70px;
+  border-radius: 20px;
+  background: rgba(255,255,255,.08);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: rgba(255,255,255,.5);
+  transition: all .2s ease;
+}
+
+.resize-bar:hover .resize-handle {
+  background: rgba(97,97,255,.35);
+  color: #fff;
+}
+
+.resize-handle i {
+  font-size: 12px;
+  pointer-events: none;
 }
 
 .resize-bar:hover { background: #6161ff; }
