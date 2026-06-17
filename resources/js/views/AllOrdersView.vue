@@ -18,7 +18,9 @@
 
     <!-- LEFT PANEL -->
     <div class="orders-left" :style="desktopLeftStyle">
-      <div class="resize-bar" @mousedown="startResize"></div>
+<div class="resize-bar" @mousedown="startResize">
+  <i class="fa-solid fa-grip-lines-vertical resize-icon"></i>
+</div>
 
       <div class="orders-left-header">
         <button class="back-btn" type="button" title="Back to dashboard" @click.stop="$router.push('/dashboard')">
@@ -339,6 +341,8 @@ v-for="(av, i) in order.owners.slice(0, 4)"
 <button v-if="canUploadFiles && card.type !== 'notes'" class="card-add-btn" @click="triggerUpload(card)">
                           <i class="fa-solid fa-plus"></i><i class="fa-regular fa-file"></i>
                     </button>
+
+
                     <input type="file" multiple :ref="'fileInput_' + card.title" class="hidden-file-input" @change="onFileChange($event, card)" />
                   </div>
                   <span class="card-title">{{ card.title }}</span>
@@ -1795,21 +1799,36 @@ showDesktopNotification(notification) {
   position: absolute;
   top: 0;
   right: 0;
-  width: 6px;
+  width: 14px;
   height: 100%;
   cursor: col-resize;
   z-index: 100;
-}
-
-.resize-bar:hover { background: #6161ff; }
-
-.orders-left-header {
-  padding: 16px 16px 8px;
-  font-size: 15px;
-  font-weight: 800;
-  color: #fff;
   display: flex;
   align-items: center;
+  justify-content: center;
+}
+
+.resize-bar:hover {
+  background: rgba(97,97,255,0.12);
+}
+
+.resize-icon {
+  color: #8d93a8;
+  font-size: 12px;
+  pointer-events: none;
+}
+
+.resize-bar:hover .resize-icon {
+  color: #6161ff;
+}
+
+.resize-bar{
+  color:#8d93a8;
+  font-size:12px;
+  font-weight:bold;
+  display:flex;
+  align-items:center;
+  justify-content:center;
 }
 
 .back-btn {
