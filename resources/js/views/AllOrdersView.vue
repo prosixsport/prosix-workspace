@@ -20,6 +20,7 @@
     <div class="orders-left" :style="desktopLeftStyle">
 <div class="resize-bar" @mousedown="startResize"></div>
 
+
       <div class="orders-left-header">
         <button class="back-btn" type="button" title="Back to dashboard" @click.stop="$router.push('/dashboard')">
           <i class="fa-solid fa-arrow-left"></i>
@@ -1795,12 +1796,13 @@ showDesktopNotification(notification) {
 
 .resize-bar {
   position: absolute;
-  top: 0;
-  right: -9px;
-  width: 18px;
-  height: 100%;
+  top: 50%;
+  right: -14px;
+  transform: translateY(-50%);
+  width: 28px;
+  height: 60px;
   cursor: ew-resize;
-  z-index: 9999;
+  z-index: 99999;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -1808,18 +1810,17 @@ showDesktopNotification(notification) {
 
 .resize-bar::before {
   content: "↔";
-  width: 24px;
-  height: 46px;
-  background: #ffffff;
-  color: #2d294d;
-  border: 2px solid #6161ff;
+  width: 28px;
+  height: 60px;
+  background: #6161ff;
+  color: #fff;
   border-radius: 999px;
   display: flex;
   align-items: center;
   justify-content: center;
-  font-size: 20px;
+  font-size: 18px;
   font-weight: 900;
-  box-shadow: 0 4px 14px rgba(0,0,0,0.25);
+  box-shadow: 0 4px 16px rgba(0,0,0,.25);
 }
 
 .resize-bar:hover::before {
