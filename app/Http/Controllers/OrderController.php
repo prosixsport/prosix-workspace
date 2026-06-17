@@ -54,10 +54,10 @@ class OrderController extends Controller
         }
 
         if ($user->role !== 'super_admin' && !$user->can_create_orders) {
-    return response()->json([
-        'message' => 'You do not have permission to create orders.'
-    ], 403);
-}
+            return response()->json([
+                'message' => 'You do not have permission to create orders.'
+            ], 403);
+        }
 
         $order = Order::create([
             'name'             => $request->name,
@@ -74,16 +74,12 @@ class OrderController extends Controller
         ]);
 
         $order->members()->syncWithoutDetaching([
-            $user->id => [
-                'role' => 'admin'
-            ]
+            $user->id => ['role' => 'admin']
         ]);
 
         foreach ($request->member_ids ?? [] as $memberId) {
             $order->members()->syncWithoutDetaching([
-                $memberId => [
-                    'role' => 'member'
-                ]
+                $memberId => ['role' => 'member']
             ]);
         }
 
@@ -110,6 +106,13 @@ class OrderController extends Controller
 
         $user = auth()->user();
         $isSuperAdmin = $user && $user->role === 'super_admin';
+
+        $oldStatus = $order->status;
+        $oldTracking = $order->trk;
+        $oldNotes = $order->notes;
+        $oldPayment = $order->payment;
+        $oldReceived = $order->payment_received;
+        $oldBalance = $order->payment_balance;
 
         $request->validate([
             'name' => 'nullable|string|max:255',
@@ -157,9 +160,7 @@ class OrderController extends Controller
                 }
 
                 if (auth()->id()) {
-                    $syncData[auth()->id()] = [
-                        'role' => 'admin'
-                    ];
+                    $syncData[auth()->id()] = ['role' => 'admin'];
                 }
 
                 $order->members()->sync($syncData);
@@ -173,14 +174,56 @@ class OrderController extends Controller
 
                 $this->sendNewOrderNotifications($order, $newMemberIds, auth()->id());
             }
-   } else {
-    $order->update($request->only([
-        'status',
-        'status_color',
-        'trk',
-        'notes',
-    ]));
-}
+        } else {
+            $order->update($request->only([
+                'status',
+                'status_color',
+                'trk',
+                'notes',
+            ]));
+        }
+
+        $order->refresh();
+
+        if ($request->has('notes') && $oldNotes !== $order->notes) {
+            $this->sendOrderActivityNotification(
+                $order,
+                auth()->id(),
+                'Notes Updated',
+                auth()->user()->name . ' changed notes in order: ' . $order->name
+            );
+        }
+
+        if ($request->has('status') && $oldStatus !== $order->status) {
+            $this->sendOrderActivityNotification(
+                $order,
+                auth()->id(),
+                'Status Updated',
+                auth()->user()->name . ' changed status from ' . ($oldStatus ?: 'N/A') . ' to ' . $order->status . ' in order: ' . $order->name
+            );
+        }
+
+        if ($request->has('trk') && $oldTracking !== $order->trk) {
+            $this->sendOrderActivityNotification(
+                $order,
+                auth()->id(),
+                'Tracking Updated',
+                auth()->user()->name . ' changed tracking in order: ' . $order->name
+            );
+        }
+
+        if (
+            ($request->has('payment') && $oldPayment !== $order->payment) ||
+            ($request->has('payment_received') && (float) $oldReceived !== (float) $order->payment_received) ||
+            ($request->has('payment_balance') && (float) $oldBalance !== (float) $order->payment_balance)
+        ) {
+            $this->sendOrderActivityNotification(
+                $order,
+                auth()->id(),
+                'Payment Updated',
+                auth()->user()->name . ' changed payment details in order: ' . $order->name
+            );
+        }
 
         return response()->json([
             'success' => true,
@@ -200,9 +243,7 @@ class OrderController extends Controller
 
         $order->delete();
 
-        return response()->json([
-            'success' => true
-        ]);
+        return response()->json(['success' => true]);
     }
 
     public function addMember(Request $request, Order $order)
@@ -249,9 +290,7 @@ class OrderController extends Controller
 
         $order->members()->detach($user->id);
 
-        return response()->json([
-            'success' => true
-        ]);
+        return response()->json(['success' => true]);
     }
 
     public function markRead($orderId)
@@ -260,9 +299,7 @@ class OrderController extends Controller
         $order = Order::findOrFail($orderId);
 
         if (in_array($user->role, ['super_admin', 'admin'])) {
-            return response()->json([
-                'success' => true
-            ]);
+            return response()->json(['success' => true]);
         }
 
         DB::table('order_reads')->updateOrInsert(
@@ -277,9 +314,7 @@ class OrderController extends Controller
             ]
         );
 
-        return response()->json([
-            'success' => true
-        ]);
+        return response()->json(['success' => true]);
     }
 
     public function readInfo(Order $order)
@@ -298,9 +333,7 @@ class OrderController extends Controller
                 ];
             });
 
-        return response()->json([
-            'reads' => $reads,
-        ]);
+        return response()->json(['reads' => $reads]);
     }
 
     private function checkAccess($order)
@@ -350,65 +383,87 @@ class OrderController extends Controller
                 'You have been added to order: ' . $order->name,
                 [
                     'type' => 'order',
-                    'order_id' => $order->id,
+                    'order_id' => (string) $order->id,
+                    'order_name' => (string) $order->name,
                 ]
             );
         }
     }
+
+    private function sendOrderActivityNotification(Order $order, $skipUserId, $title, $body)
+    {
+        $members = $order->members()
+            ->where('users.id', '!=', $skipUserId)
+            ->get();
+
+        foreach ($members as $member) {
+            FcmService::send(
+                $member->fcm_token,
+                $title,
+                $body,
+                [
+                    'type' => 'order_activity',
+                    'order_id' => (string) $order->id,
+                    'order_name' => (string) $order->name,
+                ]
+            );
+        }
+    }
+
     public function bulkMembers(Request $request)
-{
-    $request->validate([
-        'order_ids' => 'required|array',
-        'member_ids' => 'required|array',
-    ]);
+    {
+        $request->validate([
+            'order_ids' => 'required|array',
+            'member_ids' => 'required|array',
+        ]);
 
-    $orders = Order::whereIn('id', $request->order_ids)->get();
+        $orders = Order::whereIn('id', $request->order_ids)->get();
 
-    foreach ($orders as $order) {
-        $order->members()->sync($request->member_ids);
+        foreach ($orders as $order) {
+            $order->members()->sync($request->member_ids);
+        }
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Members updated successfully'
+        ]);
     }
 
-    return response()->json([
-        'success' => true,
-        'message' => 'Members updated successfully'
-    ]);
-}
+    public function bulkDuplicate(Request $request)
+    {
+        $request->validate([
+            'order_ids' => 'required|array',
+        ]);
 
-public function bulkDuplicate(Request $request)
-{
-    $request->validate([
-        'order_ids' => 'required|array',
-    ]);
+        $orders = Order::with('members')->whereIn('id', $request->order_ids)->get();
 
-    $orders = Order::with('members')->whereIn('id', $request->order_ids)->get();
+        foreach ($orders as $order) {
+            $newOrder = $order->replicate();
+            $newOrder->name = $order->name . ' Copy';
+            $newOrder->save();
 
-    foreach ($orders as $order) {
-        $newOrder = $order->replicate();
-        $newOrder->name = $order->name . ' Copy';
-        $newOrder->save();
+            $newOrder->members()->sync(
+                $order->members->pluck('id')->toArray()
+            );
+        }
 
-        $newOrder->members()->sync(
-            $order->members->pluck('id')->toArray()
-        );
+        return response()->json([
+            'success' => true,
+            'message' => 'Orders duplicated successfully'
+        ]);
     }
 
-    return response()->json([
-        'success' => true,
-        'message' => 'Orders duplicated successfully'
-    ]);
-}
+    public function bulkDelete(Request $request)
+    {
+        $request->validate([
+            'order_ids' => 'required|array',
+        ]);
 
-public function bulkDelete(Request $request)
-{
-    $request->validate([
-        'order_ids' => 'required|array',
-    ]);
+        Order::whereIn('id', $request->order_ids)->delete();
 
-    Order::whereIn('id', $request->order_ids)->delete();
-
-    return response()->json([
-        'success' => true,
-        'message' => 'Orders deleted successfully'
-    ]);
-}
+        return response()->json([
+            'success' => true,
+            'message' => 'Orders deleted successfully'
+        ]);
+    }
 }
