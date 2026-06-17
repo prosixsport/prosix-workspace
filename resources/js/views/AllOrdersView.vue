@@ -1797,32 +1797,35 @@ showDesktopNotification(notification) {
 }
 
 .resize-bar{
-  position:absolute;
-  top:0;
-  right:0;
-  width:18px;
-  height:100%;
-  cursor:col-resize;
-  z-index:100;
+  position: sticky;
+  top: 50%;
+  right: 0;
+  margin-left: auto;
+  width: 22px;
+  height: 90px;
+  cursor: col-resize;
+  z-index: 9999;
   display:flex;
   align-items:center;
   justify-content:center;
+  transform: translateY(-50%);
 }
 
 .resize-handle{
-  width:18px;
-  height:90px;
+  width:22px;
+  height:80px;
+  background:#6161ff;
+  color:#fff;
+  border-radius:12px 0 0 12px;
   display:flex;
   align-items:center;
   justify-content:center;
-  border-radius:20px;
-  background:rgba(255,255,255,0.06);
-  transition:.2s;
+  box-shadow:0 4px 14px rgba(0,0,0,.25);
 }
 
 .resize-handle i{
   font-size:18px;
-  color:#6161ff;
+  pointer-events:none;
 }
 
 .resize-bar:hover .resize-handle{
