@@ -745,7 +745,7 @@ async mounted() {
   }, 5000)
 
   const orderId = this.$route.query.order_id
-  
+
     if (orderId) {
       const foundOrder = this.orders.find(o => Number(o.id) === Number(orderId))
       if (foundOrder) {
@@ -1895,9 +1895,14 @@ grid-template-columns: 32px 1fr 118px 38px;
 .list-row.unread { background: rgba(255,255,255,0.075); border-left: 4px solid #fff; }
 .list-row.seen { background: rgba(255,255,255,0.02); opacity: .72; }
 .list-row.unread .col-task span:not(.unread-dot) { color: #fff; font-weight: 900; }
-.list-row.seen .col-task span { color: #8d93a8; }
+.list-row.seen .col-task span {
+  color: #c5cae0;
+  font-weight: 800;
+}
 .list-row.seen:hover { opacity: 1; }
-
+.list-row .col-task span:not(.unread-dot) {
+  font-weight: 800;
+}
 .unread-dot {
   width: 8px;
   height: 8px;
