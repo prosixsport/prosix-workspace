@@ -306,27 +306,37 @@ v-for="(av, i) in order.owners.slice(0, 4)"
           <div class="cards-grid">
             <div v-for="card in selectedOrder.cards" :key="card.title" class="order-card">
 
-              <div v-if="card.title === 'Notes'" class="card-notes-area">
-                <div class="notes-header">
-                  <i class="fa-solid fa-pen-to-square notes-icon"></i>
-                  <span class="text-dark">Notes</span>
-                </div>
-              <textarea
-  v-model="card.noteText"
-  class="notes-textarea text-dark"
-  placeholder="Type your notes here..."
-  :readonly="!canEditNotes"
-></textarea>
+            <div v-if="card.title === 'Notes'" class="card-notes-area">
+  <div class="notes-header">
+    <i class="fa-solid fa-pen-to-square notes-icon"></i>
+    <span class="text-dark">Notes</span>
+  </div>
 
-<div class="notes-footer">
-  <span class="notes-count text-dark">{{ card.noteText ? card.noteText.length : 0 }} chars</span>
-  <span v-if="card.saved" class="notes-saved-msg">✅ Saved!</span>
+  <div class="notes-list">
+    <div v-for="note in card.notes" :key="note.user_id" class="single-note-box">
+      <div class="single-note-head">
+        <strong>{{ note.user?.name || 'User' }}</strong>
+        <span v-if="Number(note.user_id) === Number(currentUser?.id)">Your note</span>
+      </div>
 
-  <button v-if="canEditNotes" class="notes-save-btn" @click="saveNote(card)">
-    <i class="fa-solid fa-floppy-disk me-1"></i>Save
-  </button>
+      <textarea
+        v-model="note.note"
+        class="notes-textarea text-dark"
+        placeholder="Type your notes here..."
+        :readonly="!canEditSingleNote(note)"
+      ></textarea>
+
+      <div class="notes-footer">
+        <span class="notes-count text-dark">{{ note.note ? note.note.length : 0 }} chars</span>
+        <span v-if="note.saved" class="notes-saved-msg">✅ Saved!</span>
+
+        <button v-if="canEditSingleNote(note)" class="notes-save-btn" @click="saveNote(note)">
+          <i class="fa-solid fa-floppy-disk me-1"></i>Save
+        </button>
+      </div>
+    </div>
+  </div>
 </div>
-              </div>
 
               <template v-else>
                 <div class="card-preview-area" @dragover.prevent @drop="onDrop($event, card)">
@@ -712,15 +722,15 @@ lastNotificationId: null,
   },
 
   computed: {
-canEditNotes() {
-  if (!this.selectedOrder || !this.currentUser) return false
+// canEditNotes() {
+//   if (!this.selectedOrder || !this.currentUser) return false
 
-  if (this.currentUser.role === 'super_admin') return true
+//   if (this.currentUser.role === 'super_admin') return true
 
-  return (this.selectedOrder.members || []).some(m =>
-    Number(m.id) === Number(this.currentUser.id)
-  )
-},
+//   return (this.selectedOrder.members || []).some(m =>
+//     Number(m.id) === Number(this.currentUser.id)
+//   )
+// },
   canUploadFiles() {
   return this.currentUser?.role === 'super_admin'
     || this.currentUser?.can_create_orders === true
@@ -793,6 +803,39 @@ beforeUnmount() {
 },
 
  methods: {
+  canEditSingleNote(note) {
+  if (!this.currentUser) return false
+
+  if (this.currentUser.role === 'super_admin') return true
+
+  if (this.currentUser.can_create_orders !== true) return false
+
+  return Number(note.user_id) === Number(this.currentUser.id)
+},
+
+prepareOrderNotes(order) {
+  const notes = Array.isArray(order.notes) ? [...order.notes] : []
+
+  const hasMyNote = notes.some(n =>
+    Number(n.user_id) === Number(this.currentUser?.id)
+  )
+
+  if (!hasMyNote && this.currentUser) {
+    notes.unshift({
+      id: null,
+      order_id: order.id,
+      user_id: this.currentUser.id,
+      note: '',
+      user: this.currentUser,
+      saved: false
+    })
+  }
+
+  return notes.map(n => ({
+    ...n,
+    saved: false
+  }))
+},
   canDeleteFile(file) {
     return this.isSuperAdmin || Number(file?.senderId) === Number(this.currentUser?.id)
   },
@@ -1193,7 +1236,14 @@ openPreviewFile(file) {
           { title: 'Team Roster', type: 'roster', icon: 'fa-solid fa-users', files: [], thumbnail: '' },
           { title: 'Finished Products', type: 'finished_products', icon: 'fa-solid fa-box', files: [], thumbnail: '' },
           { title: 'Files', type: 'order_files', icon: 'fa-solid fa-folder-open', files: [], thumbnail: '' },
-          { title: 'Notes', type: 'notes', icon: 'fa-solid fa-file-word', files: [], thumbnail: '', noteText: order.notes || '', saved: false }
+{
+  title: 'Notes',
+  type: 'notes',
+  icon: 'fa-solid fa-file-word',
+  files: [],
+  thumbnail: '',
+  notes: this.prepareOrderNotes(order)
+}
         ]
       }
     },
@@ -1443,16 +1493,34 @@ openPreviewFile(file) {
       } catch (e) { console.error('savePayment error:', e) }
     },
 
-   async saveNote(card) {
-  if (!this.selectedOrder || !this.canEditNotes) return
+ async saveNote(note) {
+  if (!this.selectedOrder || !this.canEditSingleNote(note)) return
 
   try {
-    await axios.put(`/api/orders/${this.selectedOrder.id}`, {
-      notes: card.noteText
-    }, { headers: this.headers() })
+    const payload = {
+      note: note.note || ''
+    }
 
-    card.saved = true
-    setTimeout(() => { card.saved = false }, 2500)
+    if (this.isSuperAdmin && note.user_id) {
+      payload.user_id = note.user_id
+    }
+
+    const res = await axios.post(
+      `/api/orders/${this.selectedOrder.id}/notes`,
+      payload,
+      { headers: this.headers() }
+    )
+
+    if (res.data?.note) {
+      note.id = res.data.note.id
+      note.user_id = res.data.note.user_id
+      note.user = res.data.note.user || note.user
+    }
+
+    note.saved = true
+    setTimeout(() => {
+      note.saved = false
+    }, 2500)
   } catch (e) {
     console.error('saveNote error:', e)
     alert(e.response?.data?.message || 'Note save nahi hua')
@@ -3108,6 +3176,35 @@ grid-template-columns: 32px 1fr 118px 38px;
 .bulk-btn:disabled {
   opacity: .6;
   cursor: not-allowed;
+}
+.notes-list {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 10px;
+  background: #fff;
+}
+
+.single-note-box {
+  border: 1px solid #d1d5db;
+  border-radius: 10px;
+  overflow: hidden;
+  background: #fff;
+}
+
+.single-note-head {
+  display: flex;
+  justify-content: space-between;
+  padding: 7px 10px;
+  background: #f3f4f6;
+  font-size: 12px;
+  color: #111;
+}
+
+.single-note-head span {
+  font-size: 10px;
+  font-weight: 900;
+  color: #6161ff;
 }
 /* ===========================
    RESPONSIVE — TABLET (768px)

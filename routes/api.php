@@ -59,6 +59,8 @@ Route::middleware('auth:sanctum')->group(function () {
   Route::post('/orders/bulk-duplicate', [OrderController::class, 'bulkDuplicate']);
   Route::post('/orders/bulk-delete', [OrderController::class, 'bulkDelete']);
 
+  Route::post('/orders/{order}/notes', [OrderController::class, 'saveNote']);
+
     // Order Members
     Route::post('/orders/{order}/members', [OrderController::class, 'addMember']);
     Route::delete('/orders/{order}/members/{user}', [OrderController::class, 'removeMember']);

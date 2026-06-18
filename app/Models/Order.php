@@ -53,5 +53,9 @@ public function files()
 {
     return $this->hasMany(\App\Models\OrderRead::class);
 }
+public function notes()
+{
+    return $this->hasMany(OrderNote::class);
+}
 }
 
