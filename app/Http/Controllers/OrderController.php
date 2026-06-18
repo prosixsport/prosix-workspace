@@ -175,12 +175,22 @@ class OrderController extends Controller
                 $this->sendNewOrderNotifications($order, $newMemberIds, auth()->id());
             }
         } else {
-            $order->update($request->only([
-                'status',
-                'status_color',
-                'trk',
-                'notes',
-            ]));
+          $allowedFields = [
+    'status',
+    'status_color',
+    'trk',
+];
+
+$isOrderMember = $order->members()
+    ->where('users.id', $user->id)
+    ->exists();
+
+if ($isOrderMember && $request->has('notes')) {
+    $allowedFields[] = 'notes';
+}
+
+$order->update($request->only($allowedFields));
+
         }
 
         $order->refresh();

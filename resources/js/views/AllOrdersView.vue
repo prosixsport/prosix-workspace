@@ -712,10 +712,14 @@ lastNotificationId: null,
   },
 
   computed: {
-  canEditNotes() {
-  return this.currentUser?.role === 'super_admin'
-    || this.currentUser?.role === 'admin'
-    || this.currentUser?.role === 'member'
+canEditNotes() {
+  if (!this.selectedOrder || !this.currentUser) return false
+
+  if (this.currentUser.role === 'super_admin') return true
+
+  return (this.selectedOrder.members || []).some(m =>
+    Number(m.id) === Number(this.currentUser.id)
+  )
 },
   canUploadFiles() {
   return this.currentUser?.role === 'super_admin'
