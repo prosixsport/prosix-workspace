@@ -1,11 +1,9 @@
 <?php
 
 namespace App\Http\Controllers;
-
-use App\Models\Order;
-use App\Models\OrderNote;
-use App\Models\OrderRead;
 use App\Models\OrderNotification;
+use App\Models\Order;
+use App\Models\OrderRead;
 use App\Models\User;
 use App\Mail\NewOrderAssignedMail;
 use App\Services\FcmService;
@@ -15,33 +13,29 @@ use Illuminate\Support\Facades\DB;
 
 class OrderController extends Controller
 {
-   public function index()
-{
-    $user = auth()->user();
+    public function index()
+    {
+        $user = auth()->user();
 
-    $orders = Order::with([
-            'members',
-            'reads.user:id,name,email,profile_photo',
-            'notes.user:id,name,email,profile_photo'
-        ])
-        ->when($user && $user->role !== 'super_admin' && $user->role !== 'admin', function ($q) use ($user) {
-            $q->whereHas('members', function ($m) use ($user) {
-                $m->where('users.id', $user->id);
+        $orders = Order::with(['members', 'reads.user:id,name,email,profile_photo'])
+            ->when($user && $user->role !== 'super_admin' && $user->role !== 'admin', function ($q) use ($user) {
+                $q->whereHas('members', function ($m) use ($user) {
+                    $m->where('users.id', $user->id);
+                });
+            })
+            ->latest()
+            ->get()
+            ->map(function ($order) use ($user) {
+                $read = $order->reads->firstWhere('user_id', $user?->id);
+
+                $order->user_has_seen = !empty($read?->read_at);
+                $order->read_at = $read?->read_at;
+
+                return $order;
             });
-        })
-        ->latest()
-        ->get()
-        ->map(function ($order) use ($user) {
-            $read = $order->reads->firstWhere('user_id', $user?->id);
 
-            $order->user_has_seen = !empty($read?->read_at);
-            $order->read_at = $read?->read_at;
-
-            return $order;
-        });
-
-    return response()->json($orders);
-}
+        return response()->json($orders);
+    }
 
     public function store(Request $request)
     {
@@ -75,7 +69,7 @@ class OrderController extends Controller
             'payment'          => $request->payment ?? '0 % Paid',
             'payment_received' => $request->payment_received ?? 0,
             'payment_balance'  => $request->payment_balance ?? 0,
-            'notes'            => '',
+            'notes'            => $request->notes ?? '',
             'created_by'       => $user->id,
         ]);
 
@@ -89,23 +83,11 @@ class OrderController extends Controller
             ]);
         }
 
-        if ($request->filled('notes')) {
-            OrderNote::updateOrCreate(
-                [
-                    'order_id' => $order->id,
-                    'user_id' => $user->id,
-                ],
-                [
-                    'note' => $request->notes,
-                ]
-            );
-        }
-
         $this->sendNewOrderNotifications($order, $request->member_ids ?? [], $user->id);
 
         return response()->json([
             'success' => true,
-            'order'   => $order->load(['members', 'notes.user:id,name,email,profile_photo'])
+            'order'   => $order->load('members')
         ]);
     }
 
@@ -114,11 +96,7 @@ class OrderController extends Controller
         $this->checkAccess($order);
 
         return response()->json(
-            $order->load([
-                'members',
-                'messages.user',
-                'notes.user:id,name,email,profile_photo'
-            ])
+            $order->load(['members', 'messages.user'])
         );
     }
 
@@ -131,6 +109,7 @@ class OrderController extends Controller
 
         $oldStatus = $order->status;
         $oldTracking = $order->trk;
+        $oldNotes = $order->notes;
         $oldPayment = $order->payment;
         $oldReceived = $order->payment_received;
         $oldBalance = $order->payment_balance;
@@ -145,6 +124,7 @@ class OrderController extends Controller
             'payment' => 'nullable|string|max:255',
             'payment_received' => 'nullable|numeric',
             'payment_balance' => 'nullable|numeric',
+            'notes' => 'nullable|string',
             'member_ids' => 'nullable|array',
             'member_ids.*' => 'exists:users,id',
         ]);
@@ -165,6 +145,7 @@ class OrderController extends Controller
                 'payment',
                 'payment_received',
                 'payment_balance',
+                'notes',
             ]));
 
             if ($request->has('member_ids')) {
@@ -193,17 +174,30 @@ class OrderController extends Controller
 
                 $this->sendNewOrderNotifications($order, $newMemberIds, auth()->id());
             }
-        } else {
-            $allowedFields = [
-                'status',
-                'status_color',
-                'trk',
-            ];
+  } else {
+    $allowedFields = [
+        'status',
+        'status_color',
+        'trk',
+    ];
 
-            $order->update($request->only($allowedFields));
-        }
+    if ($user->can_create_orders && $request->has('notes')) {
+        $allowedFields[] = 'notes';
+    }
+
+    $order->update($request->only($allowedFields));
+}
 
         $order->refresh();
+
+        if ($request->has('notes') && $oldNotes !== $order->notes) {
+            $this->sendOrderActivityNotification(
+                $order,
+                auth()->id(),
+                'Notes Updated',
+                auth()->user()->name . ' changed notes in order: ' . $order->name
+            );
+        }
 
         if ($request->has('status') && $oldStatus !== $order->status) {
             $this->sendOrderActivityNotification(
@@ -238,55 +232,9 @@ class OrderController extends Controller
 
         return response()->json([
             'success' => true,
-            'order' => $order->load(['members', 'notes.user:id,name,email,profile_photo'])
+            'order' => $order->load('members')
         ]);
     }
-
-public function saveNote(Request $request, Order $order)
-{
-    $this->checkAccess($order);
-
-    $request->validate([
-        'note' => 'nullable|string',
-        'user_id' => 'nullable|exists:users,id',
-    ]);
-
-    $user = auth()->user();
-
-    if ($user->role !== 'super_admin' && !$user->can_create_orders) {
-        return response()->json([
-            'message' => 'You do not have permission to add or edit notes.'
-        ], 403);
-    }
-
-    $noteUserId = $user->id;
-
-    if ($user->role === 'super_admin' && $request->filled('user_id')) {
-        $noteUserId = $request->user_id;
-    }
-
-    $note = OrderNote::updateOrCreate(
-        [
-            'order_id' => $order->id,
-            'user_id'  => $noteUserId,
-        ],
-        [
-            'note' => $request->note ?? '',
-        ]
-    );
-
-    $this->sendOrderActivityNotification(
-        $order,
-        auth()->id(),
-        'Notes Updated',
-        auth()->user()->name . ' updated note in order: ' . $order->name
-    );
-
-    return response()->json([
-        'success' => true,
-        'note' => $note->load('user:id,name,email,profile_photo')
-    ]);
-}
 
     public function destroy(Order $order)
     {
@@ -412,76 +360,78 @@ public function saveNote(Request $request, Order $order)
         return true;
     }
 
-    private function sendNewOrderNotifications(Order $order, $memberIds, $skipUserId = null)
-    {
-        $ids = collect($memberIds ?? [])
-            ->map(fn ($id) => (int) $id)
-            ->filter(fn ($id) => $id > 0)
-            ->filter(fn ($id) => (int) $id !== (int) $skipUserId)
-            ->unique()
-            ->values();
+  private function sendNewOrderNotifications(Order $order, $memberIds, $skipUserId = null)
+{
+    $ids = collect($memberIds ?? [])
+        ->map(fn ($id) => (int) $id)
+        ->filter(fn ($id) => $id > 0)
+        ->filter(fn ($id) => (int) $id !== (int) $skipUserId)
+        ->unique()
+        ->values();
 
-        if ($ids->isEmpty()) {
-            return;
-        }
-
-        $members = User::whereIn('id', $ids)->get();
-
-        foreach ($members as $member) {
-            OrderNotification::create([
-                'user_id' => $member->id,
-                'order_id' => $order->id,
-                'title' => 'New Order Assigned',
-                'message' => 'You have been added to order: ' . $order->name,
-                'is_read' => 0,
-            ]);
-
-            try {
-                Mail::to($member->email)->send(new NewOrderAssignedMail($order, $member));
-            } catch (\Throwable $e) {
-                report($e);
-            }
-
-            FcmService::send(
-                $member->fcm_token,
-                'New Order Assigned',
-                'You have been added to order: ' . $order->name,
-                [
-                    'type' => 'order',
-                    'order_id' => (string) $order->id,
-                    'order_name' => (string) $order->name,
-                ]
-            );
-        }
+    if ($ids->isEmpty()) {
+        return;
     }
+
+    $members = User::whereIn('id', $ids)->get();
+
+    foreach ($members as $member) {
+
+        OrderNotification::create([
+            'user_id' => $member->id,
+            'order_id' => $order->id,
+            'title' => 'New Order Assigned',
+            'message' => 'You have been added to order: ' . $order->name,
+            'is_read' => 0,
+        ]);
+
+        try {
+            Mail::to($member->email)->send(new NewOrderAssignedMail($order, $member));
+        } catch (\Throwable $e) {
+            report($e);
+        }
+
+        FcmService::send(
+            $member->fcm_token,
+            'New Order Assigned',
+            'You have been added to order: ' . $order->name,
+            [
+                'type' => 'order',
+                'order_id' => (string) $order->id,
+                'order_name' => (string) $order->name,
+            ]
+        );
+    }
+}
 
     private function sendOrderActivityNotification(Order $order, $skipUserId, $title, $body)
-    {
-        $members = $order->members()
-            ->where('users.id', '!=', $skipUserId)
-            ->get();
+{
+    $members = $order->members()
+        ->where('users.id', '!=', $skipUserId)
+        ->get();
 
-        foreach ($members as $member) {
-            OrderNotification::create([
-                'user_id' => $member->id,
-                'order_id' => $order->id,
-                'title' => $title,
-                'message' => $body,
-                'is_read' => 0,
-            ]);
+    foreach ($members as $member) {
 
-            FcmService::send(
-                $member->fcm_token,
-                $title,
-                $body,
-                [
-                    'type' => 'order_activity',
-                    'order_id' => (string) $order->id,
-                    'order_name' => (string) $order->name,
-                ]
-            );
-        }
+        OrderNotification::create([
+            'user_id' => $member->id,
+            'order_id' => $order->id,
+            'title' => $title,
+            'message' => $body,
+            'is_read' => 0,
+        ]);
+
+        FcmService::send(
+            $member->fcm_token,
+            $title,
+            $body,
+            [
+                'type' => 'order_activity',
+                'order_id' => (string) $order->id,
+                'order_name' => (string) $order->name,
+            ]
+        );
     }
+}
 
     public function bulkMembers(Request $request)
     {
@@ -493,17 +443,7 @@ public function saveNote(Request $request, Order $order)
         $orders = Order::whereIn('id', $request->order_ids)->get();
 
         foreach ($orders as $order) {
-            $syncData = [];
-
-            foreach ($request->member_ids ?? [] as $memberId) {
-                $syncData[$memberId] = ['role' => 'member'];
-            }
-
-            if ($order->created_by) {
-                $syncData[$order->created_by] = ['role' => 'admin'];
-            }
-
-            $order->members()->sync($syncData);
+            $order->members()->sync($request->member_ids);
         }
 
         return response()->json([
@@ -523,18 +463,11 @@ public function saveNote(Request $request, Order $order)
         foreach ($orders as $order) {
             $newOrder = $order->replicate();
             $newOrder->name = $order->name . ' Copy';
-            $newOrder->created_by = auth()->id();
             $newOrder->save();
 
-            $syncData = [];
-
-            foreach ($order->members as $member) {
-                $syncData[$member->id] = [
-                    'role' => $member->pivot->role ?? 'member'
-                ];
-            }
-
-            $newOrder->members()->sync($syncData);
+            $newOrder->members()->sync(
+                $order->members->pluck('id')->toArray()
+            );
         }
 
         return response()->json([
