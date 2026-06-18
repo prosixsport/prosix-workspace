@@ -15,33 +15,33 @@ use Illuminate\Support\Facades\DB;
 
 class OrderController extends Controller
 {
-    public function index()
-    {
-        $user = auth()->user();
+   public function index()
+{
+    $user = auth()->user();
 
-        $orders = Order::with([
-                'members',
-                'reads.user:id,name,email,profile_photo',
-                'notes.user:id,name,email,profile_photo'
-            ])
-            ->when($user && $user->role !== 'super_admin', function ($q) use ($user) {
-                $q->whereHas('members', function ($m) use ($user) {
-                    $m->where('users.id', $user->id);
-                });
-            })
-            ->latest()
-            ->get()
-            ->map(function ($order) use ($user) {
-                $read = $order->reads->firstWhere('user_id', $user?->id);
-
-                $order->user_has_seen = !empty($read?->read_at);
-                $order->read_at = $read?->read_at;
-
-                return $order;
+    $orders = Order::with([
+            'members',
+            'reads.user:id,name,email,profile_photo',
+            'notes.user:id,name,email,profile_photo'
+        ])
+        ->when($user && $user->role !== 'super_admin' && $user->role !== 'admin', function ($q) use ($user) {
+            $q->whereHas('members', function ($m) use ($user) {
+                $m->where('users.id', $user->id);
             });
+        })
+        ->latest()
+        ->get()
+        ->map(function ($order) use ($user) {
+            $read = $order->reads->firstWhere('user_id', $user?->id);
 
-        return response()->json($orders);
-    }
+            $order->user_has_seen = !empty($read?->read_at);
+            $order->read_at = $read?->read_at;
+
+            return $order;
+        });
+
+    return response()->json($orders);
+}
 
     public function store(Request $request)
     {
