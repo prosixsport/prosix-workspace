@@ -72,7 +72,9 @@
   </button>
 </div>
 
-
+<div v-if="canCreateOrder" class="add-row" @click="addNewOrder">
+            <i class="fa-solid fa-plus me-1"></i> Add New Order
+      </div>
 
 
       <div v-if="loadingOrders" class="orders-loading">Loading orders...</div>
@@ -136,9 +138,7 @@ v-for="(av, i) in order.owners.slice(0, 4)"
         </div>
       </div>
 
-<div v-if="canCreateOrder" class="add-row" @click="addNewOrder">
-            <i class="fa-solid fa-plus me-1"></i> Add New Order
-      </div>
+
     </div>
 
     <!-- RIGHT PANEL -->
@@ -162,6 +162,11 @@ v-for="(av, i) in order.owners.slice(0, 4)"
             <span v-else>{{ userInitial }}</span>
           </button>
         </div>
+
+
+
+
+
       </div>
 
  <!-- INFO BAR -->
@@ -288,6 +293,10 @@ v-for="(av, i) in order.owners.slice(0, 4)"
             </div>
           </div>
         </div>
+        <div v-if="selectedOrder" class="current-order-title">
+  <i class="fa-solid fa-folder-open"></i>
+  <span>{{ selectedOrder.name }}</span>
+</div>
       </div>
 
       <!-- BODY -->
@@ -1798,21 +1807,28 @@ showDesktopNotification(notification) {
   overflow-x: hidden !important;
   flex-shrink: 0;
 }
+.orders-left{
+  scrollbar-width: none !important;
+  -ms-overflow-style: none !important;
+}
 
+.orders-left::-webkit-scrollbar{
+  display: none !important;
+}
 .resize-bar{
   position:fixed;
   top:50%;
-  transform:translate(-50%,-50%);
+  transform:translate(-20%,-50%);
   z-index:99999;
   width:28px;
-  height:90px;
+  height:80px;
   cursor:col-resize;
 }
 
 .resize-handle{
   width:22px;
   height:90px;
-  background:#6161ff;
+  background:#000000;
   border-radius:0 14px 14px 0;
   display:flex;
   align-items:center;
@@ -1822,11 +1838,7 @@ showDesktopNotification(notification) {
 .resize-handle i{
   color:#fff;
 }
-.resize-bar:hover .resize-handle{
-  background:rgba(97,97,255,.15);
-  transform:scale(1.05);
-}
-.resize-bar:hover { background: #6161ff; }
+
 
 .orders-left-header {
   padding: 16px 16px 8px;
@@ -1916,7 +1928,27 @@ grid-template-columns: 32px 1fr 118px 38px;
 }
 
 .list-row:hover { background: rgba(255,255,255,0.04); }
-.list-row.active { background: rgba(97,97,255,0.15); }
+.list-row.active{
+  background:#ffffff !important;
+  border-left:5px solid #6161ff !important;
+}
+
+.list-row.active.seen,
+.list-row.active.unread{
+  background:#ffffff !important;
+}
+
+.list-row.active .col-task,
+.list-row.active .col-task span,
+.list-row.active .row-arrow{
+  color:#000 !important;
+  font-weight:900 !important;
+}
+
+.list-row.active .order-dots-btn{
+  opacity:1;
+  color:#000;
+}
 .list-row.unread { background: rgba(255,255,255,0.075); border-left: 4px solid #fff; }
 .list-row.seen {
   background: rgba(255,255,255,0.02);
@@ -2086,7 +2118,38 @@ grid-template-columns: 32px 1fr 118px 38px;
   align-items: center;
   gap: 10px;
 }
+.current-order-title{
+  position:absolute;
+  right:10px;
+  top:50%;
+  transform:translateY(-50%);
 
+  background:#fff;
+  color:#000;
+
+  border:1px solid #d8d5ff;
+  border-radius:8px;
+
+  padding:8px 14px;
+
+  font-size:13px;
+  font-weight:900;
+
+  display:flex;
+  align-items:center;
+  gap:8px;
+
+  max-width:450px;
+  white-space:nowrap;
+  overflow:hidden;
+  text-overflow:ellipsis;
+
+  z-index:10;
+}
+
+.current-order-title i{
+  color:#6161ff;
+}
 .header-icon-btn {
   position: relative;
   width: 36px;
