@@ -1,6 +1,6 @@
+
 <template>
   <div class="orders-layout" :class="{ 'left-open': mobileLeftOpen, 'chat-open': showChat }" @click="closeAllMenus">
-
     <!-- MOBILE TOP BAR -->
     <div class="mobile-topbar">
       <button class="mobile-menu-btn" @click.stop="mobileLeftOpen = !mobileLeftOpen">
@@ -22,6 +22,7 @@
     <i class="fa-solid fa-angles-right"></i>
   </div>
 </div>
+
     <!-- LEFT PANEL -->
     <div class="orders-left" :style="desktopLeftStyle">
 
@@ -1806,6 +1807,7 @@ showDesktopNotification(notification) {
   background: rgba(0,0,0,0.5);
   z-index: 998;
 }
+
 .order-search-box{
   margin:10px;
   padding:10px;
@@ -1827,9 +1829,11 @@ showDesktopNotification(notification) {
   background:transparent;
   color:#fff;
 }
-/* ===========================
-   LAYOUT
-   =========================== */
+
+/*===========================
+  LAYOUT
+  ===========================*/
+
 .orders-layout {
   display: flex;
   height: 100vh;

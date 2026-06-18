@@ -48,18 +48,17 @@
           :class="{ active: activeChatMember?.id === m.id }"
           @click="startChatWith(m)"
         >
-          <div
-            class="member-av"
-            :style="{ background: m.profile_photo_url ? '#fff' : m.color }"
-            title="View profile"
-            @click.stop="openProfile(m)"
-          >
+         <div
+  class="member-av"
+  :style="{ background: m.profile_photo_url ? '#fff' : m.color }"
+  title="Tag member"
+>
             <img v-if="m.profile_photo_url" :src="m.profile_photo_url" class="member-av-img" />
             <span v-else>{{ m.initial }}</span>
             <span class="online-dot online"></span>
           </div>
-          <div class="member-info" @click.stop="openProfile(m)" title="View profile">
-            <div class="member-name">{{ m.name }}</div>
+<div class="member-info" title="Tag member">
+                <div class="member-name">{{ m.name }}</div>
             <div class="member-role">{{ m.role }}</div>
           </div>
           <button v-if="isSuperAdmin" class="member-remove-btn" title="Remove from order" @click.stop="removeMember(m.id)">
@@ -202,7 +201,7 @@
       <div class="chat-input-hint">Enter to send · @ to tag · Click member to auto-tag</div>
     </div>
             <!-- DELETE MODAL -->
-    <div v-if="deleteTarget" class="delete-modal-overlay" @click.sel   f="deleteTarget = null">
+    <div v-if="deleteTarget" class="delete-modal-overlay" @click.self="deleteTarget = null">
       <div class="delete-modal">
         <div class="delete-modal-title">Delete message?</div>
         <button class="delete-modal-option" @click="deleteForMe">Delete for me</button>
