@@ -71,6 +71,15 @@
     <i class="fa-solid fa-trash"></i> Delete
   </button>
 </div>
+<div class="order-search-box">
+  <i class="fa-solid fa-magnifying-glass"></i>
+  <input
+    v-model="searchOrder"
+    type="text"
+    placeholder="Search order..."
+    @click.stop
+  />
+</div>
 
 <div v-if="canCreateOrder" class="add-row" @click="addNewOrder">
             <i class="fa-solid fa-plus me-1"></i> Add New Order
@@ -672,6 +681,7 @@ notificationTimer: null,
 notifications: [],
 notificationCount: 0,
 lastNotificationId: null,
+    searchOrder: '',
 
       selectedOrders: [],
       selectAll: false,
@@ -736,7 +746,19 @@ lastNotificationId: null,
       try { const user = JSON.parse(raw); return user?.name ? user.name.charAt(0).toUpperCase() : 'A' } catch { return 'A' }
     },
     userPhoto() { return this.currentUser?.profile_photo_url || null },
-    filteredOrders() { return this.orders.filter(o => o.group === this.activeGroup) },
+filteredOrders() {
+  return this.orders.filter(o => {
+    const groupMatch = o.group === this.activeGroup
+
+    const searchMatch =
+      !this.searchOrder ||
+      o.name.toLowerCase().includes(
+        this.searchOrder.toLowerCase()
+      )
+
+    return groupMatch && searchMatch
+  })
+},
     unreadOrdersCount() { return this.orders.filter(o => !o.user_has_seen).length },
     desktopLeftStyle() {
       // Only apply dynamic width on desktop (>= 768px)
@@ -1784,7 +1806,27 @@ showDesktopNotification(notification) {
   background: rgba(0,0,0,0.5);
   z-index: 998;
 }
+.order-search-box{
+  margin:10px;
+  padding:10px;
+  border-radius:8px;
+  background:#2a2d44;
+  display:flex;
+  align-items:center;
+  gap:8px;
+}
 
+.order-search-box i{
+  color:#fff;
+}
+
+.order-search-box input{
+  width:100%;
+  border:none;
+  outline:none;
+  background:transparent;
+  color:#fff;
+}
 /* ===========================
    LAYOUT
    =========================== */
@@ -2122,7 +2164,7 @@ grid-template-columns: 32px 1fr 118px 38px;
 }
 .current-order-title{
   position:absolute;
-  right:10px;
+  right:19px;
   top:50%;
   transform:translateY(-50%);
 
