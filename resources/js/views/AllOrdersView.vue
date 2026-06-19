@@ -662,7 +662,7 @@ export default {
   components: { Multiselect, OrderChatPanel },
   data() {
     return {
-      leftWidth: 350,
+      leftWidth: 370,
       isResizing: false,
       mobileLeftOpen: false,
       loadingOrders: false,
