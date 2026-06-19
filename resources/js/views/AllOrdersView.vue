@@ -124,7 +124,7 @@
 
   <div class="avatar-stack">
     <div
-      v-for="(av, i) in order.owners.slice(0, 3)"
+      v-for="(av, i) in order.owners.slice(0, 2)"
       :key="i"
       class="av"
       :class="{ 'has-photo': av.profile_photo_url }"
@@ -136,8 +136,8 @@
       <span v-else>{{ av.initial }}</span>
     </div>
 
-    <div v-if="order.owners.length > 3" class="av av-count">
-      +{{ order.owners.length - 3 }}
+    <div v-if="order.owners.length > 2" class="av av-count">
+      +{{ order.owners.length - 2 }}
     </div>
   </div>
 </div>
