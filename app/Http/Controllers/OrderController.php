@@ -13,83 +13,94 @@ use Illuminate\Support\Facades\DB;
 
 class OrderController extends Controller
 {
-    public function index()
-    {
-        $user = auth()->user();
+ public function index()
+{
+    $user = auth()->user();
 
-        $orders = Order::with(['members', 'reads.user:id,name,email,profile_photo'])
-            ->when($user && $user->role !== 'super_admin' && $user->role !== 'admin', function ($q) use ($user) {
-                $q->whereHas('members', function ($m) use ($user) {
-                    $m->where('users.id', $user->id);
-                });
-            })
-            ->latest()
-            ->get()
-            ->map(function ($order) use ($user) {
-                $read = $order->reads->firstWhere('user_id', $user?->id);
-
-                $order->user_has_seen = !empty($read?->read_at);
-                $order->read_at = $read?->read_at;
-
-                return $order;
+    $orders = Order::with(['members', 'clients', 'reads.user:id,name,email,profile_photo'])
+        ->when($user && $user->role === 'client', function ($q) use ($user) {
+            $q->whereHas('clients', function ($c) use ($user) {
+                $c->where('clients.user_id', $user->id);
             });
+        })
+        ->when($user && !in_array($user->role, ['super_admin', 'admin', 'client']), function ($q) use ($user) {
+            $q->whereHas('members', function ($m) use ($user) {
+                $m->where('users.id', $user->id);
+            });
+        })
+        ->latest()
+        ->get()
+        ->map(function ($order) use ($user) {
+            $read = $order->reads->firstWhere('user_id', $user?->id);
 
-        return response()->json($orders);
-    }
+            $order->user_has_seen = !empty($read?->read_at);
+            $order->read_at = $read?->read_at;
 
-    public function store(Request $request)
-    {
-        $request->validate([
-            'name' => 'required|string|max:255',
-            'member_ids' => 'nullable|array',
-            'member_ids.*' => 'exists:users,id',
-        ]);
+            return $order;
+        });
 
-        $user = auth()->user();
+    return response()->json($orders);
+}
 
-        if (!$user) {
-            return response()->json([
-                'message' => 'Unauthenticated. Please login again.'
-            ], 401);
-        }
+  public function store(Request $request)
+{
+    $request->validate([
+        'name' => 'required|string|max:255',
+        'member_ids' => 'nullable|array',
+        'member_ids.*' => 'exists:users,id',
+        'client_ids' => 'nullable|array',
+        'client_ids.*' => 'exists:clients,id',
+        'shipping_address' => 'nullable|string',
+    ]);
 
-        if ($user->role !== 'super_admin' && !$user->can_create_orders) {
-            return response()->json([
-                'message' => 'You do not have permission to create orders.'
-            ], 403);
-        }
+    $user = auth()->user();
 
-        $order = Order::create([
-            'name'             => $request->name,
-            'po'               => $request->po,
-            'ship_date'        => $request->ship_date,
-            'status'           => $request->status ?? 'Pending',
-            'status_color'     => $request->status_color ?? '#fdab3d',
-            'trk'              => $request->trk,
-            'payment'          => $request->payment ?? '0 % Paid',
-            'payment_received' => $request->payment_received ?? 0,
-            'payment_balance'  => $request->payment_balance ?? 0,
-            'notes'            => $request->notes ?? '',
-            'created_by'       => $user->id,
-        ]);
-
-        $order->members()->syncWithoutDetaching([
-            $user->id => ['role' => 'admin']
-        ]);
-
-        foreach ($request->member_ids ?? [] as $memberId) {
-            $order->members()->syncWithoutDetaching([
-                $memberId => ['role' => 'member']
-            ]);
-        }
-
-        $this->sendNewOrderNotifications($order, $request->member_ids ?? [], $user->id);
-
+    if (!$user) {
         return response()->json([
-            'success' => true,
-            'order'   => $order->load('members')
+            'message' => 'Unauthenticated. Please login again.'
+        ], 401);
+    }
+
+    if ($user->role !== 'super_admin' && !$user->can_create_orders) {
+        return response()->json([
+            'message' => 'You do not have permission to create orders.'
+        ], 403);
+    }
+
+    $order = Order::create([
+        'name'             => $request->name,
+        'po'               => $request->po,
+        'ship_date'        => $request->ship_date,
+        'status'           => $request->status ?? 'Pending',
+        'status_color'     => $request->status_color ?? '#fdab3d',
+        'trk'              => $request->trk,
+        'payment'          => $request->payment ?? '0 % Paid',
+        'payment_received' => $request->payment_received ?? 0,
+        'payment_balance'  => $request->payment_balance ?? 0,
+        'notes'            => $request->notes ?? '',
+        'shipping_address' => $request->shipping_address,
+        'created_by'       => $user->id,
+    ]);
+
+    $order->members()->syncWithoutDetaching([
+        $user->id => ['role' => 'admin']
+    ]);
+
+    foreach ($request->member_ids ?? [] as $memberId) {
+        $order->members()->syncWithoutDetaching([
+            $memberId => ['role' => 'member']
         ]);
     }
+
+    $order->clients()->sync($request->client_ids ?? []);
+
+    $this->sendNewOrderNotifications($order, $request->member_ids ?? [], $user->id);
+
+    return response()->json([
+        'success' => true,
+        'order'   => $order->load(['members', 'clients'])
+    ]);
+}
 
     public function show(Order $order)
     {
@@ -100,141 +111,157 @@ class OrderController extends Controller
         );
     }
 
-    public function update(Request $request, Order $order)
-    {
-        $this->checkAccess($order);
+public function update(Request $request, Order $order)
+{
+    $this->checkAccess($order);
 
-        $user = auth()->user();
-        $isSuperAdmin = $user && $user->role === 'super_admin';
-
-        $oldStatus = $order->status;
-        $oldTracking = $order->trk;
-        $oldNotes = $order->notes;
-        $oldPayment = $order->payment;
-        $oldReceived = $order->payment_received;
-        $oldBalance = $order->payment_balance;
-
-        $request->validate([
-            'name' => 'nullable|string|max:255',
-            'po' => 'nullable|string|max:255',
-            'ship_date' => 'nullable|date',
-            'status' => 'nullable|string|max:255',
-            'status_color' => 'nullable|string|max:255',
-            'trk' => 'nullable|string|max:255',
-            'payment' => 'nullable|string|max:255',
-            'payment_received' => 'nullable|numeric',
-            'payment_balance' => 'nullable|numeric',
-            'notes' => 'nullable|string',
-            'member_ids' => 'nullable|array',
-            'member_ids.*' => 'exists:users,id',
-        ]);
-
-        $oldMemberIds = $order->members()
-            ->pluck('users.id')
-            ->map(fn ($id) => (int) $id)
-            ->toArray();
-
-        if ($isSuperAdmin) {
-            $order->update($request->only([
-                'name',
-                'po',
-                'ship_date',
-                'status',
-                'status_color',
-                'trk',
-                'payment',
-                'payment_received',
-                'payment_balance',
-                'notes',
-            ]));
-
-            if ($request->has('member_ids')) {
-                $syncData = [];
-
-                foreach ($request->member_ids ?? [] as $memberId) {
-                    $syncData[$memberId] = ['role' => 'member'];
-                }
-
-                if ($order->created_by) {
-                    $syncData[$order->created_by] = ['role' => 'admin'];
-                }
-
-                if (auth()->id()) {
-                    $syncData[auth()->id()] = ['role' => 'admin'];
-                }
-
-                $order->members()->sync($syncData);
-
-                $newMemberIds = collect(array_keys($syncData))
-                    ->map(fn ($id) => (int) $id)
-                    ->filter(fn ($id) => !in_array($id, $oldMemberIds))
-                    ->filter(fn ($id) => $id !== (int) auth()->id())
-                    ->unique()
-                    ->values();
-
-                $this->sendNewOrderNotifications($order, $newMemberIds, auth()->id());
-            }
-  } else {
-    $allowedFields = [
-        'status',
-        'status_color',
-        'trk',
-    ];
-
-    if ($user->can_create_orders && $request->has('notes')) {
-        $allowedFields[] = 'notes';
-    }
-
-    $order->update($request->only($allowedFields));
+    $user = auth()->user();
+    if ($user && $user->role === 'client') {
+    return response()->json([
+        'message' => 'Clients can only view orders.'
+    ], 403);
 }
+    $isSuperAdmin = $user && $user->role === 'super_admin';
 
-        $order->refresh();
+    $oldStatus = $order->status;
+    $oldTracking = $order->trk;
+    $oldNotes = $order->notes;
+    $oldPayment = $order->payment;
+    $oldReceived = $order->payment_received;
+    $oldBalance = $order->payment_balance;
 
-        if ($request->has('notes') && $oldNotes !== $order->notes) {
-            $this->sendOrderActivityNotification(
-                $order,
-                auth()->id(),
-                'Notes Updated',
-                auth()->user()->name . ' changed notes in order: ' . $order->name
-            );
+    $request->validate([
+        'name' => 'nullable|string|max:255',
+        'po' => 'nullable|string|max:255',
+        'ship_date' => 'nullable|date',
+        'status' => 'nullable|string|max:255',
+        'status_color' => 'nullable|string|max:255',
+        'trk' => 'nullable|string|max:255',
+        'payment' => 'nullable|string|max:255',
+        'payment_received' => 'nullable|numeric',
+        'payment_balance' => 'nullable|numeric',
+        'notes' => 'nullable|string',
+        'shipping_address' => 'nullable|string',
+
+        'member_ids' => 'nullable|array',
+        'member_ids.*' => 'exists:users,id',
+
+        'client_ids' => 'nullable|array',
+        'client_ids.*' => 'exists:clients,id',
+    ]);
+
+    $oldMemberIds = $order->members()
+        ->pluck('users.id')
+        ->map(fn ($id) => (int) $id)
+        ->toArray();
+
+    if ($isSuperAdmin) {
+        $order->update($request->only([
+            'name',
+            'po',
+            'ship_date',
+            'status',
+            'status_color',
+            'trk',
+            'payment',
+            'payment_received',
+            'payment_balance',
+            'notes',
+            'shipping_address',
+        ]));
+
+        if ($request->has('member_ids')) {
+            $syncData = [];
+
+            foreach ($request->member_ids ?? [] as $memberId) {
+                $syncData[$memberId] = ['role' => 'member'];
+            }
+
+            if ($order->created_by) {
+                $syncData[$order->created_by] = ['role' => 'admin'];
+            }
+
+            if (auth()->id()) {
+                $syncData[auth()->id()] = ['role' => 'admin'];
+            }
+
+            $order->members()->sync($syncData);
+
+            $newMemberIds = collect(array_keys($syncData))
+                ->map(fn ($id) => (int) $id)
+                ->filter(fn ($id) => !in_array($id, $oldMemberIds))
+                ->filter(fn ($id) => $id !== (int) auth()->id())
+                ->unique()
+                ->values();
+
+            $this->sendNewOrderNotifications($order, $newMemberIds, auth()->id());
         }
 
-        if ($request->has('status') && $oldStatus !== $order->status) {
-            $this->sendOrderActivityNotification(
-                $order,
-                auth()->id(),
-                'Status Updated',
-                auth()->user()->name . ' changed status from ' . ($oldStatus ?: 'N/A') . ' to ' . $order->status . ' in order: ' . $order->name
-            );
+        if ($request->has('client_ids')) {
+            $order->clients()->sync($request->client_ids ?? []);
         }
 
-        if ($request->has('trk') && $oldTracking !== $order->trk) {
-            $this->sendOrderActivityNotification(
-                $order,
-                auth()->id(),
-                'Tracking Updated',
-                auth()->user()->name . ' changed tracking in order: ' . $order->name
-            );
+    } else {
+        $allowedFields = [
+            'status',
+            'status_color',
+            'trk',
+        ];
+
+        if ($user->can_create_orders && $request->has('notes')) {
+            $allowedFields[] = 'notes';
         }
 
-        if (
-            ($request->has('payment') && $oldPayment !== $order->payment) ||
-            ($request->has('payment_received') && (float) $oldReceived !== (float) $order->payment_received) ||
-            ($request->has('payment_balance') && (float) $oldBalance !== (float) $order->payment_balance)
-        ) {
-            $this->sendOrderActivityNotification(
-                $order,
-                auth()->id(),
-                'Payment Updated',
-                auth()->user()->name . ' changed payment details in order: ' . $order->name
-            );
-        }
-
-        return response()->json([
-            'success' => true,
-            'order' => $order->load('members')
-        ]);
+        $order->update($request->only($allowedFields));
     }
+
+    $order->refresh();
+
+    if ($request->has('notes') && $oldNotes !== $order->notes) {
+        $this->sendOrderActivityNotification(
+            $order,
+            auth()->id(),
+            'Notes Updated',
+            auth()->user()->name . ' changed notes in order: ' . $order->name
+        );
+    }
+
+    if ($request->has('status') && $oldStatus !== $order->status) {
+        $this->sendOrderActivityNotification(
+            $order,
+            auth()->id(),
+            'Status Updated',
+            auth()->user()->name . ' changed status from ' . ($oldStatus ?: 'N/A') . ' to ' . $order->status . ' in order: ' . $order->name
+        );
+    }
+
+    if ($request->has('trk') && $oldTracking !== $order->trk) {
+        $this->sendOrderActivityNotification(
+            $order,
+            auth()->id(),
+            'Tracking Updated',
+            auth()->user()->name . ' changed tracking in order: ' . $order->name
+        );
+    }
+
+    if (
+        ($request->has('payment') && $oldPayment !== $order->payment) ||
+        ($request->has('payment_received') && (float) $oldReceived !== (float) $order->payment_received) ||
+        ($request->has('payment_balance') && (float) $oldBalance !== (float) $order->payment_balance)
+    ) {
+        $this->sendOrderActivityNotification(
+            $order,
+            auth()->id(),
+            'Payment Updated',
+            auth()->user()->name . ' changed payment details in order: ' . $order->name
+        );
+    }
+
+    return response()->json([
+        'success' => true,
+        'order' => $order->load(['members', 'clients'])
+    ]);
+}
 
     public function destroy(Order $order)
     {
@@ -341,16 +368,17 @@ class OrderController extends Controller
         return response()->json(['reads' => $reads]);
     }
 
-    private function checkAccess($order)
-    {
-        $user = auth()->user();
+  private function checkAccess($order)
+{
+    $user = auth()->user();
 
-        if ($user && $user->role === 'super_admin') {
-            return true;
-        }
+    if ($user && $user->role === 'super_admin') {
+        return true;
+    }
 
-        $allowed = $order->members()
-            ->where('users.id', $user?->id)
+    if ($user && $user->role === 'client') {
+        $allowed = $order->clients()
+            ->where('clients.user_id', $user->id)
             ->exists();
 
         if (!$allowed) {
@@ -359,6 +387,17 @@ class OrderController extends Controller
 
         return true;
     }
+
+    $allowed = $order->members()
+        ->where('users.id', $user?->id)
+        ->exists();
+
+    if (!$allowed) {
+        abort(403, 'Access denied');
+    }
+
+    return true;
+}
 
   private function sendNewOrderNotifications(Order $order, $memberIds, $skipUserId = null)
 {

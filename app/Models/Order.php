@@ -18,6 +18,7 @@ class Order extends Model
         'payment_received',
         'payment_balance',
         'created_by',
+        'shipping_address',
     ];
 
     protected $casts = [
@@ -53,6 +54,9 @@ public function files()
 {
     return $this->hasMany(\App\Models\OrderRead::class);
 }
-
+public function clients()
+{
+    return $this->belongsToMany(Client::class, 'client_order');
+}
 }
 

@@ -12,9 +12,13 @@ use Illuminate\Support\Facades\Http;
 class MemberController extends Controller
 {
     public function index()
-    {
-        return response()->json(User::latest()->get());
-    }
+{
+    return response()->json(
+        User::where('role', '!=', 'client')
+            ->latest()
+            ->get()
+    );
+}
 
     public function invite(Request $request)
     {

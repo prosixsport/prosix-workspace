@@ -49,15 +49,23 @@
             </div>
 
             <div v-if="modal" class="modal-overlay" @click.self="closeModal">
-<div class="client-modal-box">
-                        <button class="close" @click="closeModal">×</button>
+                <div class="client-modal-box">
+                    <button class="close" @click="closeModal">×</button>
                     <h3>{{ editingId ? 'Edit Client' : 'Add Client' }}</h3>
 
                     <label>Name *</label>
                     <input v-model="form.name" placeholder="Client name" />
 
-                    <label>Email</label>
+                    <label>Email *</label>
                     <input v-model="form.email" placeholder="Email" />
+
+                    <label v-if="!editingId">Password *</label>
+                    <input
+                        v-if="!editingId"
+                        v-model="form.password"
+                        type="password"
+                        placeholder="Client password"
+                    />
 
                     <label>Phone</label>
                     <input v-model="form.phone" placeholder="Phone" />
@@ -101,6 +109,7 @@ export default {
             form: {
                 name: '',
                 email: '',
+                password: '',
                 phone: '',
                 company: '',
                 address: '',
@@ -118,6 +127,18 @@ export default {
             return {
                 Authorization: `Bearer ${localStorage.getItem('token')}`,
                 Accept: 'application/json',
+            }
+        },
+
+        emptyForm() {
+            return {
+                name: '',
+                email: '',
+                password: '',
+                phone: '',
+                company: '',
+                address: '',
+                status: 'active',
             }
         },
 
@@ -139,6 +160,7 @@ export default {
                 this.form = {
                     name: client.name || '',
                     email: client.email || '',
+                    password: '',
                     phone: client.phone || '',
                     company: client.company || '',
                     address: client.address || '',
@@ -146,15 +168,9 @@ export default {
                 }
             } else {
                 this.editingId = null
-                this.form = {
-                    name: '',
-                    email: '',
-                    phone: '',
-                    company: '',
-                    address: '',
-                    status: 'active',
-                }
+                this.form = this.emptyForm()
             }
+
             this.modal = true
         },
 
@@ -168,12 +184,30 @@ export default {
                 return
             }
 
+            if (!this.form.email) {
+                alert('Client email required')
+                return
+            }
+
+            if (!this.editingId && !this.form.password) {
+                alert('Client password required')
+                return
+            }
+
             this.saving = true
+
             try {
                 if (this.editingId) {
-                    await axios.put(`/api/clients/${this.editingId}`, this.form, { headers: this.headers() })
+                    const payload = { ...this.form }
+                    delete payload.password
+
+                    await axios.put(`/api/clients/${this.editingId}`, payload, {
+                        headers: this.headers()
+                    })
                 } else {
-                    await axios.post('/api/clients', this.form, { headers: this.headers() })
+                    await axios.post('/api/clients', this.form, {
+                        headers: this.headers()
+                    })
                 }
 
                 this.closeModal()
@@ -218,9 +252,8 @@ th { background: #fafafa; color: #6b7280; font-size: 12px; text-transform: upper
 .icon-btn.danger { background: #fee2e2; color: #b91c1c; }
 .empty { padding: 40px; text-align: center; color: #6b7280; }
 .modal-overlay { position: fixed; inset: 0; background: rgba(0,0,0,.55); display: flex; align-items: center; justify-content: center; z-index: 99999; padding: 15px; }
-.modal { background: #fff; width: 460px; max-width: 100%; border-radius: 20px; padding: 24px; position: relative; }
 .close { position: absolute; right: 15px; top: 12px; border: none; background: #f3f4f6; width: 34px; height: 34px; border-radius: 10px; font-size: 22px; cursor: pointer; }
-.modal h3 { margin: 0 0 18px; font-weight: 900; }
+.client-modal-box h3 { margin: 0 0 18px; font-weight: 900; }
 label { display: block; margin: 12px 0 6px; font-size: 13px; font-weight: 800; }
 input, textarea, select { width: 100%; border: 1.5px solid #d1d5db; border-radius: 10px; padding: 11px 12px; outline: none; }
 textarea { min-height: 80px; resize: vertical; }
@@ -240,8 +273,6 @@ textarea { min-height: 80px; resize: vertical; }
     .head { flex-direction: column; align-items: stretch; }
     .add-btn { width: 100%; }
 }
-
-/* MOBILE RESPONSIVE TABLE CARDS */
 @media (max-width: 768px) {
     .page { padding: 14px; }
     .head { flex-direction: column; align-items: stretch; gap: 12px; }
@@ -261,5 +292,4 @@ textarea { min-height: 80px; resize: vertical; }
     .modal-overlay { align-items: flex-start; overflow-y: auto; padding: 12px; }
     .client-modal-box { width: 100%; max-width: 100%; margin-top: 10px; border-radius: 18px; padding: 18px; }
 }
-
 </style>

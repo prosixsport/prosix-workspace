@@ -198,12 +198,12 @@
           </div>
           <div class="detail-info-item" style="position:relative" @click.stop>
             <span class="info-label">Ship Date</span>
-            <span class="info-value date-clickable" @click="showDatePicker = !showDatePicker">
-              {{ selectedOrder.shipDate }}
+<span class="info-value date-clickable" @click="!isClient && (showDatePicker = !showDatePicker)">
+                  {{ selectedOrder.shipDate }}
               <i class="fa-solid fa-calendar-days" style="font-size:11px;margin-left:4px;color:black"></i>
             </span>
-         <div v-if="showDatePicker" class="date-dropdown">
-  <div class="date-dropdown-header">Select Ship Date</div>
+<div v-if="showDatePicker && !isClient" class="date-dropdown">
+      <div class="date-dropdown-header">Select Ship Date</div>
 
   <input
     type="date"
@@ -217,18 +217,40 @@
   </button>
 </div>
           </div>
+          <div class="detail-info-item">
+  <span class="info-label">Shipping Address:</span>
+  <span class="info-value">
+    {{ selectedOrder?.shippingAddress || 'N/A' }}
+  </span>
+</div>
           <div class="detail-info-item" style="position:relative" @click.stop>
             <span class="info-label">Status :</span>
-            <span class="status-badge" :style="{ background: selectedOrder.statusColor }" @click="showStatusMenu = !showStatusMenu">
-              {{ selectedOrder.status }}
+<span class="status-badge" :style="{ background: selectedOrder.statusColor }" @click="!isClient && (showStatusMenu = !showStatusMenu)">
+                  {{ selectedOrder.status }}
               <i class="fa-solid fa-chevron-down" style="font-size:9px;margin-left:4px"></i>
             </span>
-            <div v-if="showStatusMenu" class="status-dropdown">
-              <div v-for="s in statusOptions" :key="s.label" class="status-drop-item" @click="changeStatus(s)">
-                <input type="color" class="status-dot status-color-picker" :value="s.color" title="Click to change label color" @click.stop @input.stop="changeStatusOptionColor(s, $event.target.value)" />
-                {{ s.label }}
-                <span class="status-group-tag">→ {{ s.groupLabel }}</span>
-              </div>
+<div v-if="showStatusMenu && !isClient" class="status-dropdown">
+                  <div v-for="s in statusOptions" :key="s.label" class="status-drop-item" @click="changeStatus(s)">
+  <input
+    type="color"
+    class="status-dot status-color-picker"
+    :value="s.color"
+    @click.stop
+    @input.stop="changeStatusOptionColor(s, $event.target.value)"
+  />
+
+  <span class="status-name">{{ s.label }}</span>
+
+  <span class="status-group-tag">→ {{ s.groupLabel }}</span>
+
+  <button v-if="s.custom" class="status-action-btn" @click.stop="editCustomStatus(s)">
+    <i class="fa-solid fa-pen"></i>
+  </button>
+
+  <button v-if="s.custom" class="status-action-btn danger" @click.stop="deleteCustomStatus(s)">
+    <i class="fa-solid fa-trash"></i>
+  </button>
+</div>
               <div class="custom-status-box">
                 <input v-model="customStatusLabel" class="custom-status-input" placeholder="Write custom status..." @keydown.enter.prevent="applyCustomStatus" />
                 <input v-model="customStatusColor" type="color" class="custom-status-color" title="Choose label color" />
@@ -247,13 +269,13 @@
           </div>
           <div class="detail-info-item tracking-info-item" style="position:relative" @click.stop>
             <span class="info-label">trk# :</span>
-            <span class="trk-badge trk-clickable" @click="openTrackingMenu">
-              <img v-if="trackingLogo(selectedOrder.trk)" :src="trackingLogo(selectedOrder.trk)" class="trk-logo" />
+<span class="trk-badge trk-clickable" @click="!isClient && openTrackingMenu()">
+                  <img v-if="trackingLogo(selectedOrder.trk)" :src="trackingLogo(selectedOrder.trk)" class="trk-logo" />
               {{ selectedOrder.trk || 'N/A' }}
               <i class="fa-solid fa-pen" style="font-size:9px;margin-left:6px"></i>
             </span>
-            <div v-if="showTrackingMenu" class="tracking-dropdown">
-              <div class="tracking-dropdown-header">Tracking Details</div>
+<div v-if="showTrackingMenu && !isClient" class="tracking-dropdown">
+                  <div class="tracking-dropdown-header">Tracking Details</div>
               <div class="payment-field">
                 <label class="payment-label">Tracking Number</label>
                 <input v-model="trackingEdit.number" class="payment-input" placeholder="e.g. 123456789" />
@@ -273,14 +295,14 @@
           </div>
           <div class="detail-info-item" style="position:relative" @click.stop>
             <span class="info-label">Payment :</span>
-            <span class="payment-badge payment-summary-badge" @click="showPaymentMenu = !showPaymentMenu">
-              <span class="payment-chip payment-chip-paid">{{ selectedOrder.payment || '0 % Paid' }}</span>
+<span class="payment-badge payment-summary-badge" @click="!isClient && (showPaymentMenu = !showPaymentMenu)">
+                  <span class="payment-chip payment-chip-paid">{{ selectedOrder.payment || '0 % Paid' }}</span>
               <span class="payment-chip payment-chip-received">R ${{ selectedOrder.paymentReceived || 0 }}</span>
               <span class="payment-chip payment-chip-balance">B ${{ selectedOrder.paymentBalance || 0 }}</span>
               <i class="fa-solid fa-chevron-down" style="font-size:9px;margin-left:4px"></i>
             </span>
-            <div v-if="showPaymentMenu" class="payment-dropdown payment-dropdown-wide">
-              <div class="payment-dropdown-header">Payment Details</div>
+<div v-if="showPaymentMenu && !isClient" class="payment-dropdown payment-dropdown-wide">
+                  <div class="payment-dropdown-header">Payment Details</div>
               <div class="payment-read-row paid-row">
                 <span>Paid</span><strong>{{ selectedOrder.payment || '0 % Paid' }}</strong>
               </div>
@@ -463,6 +485,29 @@
             </div>
             <Multiselect v-model="newOrder.selectedMembers" :options="availableMembers" :multiple="true" placeholder="Select members" label="name" track-by="id" />
           </div>
+          <div class="field-group">
+  <label>Assign Clients</label>
+
+  <Multiselect
+    v-model="newOrder.selectedClients"
+    :options="availableClients"
+    :multiple="true"
+    placeholder="Select clients"
+    label="name"
+    track-by="id"
+  />
+</div>
+
+<div class="field-group">
+  <label>Shipping Address</label>
+
+  <textarea
+    v-model="newOrder.shippingAddress"
+    class="field-input"
+    rows="3"
+    placeholder="Shipping Address"
+  ></textarea>
+</div>
         </div>
         <div class="add-order-footer">
           <button class="btn-cancel" @click="closeOrderModal">Cancel</button>
@@ -683,6 +728,17 @@ export default {
       customStatusColor: '#6161ff',
       orders: [],
       availableMembers: [],
+      availableClients: [],
+clientModal: false,
+clientSaving: false,
+clientForm: {
+  name: '',
+  email: '',
+  phone: '',
+  company: '',
+  address: '',
+  status: 'active'
+},
       teamMembers: [],
       chatMessages: [],
       unreadChatCount: 0,
@@ -710,10 +766,17 @@ lastNotificationId: null,
       trackingEdit: { number: '', company: '' },
       paymentEdit: { percent: '', received: '', balance: '' },
 
-      newOrder: {
-        name: '', po: '', selectedMembers: [], member_ids: [],
-        shipDate: '', status: 'Pending', payment: '0 % Paid', trk: 'N/A'
-      },
+    newOrder: {
+  name: '',
+  po: '',
+  selectedMembers: [],
+  selectedClients: [],
+  shippingAddress: '',
+  shipDate: '',
+  status: 'Pending',
+  payment: '0 % Paid',
+  trk: 'N/A'
+},
 
       groups: [
         { key: 'in_production', label: 'In Production' },
@@ -733,6 +796,9 @@ lastNotificationId: null,
   },
 
   computed: {
+    isClient() {
+  return this.currentUser?.role === 'client'
+},
  canEditNotes() {
   if (!this.selectedOrder || !this.currentUser) return false
 
@@ -784,7 +850,7 @@ async mounted() {
   this.loadCustomStatuses()
   await this.fetchOrders()
   await this.fetchMembers()
-
+await this.fetchClients()
   if ('Notification' in window) {
     Notification.requestPermission()
   }
@@ -824,6 +890,28 @@ beforeUnmount() {
 },
 
  methods: {
+    editCustomStatus(status) {
+  const newName = prompt('Status ka new name likho', status.label)
+  if (!newName || !newName.trim()) return
+
+  status.label = newName.trim()
+
+  localStorage.setItem(
+    'custom_order_statuses',
+    JSON.stringify(this.statusOptions.filter(s => s.custom))
+  )
+},
+
+deleteCustomStatus(status) {
+  if (!confirm('Ye custom status delete karna hai?')) return
+
+  this.statusOptions = this.statusOptions.filter(s => s.label !== status.label)
+
+  localStorage.setItem(
+    'custom_order_statuses',
+    JSON.stringify(this.statusOptions.filter(s => s.custom))
+  )
+},
   canDeleteFile(file) {
     return this.isSuperAdmin || Number(file?.senderId) === Number(this.currentUser?.id)
   },
@@ -1189,7 +1277,18 @@ openPreviewFile(file) {
         this.availableMembers = Array.isArray(res.data) ? res.data : (res.data?.data || [])
       } catch (e) { console.error('fetchMembers error:', e) }
     },
+async fetchClients() {
+  try {
+    const res = await axios.get('/api/clients', { headers: this.headers() })
 
+    this.availableClients = Array.isArray(res.data)
+      ? res.data
+      : (res.data?.data || [])
+
+  } catch (e) {
+    console.error('fetchClients error:', e)
+  }
+},
     formatOrder(order) {
       const members = order.members || []
       const status = order.status || 'Pending'
@@ -1211,6 +1310,8 @@ openPreviewFile(file) {
         paymentReceived: order.payment_received || 0,
         paymentBalance: order.payment_balance || 0,
         members,
+        clients: order.clients || [],
+shippingAddress: order.shipping_address || '',
         invoiceFiles: [],
         owners: members.map(m => ({
           id: m.id, name: m.name, email: m.email,
@@ -1338,7 +1439,17 @@ openPreviewFile(file) {
 
   this.editingOrderId = null
       this.openOrderMenuId = null
-      this.newOrder = { name: '', po: this.generatePoNumber(), selectedMembers: [], shipDate: '', status: 'Pending', payment: '0 % Paid', trk: 'N/A' }
+this.newOrder = {
+  name: '',
+  po: this.generatePoNumber(),
+  selectedMembers: [],
+  selectedClients: [],
+  shippingAddress: '',
+  shipDate: '',
+  status: 'Pending',
+  payment: '0 % Paid',
+  trk: 'N/A'
+}
       this.showAddModal = true
       this.$nextTick(() => { this.$refs.orderNameInput?.focus() })
     },
@@ -1352,6 +1463,8 @@ openPreviewFile(file) {
       this.newOrder = {
         name: order.name || '', po: order.po === 'N/A' ? '' : (order.po || ''),
         selectedMembers: (order.members || []).map(member => this.availableMembers.find(m => Number(m.id) === Number(member.id)) || member),
+        selectedClients: (order.clients || []).map(client => this.availableClients.find(c => Number(c.id) === Number(client.id)) || client),
+shippingAddress: order.shippingAddress || '',
         shipDate: order.shipDateRaw || '', status: order.status || 'Pending',
         payment: order.payment || '0 % Paid', trk: order.trk === 'N/A' ? '' : (order.trk || 'N/A')
       }
@@ -1402,6 +1515,8 @@ openPreviewFile(file) {
       const payload = {
         name: this.newOrder.name, po: this.newOrder.po,
         member_ids: this.newOrder.selectedMembers.map(m => m.id),
+        client_ids: this.newOrder.selectedClients.map(c => c.id),
+shipping_address: this.newOrder.shippingAddress,
         ship_date: this.newOrder.shipDate || null, status: this.newOrder.status,
         status_color: status?.color || '#fdab3d', trk: this.newOrder.trk || 'N/A',
         payment: this.newOrder.payment || '0 % Paid'
@@ -1450,17 +1565,29 @@ openPreviewFile(file) {
       } catch (e) { console.error('changeStatus error:', e) }
     },
 
-    async updateShipDate(event) {
-      if (!this.selectedOrder) return
-      const raw = event.target.value
-      if (!raw) return
-      try {
-        await axios.put(`/api/orders/${this.selectedOrder.id}`, { ship_date: raw }, { headers: this.headers() })
-        this.selectedOrder.shipDateRaw = raw
-        this.selectedOrder.shipDate = this.formatDate(raw)
-        this.showDatePicker = false
-      } catch (e) { console.error('updateShipDate error:', e) }
-    },
+  async updateShipDate(event) {
+  if (this.isClient) return
+
+  if (!this.selectedOrder) return
+
+  const raw = event.target.value
+  if (!raw) return
+
+  try {
+    await axios.put(
+      `/api/orders/${this.selectedOrder.id}`,
+      { ship_date: raw },
+      { headers: this.headers() }
+    )
+
+    this.selectedOrder.shipDateRaw = raw
+    this.selectedOrder.shipDate = this.formatDate(raw)
+    this.showDatePicker = false
+
+  } catch (e) {
+    console.error('updateShipDate error:', e)
+  }
+},
 
     async savePayment() {
       if (!this.selectedOrder) return
@@ -3200,6 +3327,35 @@ grid-template-columns: 32px 1fr 118px 38px;
   align-items:center !important;
   gap:2px !important;
   flex-shrink:0 !important;
+}
+.status-name {
+  flex: 1;
+}
+
+.status-action-btn {
+  border: none;
+  background: #eef2ff;
+  color: #4f46e5;
+  width: 24px;
+  height: 24px;
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 11px;
+}
+
+.status-action-btn.danger {
+  background: #fff0f0;
+  color: #e2445c;
+}
+.shipping-info-item {
+  max-width: 260px;
+}
+
+.shipping-value {
+  max-width: 180px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 /* ===========================
    RESPONSIVE — TABLET (768px)

@@ -10,6 +10,7 @@ class Client extends Model
     use HasFactory;
 
     protected $fillable = [
+        'user_id',
         'name',
         'email',
         'phone',
@@ -23,4 +24,12 @@ class Client extends Model
     {
         return $this->hasMany(Invoice::class);
     }
+    public function orders()
+{
+    return $this->belongsToMany(Order::class, 'client_order');
+}
+public function user()
+{
+    return $this->belongsTo(User::class);
+}
 }
