@@ -109,48 +109,38 @@
     @click.stop
   />
 </div>
-      <div class="col-task order-task-new">
-  <div class="order-name-row">
-    <div class="order-name-left">
-      <span v-if="!order.user_has_seen" class="unread-dot"></span>
-      <span>{{ order.name }}</span>
+        <div class="col-task">
+          <span v-if="!order.user_has_seen" class="unread-dot"></span>
+          <i v-if="order.hasChildren" class="fa-solid fa-chevron-right row-arrow"></i>
+          <span>{{ order.name }}</span>
+        </div>
+    <div class="col-owner owner-status-images">
+  <span
+    class="owner-status-badge"
+    :style="{ background: order.statusColor }"
+  >
+    {{ order.status }}
+  </span>
+
+  <div class="avatar-stack">
+    <div
+      v-for="(av, i) in order.owners.slice(0, 3)"
+      :key="i"
+      class="av"
+      :class="{ 'has-photo': av.profile_photo_url }"
+      :style="{ background: av.profile_photo_url ? '#fff' : av.color }"
+      :title="av.name"
+      @click.stop="openProfile(av)"
+    >
+      <img v-if="av.profile_photo_url" :src="av.profile_photo_url" class="avatar-img" />
+      <span v-else>{{ av.initial }}</span>
     </div>
 
-    <span class="order-status-side" :style="{ background: order.statusColor }">
-      {{ order.status }}
-    </span>
-  </div>
-
-  <div class="order-images-under">
-    <div
-      v-for="(av, i) in order.owners.slice(0, 4)"
-      :key="i"
-      class="order-under-av"
-      :style="{ background: av.profile_photo_url ? '#fff' : av.color }"
-    >
-      <img v-if="av.profile_photo_url" :src="av.profile_photo_url" />
-      <span v-else>{{ av.initial }}</span>
+    <div v-if="order.owners.length > 3" class="av av-count">
+      +{{ order.owners.length - 3 }}
     </div>
   </div>
 </div>
-
-<div class="col-owner" style="display:none;">
-          <div class="avatar-stack">
-            <div
-v-for="(av, i) in order.owners.slice(0, 4)"
-              :key="i"
-              class="av"
-              :class="{ 'has-photo': av.profile_photo_url }"
-              :style="{ background: av.profile_photo_url ? '#fff' : av.color }"
-              :title="av.name"
-              @click.stop="openProfile(av)"
-            >
-              <img v-if="av.profile_photo_url" :src="av.profile_photo_url" class="avatar-img" />
-              <span v-else>{{ av.initial }}</span>
-            </div>
-<div v-if="order.owners.length > 4" class="av av-count">+{{ order.owners.length - 4 }}</div>
-          </div>
-        </div>
         <div class="order-actions-wrap" @click.stop>
           <button class="order-dots-btn" @click="toggleOrderMenu(order.id)">
             <i class="fa-solid fa-ellipsis"></i>
@@ -3173,73 +3163,43 @@ grid-template-columns: 32px 1fr 118px 38px;
   opacity: .6;
   cursor: not-allowed;
 }
-.list-row {
-  min-height: 64px !important;
+.list-head,
+.list-row{
+  grid-template-columns: 32px 1fr 130px 38px !important;
 }
 
-.order-task-new {
-  display: flex !important;
-  flex-direction: column !important;
-  align-items: stretch !important;
-  gap: 5px !important;
-  overflow: visible !important;
+.owner-status-images{
+  display:flex !important;
+  align-items:center !important;
+  justify-content:flex-start !important;
+  gap:7px !important;
+  overflow:visible !important;
+    padding-left:10px !important;
+
 }
 
-.order-name-row {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 8px;
-  width: 100%;
+.owner-status-badge{
+  display:inline-flex !important;
+  align-items:center !important;
+  justify-content:center !important;
+  min-width:75px !important;
+  max-width:90px !important;
+  color:#fff !important;
+  font-size:9px !important;
+  font-weight:900 !important;
+  padding:4px 7px !important;
+  border-radius:999px !important;
+  white-space:nowrap !important;
+  overflow:hidden !important;
+  text-overflow:ellipsis !important;
+  flex-shrink:0 !important;
 }
 
-.order-name-left {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  min-width: 0;
-}
-
-.order-name-left span:last-child {
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.order-status-side{
-  width:85px;
-  text-align:center;
-  justify-self:end;
-  color:#fff;
-  font-size:9px;
-  font-weight:900;
-  border-radius:999px;
-  padding:4px 7px;
-  white-space:nowrap;
-}
-.order-images-under {
-  display: flex;
-  gap: 4px;
-  margin-left: 14px;
-}
-
-.order-under-av {
-  width: 22px;
-  height: 22px;
-  border-radius: 50%;
-  overflow: hidden;
-  color: #fff;
-  font-size: 9px;
-  font-weight: 900;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-}
-
-.order-under-av img {
-  width: 100%;
-  height: 100%;
-  object-fit: cover;
+.owner-status-images .avatar-stack{
+  display:flex !important;
+  align-items:center !important;
+  gap:2px !important;
+  flex-shrink:0 !important;
 }
 /* ===========================
    RESPONSIVE — TABLET (768px)
