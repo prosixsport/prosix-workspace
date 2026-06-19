@@ -662,7 +662,7 @@ export default {
   components: { Multiselect, OrderChatPanel },
   data() {
     return {
-      leftWidth: 320,
+      leftWidth: 350,
       isResizing: false,
       mobileLeftOpen: false,
       loadingOrders: false,
@@ -3165,7 +3165,7 @@ grid-template-columns: 32px 1fr 118px 38px;
 }
 .list-head,
 .list-row{
-  grid-template-columns: 32px 1fr 130px 38px !important;
+  grid-template-columns: 32px 1fr 140px 38px !important;
 }
 
 .owner-status-images{
