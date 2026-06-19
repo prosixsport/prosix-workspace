@@ -30,7 +30,7 @@ class ClientController extends Controller
         'name' => $data['name'],
         'email' => $data['email'],
         'password' => Hash::make($data['password']),
-        'role' => 'client',
+'role' => 'member',
         'is_active' => true,
     ]);
 
