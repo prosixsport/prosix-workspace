@@ -109,12 +109,32 @@
     @click.stop
   />
 </div>
-        <div class="col-task">
-          <span v-if="!order.user_has_seen" class="unread-dot"></span>
-          <i v-if="order.hasChildren" class="fa-solid fa-chevron-right row-arrow"></i>
-          <span>{{ order.name }}</span>
-        </div>
-        <div class="col-owner">
+      <div class="col-task order-task-new">
+  <div class="order-name-row">
+    <div class="order-name-left">
+      <span v-if="!order.user_has_seen" class="unread-dot"></span>
+      <span>{{ order.name }}</span>
+    </div>
+
+    <span class="order-status-side" :style="{ background: order.statusColor }">
+      {{ order.status }}
+    </span>
+  </div>
+
+  <div class="order-images-under">
+    <div
+      v-for="(av, i) in order.owners.slice(0, 4)"
+      :key="i"
+      class="order-under-av"
+      :style="{ background: av.profile_photo_url ? '#fff' : av.color }"
+    >
+      <img v-if="av.profile_photo_url" :src="av.profile_photo_url" />
+      <span v-else>{{ av.initial }}</span>
+    </div>
+  </div>
+</div>
+
+<div class="col-owner" style="display:none;">
           <div class="avatar-stack">
             <div
 v-for="(av, i) in order.owners.slice(0, 4)"
@@ -3152,6 +3172,74 @@ grid-template-columns: 32px 1fr 118px 38px;
 .bulk-btn:disabled {
   opacity: .6;
   cursor: not-allowed;
+}
+.list-row {
+  min-height: 64px !important;
+}
+
+.order-task-new {
+  display: flex !important;
+  flex-direction: column !important;
+  align-items: stretch !important;
+  gap: 5px !important;
+  overflow: visible !important;
+}
+
+.order-name-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  width: 100%;
+}
+
+.order-name-left {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+}
+
+.order-name-left span:last-child {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.order-status-side{
+  width:85px;
+  text-align:center;
+  justify-self:end;
+  color:#fff;
+  font-size:9px;
+  font-weight:900;
+  border-radius:999px;
+  padding:4px 7px;
+  white-space:nowrap;
+}
+.order-images-under {
+  display: flex;
+  gap: 4px;
+  margin-left: 14px;
+}
+
+.order-under-av {
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  overflow: hidden;
+  color: #fff;
+  font-size: 9px;
+  font-weight: 900;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.order-under-av img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
 }
 /* ===========================
    RESPONSIVE — TABLET (768px)
