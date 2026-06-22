@@ -24,13 +24,16 @@
 </div>
 
     <!-- LEFT PANEL -->
-    <div class="orders-left" :style="desktopLeftStyle">
+<div class="orders-left" :class="{ 'sidebar-light': sidebarLightMode }" :style="desktopLeftStyle">
 
       <div class="orders-left-header">
         <button class="back-btn" type="button" title="Back to dashboard" @click.stop="$router.push('/dashboard')">
           <i class="fa-solid fa-arrow-left"></i>
         </button>
         <span class="orders-title">All Orders</span>
+        <button class="sidebar-mode-btn" @click.stop="sidebarLightMode = !sidebarLightMode">
+  <i :class="sidebarLightMode ? 'fa-solid fa-moon' : 'fa-solid fa-sun'"></i>
+</button>
         <span v-if="unreadOrdersCount > 0" class="order-notify-pill">{{ unreadOrdersCount }} new</span>
       </div>
 
@@ -52,6 +55,7 @@
     @change="toggleSelectAll"
     @click.stop
   />
+
 </div>
         <div class="col-task">Task</div>
         <div class="col-owner">OWNER</div>
@@ -707,6 +711,7 @@ export default {
   components: { Multiselect, OrderChatPanel },
   data() {
     return {
+    sidebarLightMode: false,
       leftWidth: 370,
       isResizing: false,
       mobileLeftOpen: false,
@@ -3356,6 +3361,91 @@ grid-template-columns: 32px 1fr 118px 38px;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+.sidebar-mode-btn {
+  border: none;
+  background: rgba(255,255,255,0.12);
+  color: #fff;
+  width: 30px;
+  height: 30px;
+  border-radius: 8px;
+  cursor: pointer;
+  font-size: 12px;
+  margin-left: 8px;
+}
+
+.orders-left.sidebar-light {
+  background: #ffffff !important;
+  color: #000 !important;
+  border-right: 1px solid #e5e7eb !important;
+}
+
+.orders-left.sidebar-light .orders-left-header,
+.orders-left.sidebar-light .orders-title {
+  color: #000 !important;
+}
+
+.orders-left.sidebar-light .sidebar-mode-btn {
+  background: #111 !important;
+  color: #fff !important;
+}
+
+.orders-left.sidebar-light .orders-tab {
+  color: #555 !important;
+}
+
+.orders-left.sidebar-light .orders-tab.active {
+  color: #000 !important;
+  border-bottom-color: #6161ff !important;
+}
+
+.orders-left.sidebar-light .list-head {
+  color: #555 !important;
+  border-bottom: 1px solid #ddd !important;
+}
+
+.orders-left.sidebar-light .list-row {
+  background: #fff !important;
+  border-bottom: 1px solid #e5e7eb !important;
+}
+
+.orders-left.sidebar-light .list-row:hover {
+  background: #f5f5f5 !important;
+}
+
+.orders-left.sidebar-light .col-task,
+.orders-left.sidebar-light .col-task span {
+  color: #000 !important;
+  font-weight: 900 !important;
+}
+
+.orders-left.sidebar-light .order-search-box {
+  background: #f3f4f6 !important;
+}
+
+.orders-left.sidebar-light .order-search-box i,
+.orders-left.sidebar-light .order-search-box input {
+  color: #000 !important;
+}
+
+.orders-left.sidebar-light .add-row {
+  color: #000 !important;
+  border-top: 1px solid #ddd !important;
+}
+
+.orders-left.sidebar-light .av {
+  border-color: #fff !important;
+}
+
+.orders-left.sidebar-light .av-count {
+  background: #444 !important;
+  color: #fff !important;
+}
+
+.orders-left.sidebar-light .order-dots-btn {
+  opacity: 1;
+  background: #f3f4f6 !important;
+  color: #000 !important;
 }
 /* ===========================
    RESPONSIVE — TABLET (768px)
