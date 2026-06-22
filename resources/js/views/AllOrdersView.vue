@@ -146,7 +146,11 @@
   </div>
 </div>
         <div class="order-actions-wrap" @click.stop>
-          <button class="order-dots-btn" @click="toggleOrderMenu(order.id)">
+<button
+  v-if="selectedOrders.includes(order.id)"
+  class="order-dots-btn"
+  @click="toggleOrderMenu(order.id)"
+>
             <i class="fa-solid fa-ellipsis"></i>
           </button>
           <div v-if="openOrderMenuId === order.id" class="order-menu">
@@ -2225,9 +2229,9 @@ grid-template-columns: 32px 1fr 118px 38px;
   transition: all 0.15s;
 }
 
-.list-row:hover .order-dots-btn,
-.order-dots-btn:hover { opacity: 1; background: rgba(255,255,255,0.14); }
-
+.order-dots-btn {
+  opacity: 1;
+}
 .order-menu {
   position: absolute;
   right: 6px;
