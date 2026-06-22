@@ -912,7 +912,7 @@ beforeUnmount() {
 },
 
 deleteCustomStatus(status) {
-  if (!confirm('Ye custom status delete karna hai?')) return
+  if (!confirm('Are you sure you want to delete this custom status?')) return
 
   this.statusOptions = this.statusOptions.filter(s => s.label !== status.label)
 
@@ -2033,7 +2033,6 @@ showDesktopNotification(notification) {
   color:#fff;
 }
 
-
 .orders-left-header {
   padding: 16px 16px 8px;
   font-size: 15px;
@@ -2155,6 +2154,7 @@ grid-template-columns: 32px 1fr 118px 38px;
   color: #ffffff;
   font-weight: 900;
 }
+
 .list-row.unread .col-task span:not(.unread-dot) { color: #fff; font-weight: 900; }
 .list-row.seen .col-task span {
   color: #c5cae0;
