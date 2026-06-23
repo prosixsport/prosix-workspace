@@ -233,11 +233,34 @@
   </button>
 </div>
           </div>
-          <div class="detail-info-item">
-  <span class="info-label">Shipping Address:</span>
-  <span class="info-value">
+      <div class="detail-info-item" style="position:relative" @click.stop>
+  <span class="info-label">Shipping Address :</span>
+
+  <span
+  class="info-value"
+  @click="!isClient && (showShippingAddressMenu = !showShippingAddressMenu)"
+>
     {{ selectedOrder?.shippingAddress || 'N/A' }}
+    <i class="fa-solid fa-pen"></i>
   </span>
+
+<div
+  v-if="showShippingAddressMenu && !isClient"
+  class="tracking-dropdown"
+>
+    <textarea
+      v-model="shippingAddressEdit"
+      class="payment-input"
+      rows="4"
+    ></textarea>
+
+    <button
+      class="payment-save-btn"
+      @click="saveShippingAddress"
+    >
+      Save Address
+    </button>
+  </div>
 </div>
           <div class="detail-info-item" style="position:relative" @click.stop>
             <span class="info-label">Status :</span>
@@ -723,6 +746,8 @@ export default {
   components: { Multiselect, OrderChatPanel },
   data() {
     return {
+    showShippingAddressMenu: false,
+shippingAddressEdit: '',
     sidebarLightMode: false,
       leftWidth: 370,
       isResizing: false,
@@ -913,6 +938,39 @@ beforeUnmount()  {
 },
 
  methods: {
+ async saveShippingAddress() {
+  if (!this.selectedOrder) return
+
+  try {
+    await axios.put(
+      `/api/orders/${this.selectedOrder.id}`,
+      {
+        shipping_address: this.shippingAddressEdit
+      },
+      {
+        headers: this.headers()
+      }
+    )
+
+    this.selectedOrder.shippingAddress =
+      this.shippingAddressEdit
+
+    const idx = this.orders.findIndex(
+      o => Number(o.id) === Number(this.selectedOrder.id)
+    )
+
+    if (idx !== -1) {
+      this.orders[idx].shippingAddress =
+        this.shippingAddressEdit
+    }
+
+    this.showShippingAddressMenu = false
+
+  } catch (e) {
+    console.error(e)
+    alert('Shipping address save nahi hua')
+  }
+},
     editCustomStatus(status) {
   const newName = prompt('Status ka new name likho', status.label)
   if (!newName || !newName.trim()) return
@@ -1019,7 +1077,7 @@ async bulkDeleteOrders() {
     await axios.post('/api/orders/bulk-delete', {
       order_ids: this.selectedOrders
     }, { headers: this.headers() })
-    
+
     const deletedIds = [...this.selectedOrders].map(id => Number(id))
     this.clearBulkSelection()
     await this.fetchOrders()
@@ -1387,6 +1445,7 @@ shippingAddress: order.shipping_address || '',
         balance: order.paymentBalance || ''
       }
       this.trackingEdit = this.parseTracking(order.trk)
+      this.shippingAddressEdit = order.shippingAddress || ''
       this.teamMembers = (order.members || []).map(m => ({
         id: m.id, name: m.name, email: m.email,
         initial: this.initial(m.name), color: this.memberColor(m.id),
