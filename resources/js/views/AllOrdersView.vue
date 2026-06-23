@@ -896,11 +896,10 @@ await this.fetchClients()
 } else if (this.filteredOrders.length) {
   await this.selectOrder(this.filteredOrders[0])
 }
-
     this.unreadTimer = setInterval(() => { this.fetchUnreadCount() }, 5000)
   },
 
-beforeUnmount() {
+beforeUnmount()  {
   document.removeEventListener('mousemove', this.resizeSidebar)
   document.removeEventListener('mouseup', this.stopResize)
 
@@ -1020,7 +1019,7 @@ async bulkDeleteOrders() {
     await axios.post('/api/orders/bulk-delete', {
       order_ids: this.selectedOrders
     }, { headers: this.headers() })
-
+    
     const deletedIds = [...this.selectedOrders].map(id => Number(id))
     this.clearBulkSelection()
     await this.fetchOrders()

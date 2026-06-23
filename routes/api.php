@@ -1,7 +1,6 @@
 <?php
 
 use App\Http\Controllers\AuthController;
-use App\Http\Controllers\BoardController;
 use App\Http\Controllers\MemberController;
 use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\OrderController;
@@ -79,10 +78,7 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::post('/members/{user}/order-create-permission', [MemberController::class, 'toggleOrderCreatePermission']);
     Route::delete('/members/{id}', [MemberController::class, 'destroy']);
 
-    // Board Members
-    Route::get('/boards/{id}/members', [BoardController::class, 'members']);
-    Route::post('/boards/{id}/members', [BoardController::class, 'addMember']);
-    Route::delete('/boards/{id}/members/{userId}', [BoardController::class, 'removeMember']);
+
 
     // Files
     Route::get('/orders/{order}/files', [OrderFileController::class, 'index']);
