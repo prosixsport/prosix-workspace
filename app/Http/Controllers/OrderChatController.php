@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Models\OrderNotification;
 use App\Events\OrderMessageSent;
 use App\Models\Order;
 use App\Models\OrderMessage;
@@ -217,48 +218,99 @@ broadcast(new OrderMessageSent($message));
         ]);
     }
 
-    private function sendChatNotifications(Order $order, User $sender, string $messageText)
-    {
-        $users = $order->members()
-            ->where('users.id', '!=', $sender->id)
+//     private function sendChatNotifications(Order $order, User $sender, string $messageText)
+//     {
+//         $users = $order->members()
+//             ->where('users.id', '!=', $sender->id)
+//             ->get();
+
+//         if ($sender->role !== 'super_admin') {
+//             $admins = User::whereIn('role', ['super_admin', 'admin'])
+//                 ->where('id', '!=', $sender->id)
+//                 ->get();
+
+//             $users = $users->merge($admins)->unique('id');
+//         }
+
+//         $shortMessage = mb_strlen($messageText) > 80
+//             ? mb_substr($messageText, 0, 80) . '...'
+//             : $messageText;
+
+//         foreach ($users as $user) {
+//             FcmService::send(
+//                 $user->fcm_token,
+//                 'New Chat Message',
+//                 $sender->name . ': ' . $shortMessage,
+//                [
+//     'type' => 'chat',
+//     'order_id' => (string) $order->id,
+//     'order_name' => $order->name ?? $order->title ?? ('Order #' . $order->id),
+// ]
+//             );
+//         }
+//     }
+private function sendChatNotifications(Order $order, User $sender, string $messageText)
+{
+    $members = $order->members()
+        ->where('users.id', '!=', $sender->id)
+        ->get();
+
+    $clients = $order->clients()
+        ->with('user')
+        ->get()
+        ->pluck('user')
+        ->filter()
+        ->where('id', '!=', $sender->id);
+
+    $users = $members->merge($clients);
+
+    if ($sender->role !== 'super_admin') {
+        $admins = User::whereIn('role', ['super_admin', 'admin'])
+            ->where('id', '!=', $sender->id)
             ->get();
 
-        if ($sender->role !== 'super_admin') {
-            $admins = User::whereIn('role', ['super_admin', 'admin'])
-                ->where('id', '!=', $sender->id)
-                ->get();
-
-            $users = $users->merge($admins)->unique('id');
-        }
-
-        $shortMessage = mb_strlen($messageText) > 80
-            ? mb_substr($messageText, 0, 80) . '...'
-            : $messageText;
-
-        foreach ($users as $user) {
-            FcmService::send(
-                $user->fcm_token,
-                'New Chat Message',
-                $sender->name . ': ' . $shortMessage,
-               [
-    'type' => 'chat',
-    'order_id' => (string) $order->id,
-    'order_name' => $order->name ?? $order->title ?? ('Order #' . $order->id),
-]
-            );
-        }
+        $users = $users->merge($admins);
     }
 
+    $users = $users->unique('id')->values();
+
+    $shortMessage = mb_strlen($messageText) > 80
+        ? mb_substr($messageText, 0, 80) . '...'
+        : $messageText;
+
+    foreach ($users as $user) {
+
+        OrderNotification::create([
+            'user_id'  => $user->id,
+            'order_id' => $order->id,
+            'title'    => 'New Chat Message',
+            'message'  => $sender->name . ': ' . $shortMessage,
+            'is_read'  => 0,
+        ]);
+
+        FcmService::send(
+            $user->fcm_token,
+            'New Chat Message',
+            $sender->name . ': ' . $shortMessage,
+            [
+                'type' => 'chat',
+                'order_id' => (string) $order->id,
+                'order_name' => $order->name ?? ('Order #' . $order->id),
+            ]
+        );
+    }
+}
     private function checkAccess($order)
-    {
-        $user = auth()->user();
+{
+    $user = auth()->user();
 
-        if ($user && $user->role === 'super_admin') {
-            return true;
-        }
+    if ($user && $user->role === 'super_admin') {
+        return true;
+    }
 
-        $allowed = $order->members()
-            ->where('users.id', auth()->id())
+    if ($user && $user->role === 'client') {
+        $allowed = $order->clients()
+            ->where('clients.user_id', $user->id)
             ->exists();
 
         if (!$allowed) {
@@ -267,4 +319,15 @@ broadcast(new OrderMessageSent($message));
 
         return true;
     }
+
+    $allowed = $order->members()
+        ->where('users.id', auth()->id())
+        ->exists();
+
+    if (!$allowed) {
+        abort(403, 'Access denied');
+    }
+
+    return true;
+}
 }

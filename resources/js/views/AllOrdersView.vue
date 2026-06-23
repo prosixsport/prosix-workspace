@@ -58,11 +58,11 @@
 
 </div>
         <div class="col-task">Task</div>
-        <div class="col-owner">OWNER</div>
+        <!-- <div class="col-owner">OWNER</div> -->
         <div class="col-actions"></div>
       </div>
 <div v-if="isSuperAdmin && selectedOrders.length > 1" class="bulk-actions" @click.stop>
-      <strong>{{ selectedOrders.length }}</strong>
+    <strong>{{ selectedOrders.length }}</strong>
 
   <button class="bulk-btn" @click="openBulkMembersModal" :disabled="bulkActionLoading">
     <i class="fa-solid fa-users"></i> Edit Members
@@ -75,7 +75,9 @@
   <button class="bulk-btn danger" @click="bulkDeleteOrders" :disabled="bulkActionLoading">
     <i class="fa-solid fa-trash"></i> Delete
   </button>
+
 </div>
+
 <div class="order-search-box">
   <i class="fa-solid fa-magnifying-glass"></i>
   <input
@@ -85,6 +87,11 @@
     @click.stop
   />
 </div>
+
+
+
+
+
 
 <div v-if="canCreateOrder" class="add-row" @click="addNewOrder">
             <i class="fa-solid fa-plus me-1"></i> Add New Order
@@ -113,6 +120,7 @@
     @click.stop
   />
 </div>
+
         <div class="col-task">
           <span v-if="!order.user_has_seen" class="unread-dot"></span>
           <i v-if="order.hasChildren" class="fa-solid fa-chevron-right row-arrow"></i>
@@ -277,12 +285,12 @@
           </div>
           <div class="detail-info-item tracking-info-item" style="position:relative" @click.stop>
             <span class="info-label">trk# :</span>
-<span class="trk-badge trk-clickable" @click="!isClient && openTrackingMenu()">
+          <span class="trk-badge trk-clickable" @click="!isClient && openTrackingMenu()">
                   <img v-if="trackingLogo(selectedOrder.trk)" :src="trackingLogo(selectedOrder.trk)" class="trk-logo" />
               {{ selectedOrder.trk || 'N/A' }}
               <i class="fa-solid fa-pen" style="font-size:9px;margin-left:6px"></i>
             </span>
-<div v-if="showTrackingMenu && !isClient" class="tracking-dropdown">
+             <div v-if="showTrackingMenu && !isClient" class="tracking-dropdown">
                   <div class="tracking-dropdown-header">Tracking Details</div>
               <div class="payment-field">
                 <label class="payment-label">Tracking Number</label>
@@ -303,13 +311,13 @@
           </div>
           <div class="detail-info-item" style="position:relative" @click.stop>
             <span class="info-label">Payment :</span>
-<span class="payment-badge payment-summary-badge" @click="!isClient && (showPaymentMenu = !showPaymentMenu)">
+            <span class="payment-badge payment-summary-badge" @click="!isClient && (showPaymentMenu = !showPaymentMenu)">
                   <span class="payment-chip payment-chip-paid">{{ selectedOrder.payment || '0 % Paid' }}</span>
               <span class="payment-chip payment-chip-received">R ${{ selectedOrder.paymentReceived || 0 }}</span>
               <span class="payment-chip payment-chip-balance">B ${{ selectedOrder.paymentBalance || 0 }}</span>
               <i class="fa-solid fa-chevron-down" style="font-size:9px;margin-left:4px"></i>
             </span>
-<div v-if="showPaymentMenu && !isClient" class="payment-dropdown payment-dropdown-wide">
+           <div v-if="showPaymentMenu && !isClient" class="payment-dropdown payment-dropdown-wide">
                   <div class="payment-dropdown-header">Payment Details</div>
               <div class="payment-read-row paid-row">
                 <span>Paid</span><strong>{{ selectedOrder.payment || '0 % Paid' }}</strong>
@@ -847,7 +855,7 @@ filteredOrders() {
 },
     unreadOrdersCount() { return this.orders.filter(o => !o.user_has_seen).length },
     desktopLeftStyle() {
-      // Only apply dynamic width on desktop (>= 768px)
+       // Only apply dynamic width on desktop (>= 768px)
       if (typeof window !== 'undefined' && window.innerWidth >= 768) {
         return { width: this.leftWidth + 'px' }
       }
@@ -871,16 +879,23 @@ await this.fetchClients()
   }, 5000)
 
   const orderId = this.$route.query.order_id
+  const openChat = this.$route.query.open_chat
 
-    if (orderId) {
-      const foundOrder = this.orders.find(o => Number(o.id) === Number(orderId))
-      if (foundOrder) {
-        this.activeGroup = foundOrder.group
-        await this.selectOrder(foundOrder)
-      }
-    } else if (this.filteredOrders.length) {
-      await this.selectOrder(this.filteredOrders[0])
+   if (orderId) {
+  const foundOrder = this.orders.find(o => Number(o.id) === Number(orderId))
+
+  if (foundOrder) {
+    this.activeGroup = foundOrder.group
+    await this.selectOrder(foundOrder)
+
+    if (openChat == 1) {
+      this.showChat = true
+      await this.markChatRead()
     }
+  }
+} else if (this.filteredOrders.length) {
+  await this.selectOrder(this.filteredOrders[0])
+}
 
     this.unreadTimer = setInterval(() => { this.fetchUnreadCount() }, 5000)
   },
@@ -1844,23 +1859,35 @@ async fetchNotifications(showPopup = false) {
 showDesktopNotification(notification) {
   if (!('Notification' in window)) return
 
-  if (Notification.permission === 'granted') {
-    new Notification(notification.title || 'Order Notification', {
-      body: notification.message || 'New order update received'
-    })
+  if (Notification.permission !== 'granted') {
+    Notification.requestPermission()
+    return
+  }
+
+  const title = notification.title || 'New Notification'
+  const body = notification.message || 'New update received'
+
+  const n = new Notification(title, {
+    body: body,
+    icon: '/assets/images/P LOGO WHITE.png',
+    tag: 'order-' + notification.order_id
+  })
+
+  n.onclick = () => {
+    window.focus()
+
+    if (notification.order_id) {
+      this.$router.push({
+        path: '/orders',
+        query: { order_id: notification.order_id, open_chat: 1 }
+      })
+    }
+
+    n.close()
   }
 }
 
-
-
-
-
-
-
-
   }
-
-
 
 }
 </script>
@@ -1876,7 +1903,7 @@ showDesktopNotification(notification) {
 
 .detail-topbar,
 .detail-info-item {
-  overflow: visible !important;
+overflow: visible !important;
 }
 
 .status-dropdown,
@@ -1978,7 +2005,7 @@ showDesktopNotification(notification) {
 
 /*===========================
   LAYOUT
-  ===========================*/
+===========================*/
 
 .orders-layout {
   display: flex;
