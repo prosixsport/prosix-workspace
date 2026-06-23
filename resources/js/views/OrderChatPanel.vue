@@ -360,7 +360,7 @@ audioChunks: []
 async startRecording() {
 
   if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
-    alert('Microphone support nahi hai')
+alert('Microphone is not supported')
     return
   }
 
@@ -404,10 +404,10 @@ async startRecording() {
     console.error('MIC ERROR:', e)
 
     if (e.name === 'NotAllowedError') {
-      alert('Mic permission deny hai')
+alert('Microphone permission was denied')
     }
     else if (e.name === 'NotFoundError') {
-      alert('Microphone device nahi mila')
+alert('Microphone device not found')
     }
     else {
       alert('Error: ' + e.name)
@@ -456,7 +456,7 @@ async uploadVoiceMessage(file) {
     this.scrollChatBottom()
   } catch (e) {
     console.error('uploadVoiceMessage error:', e)
-    alert('Voice message upload nahi hui')
+alert('Voice message upload failed')
   }
 },
     async openProfile(member) {
@@ -466,7 +466,7 @@ async uploadVoiceMessage(file) {
         this.profileUser = res.data
         this.profileForm = { name: res.data?.name || '', about: res.data?.about || '', profile_photo: null, preview: res.data?.profile_photo_url || '' }
         this.profileModal = true
-      } catch (e) { console.error('openProfile error:', e); alert(e.response?.data?.message || 'Profile load nahi hui') }
+      } catch (e) { console.error('openProfile error:', e); alert(e.response?.data?.message || 'Profile could not be loaded') }
     },
 
     openProfileByMessage(msg) {
@@ -501,7 +501,7 @@ async uploadVoiceMessage(file) {
         if (user) localStorage.setItem('user', JSON.stringify(user))
         this.closeProfile()
         this.$emit('refresh-orders')
-      } catch (e) { console.error('saveProfile error:', e); alert(e.response?.data?.message || 'Profile save nahi hui') }
+      } catch (e) { console.error('saveProfile error:', e); alert(e.response?.data?.message || 'Profile could not be saved') }
     },
 
     messagePhoto(msg) {
@@ -570,7 +570,7 @@ async uploadVoiceMessage(file) {
         })
         this.$emit('update-chat-messages', nextMessages)
         this.cancelEditMessage()
-      } catch (e) { console.error('saveEditMessage error:', e); alert(e.response?.data?.message || 'Message edit nahi hua') }
+      } catch (e) { console.error('saveEditMessage error:', e); alert(e.response?.data?.message || 'Message could not be edited') }
     },
 
     openDeleteOptions(msg) { this.deleteTarget = msg; this.openMessageMenuKey = null },
@@ -584,7 +584,7 @@ async uploadVoiceMessage(file) {
         const nextMessages = this.chatMessages.filter(msg => this.messageKey(msg, 0) !== this.messageKey(target, 0))
         this.$emit('update-chat-messages', nextMessages)
         this.deleteTarget = null
-      } catch (e) { console.error('deleteForMe error:', e); alert(e.response?.data?.message || 'Delete for me nahi hua') }
+      } catch (e) { console.error('deleteForMe error:', e); alert(e.response?.data?.message || 'Delete for me failed') }
     },
 
     async deleteForEveryone() {
@@ -600,7 +600,7 @@ async uploadVoiceMessage(file) {
         })
         this.$emit('update-chat-messages', nextMessages)
         this.deleteTarget = null
-      } catch (e) { console.error('deleteForEveryone error:', e); alert(e.response?.data?.message || 'Delete for everyone nahi hua') }
+      } catch (e) { console.error('deleteForEveryone error:', e); alert(e.response?.data?.message || 'Delete for everyone failed') }
     },
 
     startChatWith(member) {
@@ -652,7 +652,7 @@ async uploadVoiceMessage(file) {
         this.newMessage = ''
         this.showTagDropdown = false
         this.scrollChatBottom()
-      } catch (e) { console.error('sendMessage error:', e); alert(e.response?.data?.message || 'Message send nahi hua') }
+      } catch (e) { console.error('sendMessage error:', e); alert(e.response?.data?.message || 'Message could not be sent') }
     },
 
     async uploadChatFiles(event) {
@@ -706,7 +706,7 @@ async uploadVoiceMessage(file) {
         const withoutTemp = messagesWithTemp.filter(msg => !String(msg.fileMessageId || '').startsWith('chat-temp-'))
         this.$emit('update-chat-messages', withoutTemp)
         console.error('uploadChatFiles error:', e)
-        alert(e.response?.data?.message || 'Chat file upload nahi hui')
+        alert(e.response?.data?.message || 'Chat file upload failed')
       }
     },
 
@@ -717,7 +717,7 @@ async uploadVoiceMessage(file) {
         this.addMemberId = ''
         this.showAddMemberBox = false
         this.$emit('refresh-orders')
-      } catch (e) { console.error('addMemberToOrder error:', e); alert(e.response?.data?.message || 'Member add nahi hua') }
+      } catch (e) { console.error('addMemberToOrder error:', e); alert(e.response?.data?.message || 'Member could not be added') }
     },
 
     async removeMember(userId) {
@@ -726,7 +726,7 @@ async uploadVoiceMessage(file) {
       try {
         await axios.delete(`/api/orders/${this.selectedOrder.id}/members/${userId}`, { headers: this.headers() })
         this.$emit('refresh-orders')
-      } catch (e) { console.error('removeMember error:', e); alert(e.response?.data?.message || 'Member remove nahi hua') }
+      } catch (e) { console.error('removeMember error:', e); alert(e.response?.data?.message || 'Member could not be removed') }
     },
 
     scrollChatBottom() {

@@ -968,11 +968,11 @@ beforeUnmount()  {
 
   } catch (e) {
     console.error(e)
-    alert('Shipping address save nahi hua')
+    alert('Shipping address not saved ')
   }
 },
     editCustomStatus(status) {
-  const newName = prompt('Status ka new name likho', status.label)
+const newName = prompt('Enter new status name', status.label)
   if (!newName || !newName.trim()) return
 
   status.label = newName.trim()
@@ -1041,7 +1041,7 @@ async bulkUpdateMembers() {
     }
   } catch (e) {
     console.error('bulkUpdateMembers error:', e)
-    alert(e.response?.data?.message || 'Members update nahi huay')
+alert(e.response?.data?.message || 'Members were not updated')
   } finally {
     this.bulkSaving = false
   }
@@ -1061,7 +1061,7 @@ async bulkDuplicateOrders() {
     await this.fetchOrders()
   } catch (e) {
     console.error('bulkDuplicateOrders error:', e)
-    alert(e.response?.data?.message || 'Orders duplicate nahi huay')
+alert(e.response?.data?.message || 'Orders were not duplicated')
   } finally {
     this.bulkActionLoading = false
   }
@@ -1088,7 +1088,7 @@ async bulkDeleteOrders() {
     }
   } catch (e) {
     console.error('bulkDeleteOrders error:', e)
-    alert(e.response?.data?.message || 'Orders delete nahi huay')
+alert(e.response?.data?.message || 'Orders were not deleted')
   } finally {
     this.bulkActionLoading = false
   }
@@ -1157,7 +1157,7 @@ async bulkDeleteOrders() {
         await axios.post(`/api/orders/${this.selectedOrder.id}/files`, formData, { headers: { ...this.headers(), 'Content-Type': 'multipart/form-data' } })
         await this.fetchOrderFiles(this.selectedOrder.id)
         alert('Invoice uploaded successfully')
-      } catch (e) { console.error('invoice upload error:', e); alert(e.response?.data?.message || 'Invoice upload nahi hui') }
+      } catch (e) { console.error('invoice upload error:', e); alert(e.response?.data?.message || 'Invoice was not uploaded') }
     },
 
     parseTracking(value) {
@@ -1212,7 +1212,7 @@ async bulkDeleteOrders() {
         const idx = this.orders.findIndex(o => Number(o.id) === Number(this.selectedOrder.id))
         if (idx !== -1) this.orders[idx].trk = trk
         this.showTrackingMenu = false
-      } catch (e) { console.error('saveTracking error:', e); alert(e.response?.data?.message || 'Tracking save nahi hua') }
+      } catch (e) { console.error('saveTracking error:', e); alert(e.response?.data?.message || 'Tracking was not saved') }
     },
 
 openPreviewFile(file) {
@@ -1279,7 +1279,7 @@ openPreviewFile(file) {
         this.profileUser = res.data
         this.profileForm = { name: res.data?.name || '', about: res.data?.about || '', profile_photo: null, preview: res.data?.profile_photo_url || '' }
         this.profileModal = true
-      } catch (e) { console.error('openProfile error:', e); alert(e.response?.data?.message || 'Profile load nahi hui') }
+      } catch (e) { console.error('openProfile error:', e); alert(e.response?.data?.message || 'Profile could not be loaded') }
     },
 
     closeProfile() {
@@ -1308,7 +1308,7 @@ openPreviewFile(file) {
         this.closeProfile()
         await this.fetchMembers()
         await this.fetchOrders()
-      } catch (e) { console.error('saveProfile error:', e); alert(e.response?.data?.message || 'Profile save nahi hui') }
+      } catch (e) { console.error('saveProfile error:', e); alert(e.response?.data?.message || 'Profile could not be saved') }
     },
 
     async toggleChat() {
@@ -1572,7 +1572,7 @@ shippingAddress: order.shippingAddress || '',
         this.activeGroup = newOrder.group
         await this.selectOrder(newOrder)
         this.openOrderMenuId = null
-      } catch (e) { console.error('duplicateOrder error:', e); alert(e.response?.data?.message || 'Order duplicate nahi hua') }
+      } catch (e) { console.error('duplicateOrder error:', e); alert(e.response?.data?.message || 'Order could not be duplicated') }
     },
 
     async deleteOrder(order) {
@@ -1586,7 +1586,7 @@ shippingAddress: order.shippingAddress || '',
           if (this.selectedOrder) await this.selectOrder(this.selectedOrder)
         }
         this.openOrderMenuId = null
-      } catch (e) { console.error('deleteOrder error:', e); alert(e.response?.data?.message || 'Order delete nahi hua') }
+      } catch (e) { console.error('deleteOrder error:', e); alert(e.response?.data?.message || 'Order could not be deleted') }
     },
 
     async confirmAddOrder() {
@@ -1618,7 +1618,7 @@ shipping_address: this.newOrder.shippingAddress,
         const freshOrder = this.orders.find(o => Number(o.id) === Number(order.id)) || order
         await this.selectOrder(freshOrder)
         this.closeOrderModal()
-      } catch (e) { console.error('confirmAddOrder error:', e); alert(e.response?.data?.message || 'Order save nahi hua') }
+      } catch (e) { console.error('confirmAddOrder error:', e); alert(e.response?.data?.message || 'Order could not be saved') }
       finally { this.savingOrder = false }
     },
 

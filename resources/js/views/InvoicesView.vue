@@ -206,8 +206,9 @@
                         <input type="file" @change="onInvoiceAttachmentChange" />
 
                         <small v-if="editingInvoiceId">
-                            Agar old file rehny deni hai to new file select na karo.
-                        </small>
+    Leave the file field empty to keep the current attachment.
+
+</small>
                     </div>
 
                     <div class="total-box">
@@ -635,13 +636,13 @@ export default {
 
         async saveInvoice() {
             if (!this.form.client_id) {
-                alert('Client select karo')
+alert('Please select a client')
                 return
             }
 
             const hasEmpty = this.form.items.some(item => !item.description || !item.quantity)
             if (hasEmpty) {
-                alert('Item description aur quantity required hai')
+alert('Item description and quantity are required')
                 return
             }
 

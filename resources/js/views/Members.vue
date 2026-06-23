@@ -294,7 +294,7 @@ async toggleOrderCreatePermission(member) {
         )
     } catch (e) {
         console.error(e)
-        this.showToast(e.response?.data?.message || 'Permission update nahi hui', 'error')
+this.showToast(e.response?.data?.message || 'Permission update failed', 'error')
     }
 },
 async toggleStatus(member) {
@@ -685,7 +685,7 @@ async deleteMember(id) {
     .members-header h4 { font-size: 20px; }
     .primary-btn { width: 100%; }
 
-    /* TABLE hide karo, cards dikhao */
+/* Hide table and show cards */
     .members-card { background: transparent; border: none; box-shadow: none; overflow: visible; }
 
     .table-responsive { overflow: visible; }
