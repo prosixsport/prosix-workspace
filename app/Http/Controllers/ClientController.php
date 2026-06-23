@@ -15,50 +15,52 @@ class ClientController extends Controller
         return Client::latest()->get();
     }
 
-    public function store(Request $request)
-    {
-        $data = $request->validate([
-            'name' => 'required|string|max:255',
+ public function store(Request $request)
+{
+    $data = $request->validate([
+        'name' => 'required|string|max:255',
+        'email' => 'required|email|max:255',
+        'phone' => 'nullable|string|max:50',
+        'company' => 'nullable|string|max:255',
+        'address' => 'nullable|string',
+        'status' => 'nullable|string',
+        'password' => 'required|min:6',
+    ]);
 
-            'email' => [
-                'required',
-                'email',
-                'max:255',
-                Rule::unique('users', 'email')->whereNull('deleted_at'),
-            ],
+    $emailExists = User::where('email', $data['email'])->exists();
 
-            'phone' => 'nullable|string|max:50',
-            'company' => 'nullable|string|max:255',
-            'address' => 'nullable|string',
-            'status' => 'nullable|string',
-            'password' => 'required|min:6',
-        ]);
-
-        $user = User::create([
-            'name' => $data['name'],
-            'email' => $data['email'],
-            'password' => Hash::make($data['password']),
-            'role' => 'client',
-            'is_active' => true,
-        ]);
-
-        $client = Client::create([
-            'user_id' => $user->id,
-            'name' => $data['name'],
-            'email' => $data['email'],
-            'phone' => $data['phone'] ?? null,
-            'company' => $data['company'] ?? null,
-            'address' => $data['address'] ?? null,
-            'status' => $data['status'] ?? 'active',
-            'created_by' => $request->user()->id,
-        ]);
-
+    if ($emailExists) {
         return response()->json([
-            'success' => true,
-            'message' => 'Client created successfully',
-            'client' => $client,
-        ], 201);
+            'success' => false,
+            'message' => 'This email is already used.',
+        ], 422);
     }
+
+    $user = User::create([
+        'name' => $data['name'],
+        'email' => $data['email'],
+        'password' => Hash::make($data['password']),
+        'role' => 'client',
+        'is_active' => true,
+    ]);
+
+    $client = Client::create([
+        'user_id' => $user->id,
+        'name' => $data['name'],
+        'email' => $data['email'],
+        'phone' => $data['phone'] ?? null,
+        'company' => $data['company'] ?? null,
+        'address' => $data['address'] ?? null,
+        'status' => $data['status'] ?? 'active',
+        'created_by' => $request->user()->id,
+    ]);
+
+    return response()->json([
+        'success' => true,
+        'message' => 'Client created successfully',
+        'client' => $client,
+    ], 201);
+}
 
     public function show(Client $client)
     {
