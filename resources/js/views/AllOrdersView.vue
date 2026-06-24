@@ -165,8 +165,8 @@
             <div class="order-menu-item" @click="openOrderInfo(order)">
               <i class="fa-solid fa-circle-info"></i> Info
             </div>
-            <template v-if="isSuperAdmin">
-              <div class="order-menu-item" @click="openEditOrder(order)"><i class="fa-solid fa-pen"></i> Edit</div>
+<template v-if="isSuperAdmin || currentUser?.can_create_orders === true">
+                  <div class="order-menu-item" @click="openEditOrder(order)"><i class="fa-solid fa-pen"></i> Edit</div>
               <div class="order-menu-item" @click="duplicateOrder(order)"><i class="fa-solid fa-copy"></i> Duplicate</div>
               <div class="order-menu-item danger" @click="deleteOrder(order)"><i class="fa-solid fa-trash"></i> Delete</div>
             </template>
