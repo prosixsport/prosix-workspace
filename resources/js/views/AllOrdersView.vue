@@ -1235,7 +1235,7 @@ openPreviewFile(file) {
     window.open(file.url, '_blank')
     return
   }
-
+                                                                                                
   this.previewFile = file
 },
     safeFileName(name) { return String(name || 'file').replace(/[^a-z0-9_.-]/gi, '_') },
@@ -1761,6 +1761,7 @@ if (!this.canUploadFiles || !card || card.type === 'notes') return
       const input = this.$refs[refKey]
       if (input) { const el = Array.isArray(input) ? input[0] : input; el.click() }
     },
+
     async uploadFilesToOrder(files, cardType) {
       if (!files.length || !this.selectedOrder) return
       const card = this.selectedOrder.cards.find(c => c.type === cardType)

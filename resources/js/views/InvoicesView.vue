@@ -666,7 +666,7 @@ alert('Item description and quantity are required')
                         },
                     })
                 }
-
+                                              
                 this.closeModal()
                 this.fetchInvoices()
             } catch (e) {

@@ -194,8 +194,8 @@
   <span class="rec-dot"></span> Recording...
 </div>
 
-        <button class="chat-send-btn" @click="sendMessage">
-          <i class="fa-solid fa-paper-plane"></i>
+<button class="chat-send-btn" @click="sendMessage" :disabled="isSendingMessage || !newMessage.trim()">
+              <i class="fa-solid fa-paper-plane"></i>
         </button>
       </div>
       <div class="chat-input-hint">Enter to send · @ to tag · Click member to auto-tag</div>
@@ -289,6 +289,7 @@ export default {
       activeChatMember: null,
       addMemberId: '',
       newMessage: '',
+      isSendingMessage: false,
       tagQuery: '',
       openMessageMenuKey: null,
       editingMessageId: null,
@@ -631,29 +632,51 @@ alert('Voice message upload failed')
       return text.replace(/@([A-Za-z ]+)/g, '<span class="tag-highlight">@$1</span>')
     },
 
-    async sendMessage() {
-      if (!this.newMessage.trim() || !this.selectedOrder) return
-      try {
-        const res = await axios.post(`/api/orders/${this.selectedOrder.id}/messages`, { message: this.newMessage }, { headers: this.headers() })
-        const msg = res.data?.message || res.data
-        const createdDate = msg.created_at ? new Date(msg.created_at) : new Date()
-        const newMsg = {
-          id: msg.id, localKey: `msg-${msg.id || Date.now()}`,
-          senderId: msg.user?.id || this.currentUser?.id || null,
-          sender: msg.user?.name || this.currentUser?.name || 'You',
-          senderInitial: this.initial(msg.user?.name || this.currentUser?.name || 'You'),
-          senderColor: this.memberColor(msg.user?.id || this.currentUser?.id || 0),
-          senderPhoto: msg.user?.profile_photo_url || this.currentUser?.profile_photo_url || null,
-          time: createdDate.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-          sortAt: createdDate.getTime(),
-          editedAt: null, deletedEveryoneAt: null, text: msg.message, reads: [], seenBy: []
-        }
-        this.$emit('update-chat-messages', [...this.chatMessages, newMsg])
-        this.newMessage = ''
-        this.showTagDropdown = false
-        this.scrollChatBottom()
-      } catch (e) { console.error('sendMessage error:', e); alert(e.response?.data?.message || 'Message could not be sent') }
-    },
+async sendMessage() {
+  if (this.isSendingMessage) return
+  if (!this.newMessage.trim() || !this.selectedOrder) return
+
+  this.isSendingMessage = true
+  const messageText = this.newMessage.trim()
+
+  try {
+    const res = await axios.post(
+      `/api/orders/${this.selectedOrder.id}/messages`,
+      { message: messageText },
+      { headers: this.headers() }
+    )
+
+    const msg = res.data?.message || res.data
+    const createdDate = msg.created_at ? new Date(msg.created_at) : new Date()
+
+    const newMsg = {
+      id: msg.id,
+      localKey: `msg-${msg.id || Date.now()}`,
+      senderId: msg.user?.id || this.currentUser?.id || null,
+      sender: msg.user?.name || this.currentUser?.name || 'You',
+      senderInitial: this.initial(msg.user?.name || this.currentUser?.name || 'You'),
+      senderColor: this.memberColor(msg.user?.id || this.currentUser?.id || 0),
+      senderPhoto: msg.user?.profile_photo_url || this.currentUser?.profile_photo_url || null,
+      time: createdDate.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+      sortAt: createdDate.getTime(),
+      editedAt: null,
+      deletedEveryoneAt: null,
+      text: msg.message,
+      reads: [],
+      seenBy: []
+    }
+
+    this.$emit('update-chat-messages', [...this.chatMessages, newMsg])
+    this.newMessage = ''
+    this.showTagDropdown = false
+    this.scrollChatBottom()
+  } catch (e) {
+    console.error('sendMessage error:', e)
+    alert(e.response?.data?.message || 'Message could not be sent')
+  } finally {
+    this.isSendingMessage = false
+  }
+},
 
     async uploadChatFiles(event) {
       const files = Array.from(event.target.files || [])
