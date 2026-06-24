@@ -788,6 +788,8 @@ alert('Voice message upload failed')
   z-index: 100;
 }
 
+
+
 .rec-dot {
   width: 10px;
   height: 10px;
@@ -805,6 +807,7 @@ alert('Voice message upload failed')
   flex-direction: column;
   overflow: hidden;
   position: relative;
+  height: 100%;
 }
 
 /* Mobile: full width overlay */
@@ -934,6 +937,8 @@ alert('Voice message upload failed')
   display: flex;
   flex-direction: column;
   gap: 10px;
+  min-height: 0;
+  padding-bottom: 14px;
 }
 
 .chat-empty { text-align: center; color: #9aa0b8; font-size: 13px; padding: 20px 0; }
@@ -1171,6 +1176,14 @@ alert('Voice message upload failed')
 
 .seen-row { font-size: 10px; color: #9aa0b8; margin-top: 2px; text-align: right; }
 
+
+
+.chat-input-area {
+  position: sticky;
+  bottom: 0;
+  background: #fff;
+  z-index: 50;
+}
 /* RESPONSIVE */
 @media (max-width: 767px) {
   .chat-panel:not(.mobile-fullscreen) { display: none; }
@@ -1187,7 +1200,9 @@ alert('Voice message upload failed')
   .chat-file-img { width: 44px; height: 44px; }
   .chat-file-doc { width: 44px; height: 44px; font-size: 18px; }
 }
-
+.chat-panel.mobile-fullscreen {
+  height: calc(100vh - 52px);
+}
 .mt-2 { margin-top: 8px; }
 .mt-3 { margin-top: 12px; }
 .w-100 { width: 100%; }
