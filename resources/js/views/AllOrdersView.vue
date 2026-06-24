@@ -351,8 +351,8 @@
               <div class="payment-read-row balance-row">
                 <span>Balance</span><strong>${{ selectedOrder.paymentBalance || 0 }}</strong>
               </div>
-              <div v-if="isSuperAdmin" class="payment-admin-editor">
-                <div class="payment-field">
+<div v-if="isSuperAdmin || currentUser?.can_create_orders === true" class="payment-admin-editor">
+                    <div class="payment-field">
                   <label class="payment-label">Paid %</label>
                   <div class="payment-percent-row">
                     <input v-model="paymentEdit.percent" type="number" min="0" max="100" class="payment-input" placeholder="e.g. 40" />
@@ -590,7 +590,7 @@
         />
 
         <small style="color:#6b7280;font-weight:700;margin-top:6px;">
-          Save karne par selected members selected orders me update ho jayen gy.
+Saving will update the selected members for all selected orders.
         </small>
       </div>
     </div>
@@ -1235,7 +1235,7 @@ openPreviewFile(file) {
     window.open(file.url, '_blank')
     return
   }
-                                                                                                
+
   this.previewFile = file
 },
     safeFileName(name) { return String(name || 'file').replace(/[^a-z0-9_.-]/gi, '_') },
@@ -1557,7 +1557,7 @@ shippingAddress: order.shippingAddress || '',
     getOrderNote(order) { return order.cards?.find(c => c.title === 'Notes')?.noteText || '' },
 
     async duplicateOrder(order) {
-      if (!this.isSuperAdmin) return
+if (!this.isSuperAdmin && this.currentUser?.can_create_orders !== true) return
       const status = this.statusOptions.find(s => s.label === order.status)
       try {
         const res = await axios.post('/api/orders', {
