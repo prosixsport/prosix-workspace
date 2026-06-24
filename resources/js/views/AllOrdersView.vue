@@ -2368,8 +2368,9 @@ grid-template-columns: 32px 1fr 118px 38px;
   background: #f6f7fb;
   display: flex;
   flex-direction: column;
-  overflow: visible;
   min-width: 0;
+    height:100vh;
+    overflow:hidden;
 }
 
 .detail-header {
@@ -2689,14 +2690,19 @@ grid-template-columns: 32px 1fr 118px 38px;
 .payment-save-btn:hover { background: #4f4fd4; }
 
 /* BODY */
-.detail-body {
-  display: flex;
-  flex: 1;
-  overflow: hidden;
+.detail-body{
+    display:flex;
+    flex:1;
+    min-height:0;
+    overflow:hidden;
 }
 
 /* CARDS */
-.cards-area { flex: 1; overflow-y: auto; padding: 12px; }
+.cards-area{
+    flex:1;
+    min-width:0;
+    overflow:auto;
+}
 
 .cards-grid {
   display: grid;

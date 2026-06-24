@@ -1184,6 +1184,25 @@ alert('Voice message upload failed')
   background: #fff;
   z-index: 50;
 }
+.chat-panel {
+  display: flex !important;
+  flex-direction: column !important;
+  height: 100% !important;
+}
+
+.chat-messages {
+  flex: 1 !important;
+  min-height: 0 !important;
+  overflow-y: auto !important;
+}
+
+.chat-input-area {
+  position: sticky !important;
+  bottom: 0 !important;
+  background: #fff !important;
+  z-index: 999 !important;
+  flex-shrink: 0 !important;
+}
 /* RESPONSIVE */
 @media (max-width: 767px) {
   .chat-panel:not(.mobile-fullscreen) { display: none; }
