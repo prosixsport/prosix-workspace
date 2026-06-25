@@ -61,8 +61,8 @@
         <!-- <div class="col-owner">OWNER</div> -->
         <div class="col-actions"></div>
       </div>
-<div v-if="isSuperAdmin && selectedOrders.length > 1" class="bulk-actions" @click.stop>
-    <strong>{{ selectedOrders.length }}</strong>
+<div v-if="(isSuperAdmin || currentUser?.can_create_orders === true) && selectedOrders.length > 1" class="bulk-actions" @click.stop>
+        <strong>{{ selectedOrders.length }}</strong>
 
   <button class="bulk-btn" @click="openBulkMembersModal" :disabled="bulkActionLoading">
     <i class="fa-solid fa-users"></i> Edit Members
