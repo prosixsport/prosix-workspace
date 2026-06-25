@@ -155,8 +155,8 @@ public function update(Request $request, Order $order)
         ->map(fn ($id) => (int) $id)
         ->toArray();
 
-    if ($isSuperAdmin) {
-        $order->update($request->only([
+if ($isSuperAdmin || $user->can_create_orders) {
+            $order->update($request->only([
             'name',
             'po',
             'ship_date',
@@ -275,8 +275,8 @@ $order->update($request->only($allowedFields));
     {
         $this->checkAccess($order);
 
-        if (auth()->user()?->role !== 'super_admin') {
-            return response()->json([
+if (auth()->user()?->role !== 'super_admin' && !auth()->user()?->can_create_orders) {
+                return response()->json([
                 'message' => 'Only super admin can delete orders.'
             ], 403);
         }

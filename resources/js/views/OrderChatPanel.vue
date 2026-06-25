@@ -104,8 +104,14 @@
               </div>
             </div>
 
-            <template v-else>
-              <div v-if="msg.text" v-html="formatMessage(msg.text)"></div>
+          <template v-else>
+  <div v-if="msg.reply_to" class="reply-box">
+    <strong>{{ msg.reply_to?.user?.name || 'User' }}</strong>
+    <p>{{ msg.reply_to?.message || 'Message deleted' }}</p>
+  </div>
+
+  <div v-if="msg.text" v-html="formatMessage(msg.text)"></div>
+
               <span v-if="msg.editedAt" class="edited-label">edited</span>
               <div v-if="msg.files && msg.files.length" class="chat-file-list">
                 <a
@@ -137,6 +143,9 @@
             <div v-if="canEditMessage(msg)" class="msg-action-item" @click="startEditMessage(msg)">
               <i class="fa-solid fa-pen"></i> Edit
             </div>
+            <div class="msg-action-item" @click="replyToMessage(msg)">
+  <i class="fa-solid fa-reply"></i> Reply
+</div>
             <div class="msg-action-item" @click="openMessageInfo(msg)">
               <i class="fa-solid fa-circle-info"></i> Info
             </div>
@@ -162,8 +171,16 @@
       </div>
     </div>
 
-    <div class="chat-input-area">
-      <div class="chat-input-box">
+<div class="chat-input-area">
+  <div v-if="replyTarget" class="reply-preview">
+    <div>
+      <strong>Replying to {{ replySender(replyTarget) }}</strong>
+      <p>{{ replyText(replyTarget) }}</p>
+    </div>
+
+    <button type="button" @click="cancelReply">×</button>
+  </div>
+        <div class="chat-input-box">
         <textarea
           v-model="newMessage"
           class="chat-input"
@@ -289,6 +306,7 @@ export default {
       activeChatMember: null,
       addMemberId: '',
       newMessage: '',
+      replyTarget: null,
       isSendingMessage: false,
       tagQuery: '',
       openMessageMenuKey: null,
@@ -350,6 +368,23 @@ audioChunks: []
   },
 
   methods: {
+    replyToMessage(msg) {
+  this.replyTarget = msg
+  this.openMessageMenuKey = null
+  this.$nextTick(() => this.$refs.chatInput?.focus())
+},
+
+cancelReply() {
+  this.replyTarget = null
+},
+
+replySender(msg) {
+  return msg?.sender || msg?.user?.name || 'User'
+},
+
+replyText(msg) {
+  return msg?.text || msg?.message || 'Message deleted'
+},
     async toggleRecording() {
   if (this.isRecording) {
     this.stopRecording()
@@ -642,7 +677,10 @@ async sendMessage() {
   try {
     const res = await axios.post(
       `/api/orders/${this.selectedOrder.id}/messages`,
-      { message: messageText },
+{
+  message: messageText,
+  reply_to_id: this.replyTarget?.id || null
+},
       { headers: this.headers() }
     )
 
@@ -662,13 +700,22 @@ async sendMessage() {
       editedAt: null,
       deletedEveryoneAt: null,
       text: msg.message,
-      reads: [],
-      seenBy: []
+reply_to_id: msg.reply_to_id || this.replyTarget?.id || null,
+reply_to: msg.reply_to || (this.replyTarget ? {
+  id: this.replyTarget.id,
+  message: this.replyTarget.text || this.replyTarget.message || '',
+  user: {
+    name: this.replyTarget.sender || 'User'
+  }
+} : null),
+reads: [],
+seenBy: []
     }
 
     this.$emit('update-chat-messages', [...this.chatMessages, newMsg])
     this.newMessage = ''
     this.showTagDropdown = false
+    this.replyTarget = null
     this.scrollChatBottom()
   } catch (e) {
     console.error('sendMessage error:', e)
@@ -1225,6 +1272,49 @@ async sendMessage() {
   background: #fff !important;
   z-index: 999 !important;
   flex-shrink: 0 !important;
+}
+.reply-preview {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  background: #eef0ff;
+  border-left: 3px solid #6161ff;
+  border-radius: 8px;
+  padding: 8px 10px;
+  margin-bottom: 6px;
+  font-size: 12px;
+  color: #172b4d;
+}
+
+.reply-preview p {
+  margin: 2px 0 0;
+  color: #6b7280;
+  max-width: 240px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.reply-preview button {
+  border: none;
+  background: transparent;
+  font-size: 18px;
+  color: #6b7280;
+  cursor: pointer;
+}
+
+.reply-box {
+  background: #fff;
+  border-left: 3px solid #6161ff;
+  border-radius: 7px;
+  padding: 6px 8px;
+  margin-bottom: 6px;
+  font-size: 12px;
+}
+
+.reply-box p {
+  margin: 2px 0 0;
+  color: #6b7280;
 }
 /* RESPONSIVE */
 @media (max-width: 767px) {
