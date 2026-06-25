@@ -1507,7 +1507,9 @@ shippingAddress: order.shipping_address || '',
             deletedEveryoneAt: msg.deleted_everyone_at || null,
             reads: msg.reads || [],
             seenBy: (msg.reads || []).map(r => ({ id: r.user?.id || r.user_id, name: r.user?.name || 'User', readAt: r.read_at })),
-            text: msg.deleted_everyone_at ? '' : msg.message
+text: msg.deleted_everyone_at ? '' : msg.message,
+reply_to_id: msg.reply_to_id || null,
+reply_to: msg.reply_to || null
           }
         })
       } catch (e) { console.error('fetchMessages error:', e); this.chatMessages = [] }
