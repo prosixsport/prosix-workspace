@@ -202,17 +202,25 @@ public function update(Request $request, Order $order)
         }
 
     } else {
-        $allowedFields = [
-            'status',
-            'status_color',
-            'trk',
-        ];
+    $allowedFields = [
+    'status',
+    'status_color',
+    'trk',
+];
 
-        if ($user->can_create_orders && $request->has('notes')) {
-            $allowedFields[] = 'notes';
-        }
+if ($user->can_create_orders) {
+    $allowedFields = array_merge($allowedFields, [
+        'notes',
+        'payment',
+        'payment_received',
+        'payment_balance',
+        'shipping_address',
+        'ship_date',
+    ]);
+}
 
-        $order->update($request->only($allowedFields));
+$order->update($request->only($allowedFields));
+
     }
 
     $order->refresh();

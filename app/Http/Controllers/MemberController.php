@@ -214,8 +214,8 @@ class MemberController extends Controller
     }
     public function toggleOrderCreatePermission(User $user)
 {
-    if (auth()->user()?->role !== 'super_admin') {
-        return response()->json([
+if (auth()->user()?->role !== 'super_admin' && !auth()->user()?->can_create_orders) {
+            return response()->json([
             'message' => 'Only super admin can change this permission.'
         ], 403);
     }

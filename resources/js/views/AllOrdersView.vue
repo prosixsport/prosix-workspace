@@ -779,19 +779,16 @@ clientForm: {
   phone: '',
   company: '',
   address: '',
-  status: 'active'
-},
+  status: 'active'},
       teamMembers: [],
       chatMessages: [],
       unreadChatCount: 0,
       unreadTimer: null,
-
 notificationTimer: null,
 notifications: [],
 notificationCount: 0,
 lastNotificationId: null,
     searchOrder: '',
-
       selectedOrders: [],
       selectAll: false,
       bulkMembersModal: false,
@@ -1576,7 +1573,7 @@ if (!this.isSuperAdmin && this.currentUser?.can_create_orders !== true) return
     },
 
     async deleteOrder(order) {
-      if (!this.isSuperAdmin) return
+if (!this.isSuperAdmin && this.currentUser?.can_create_orders !== true) return
       if (!confirm('Delete this order?')) return
       try {
         await axios.delete(`/api/orders/${order.id}`, { headers: this.headers() })

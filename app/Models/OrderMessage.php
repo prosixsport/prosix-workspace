@@ -13,6 +13,7 @@ class OrderMessage extends Model
         'edited_at',
         'deleted_everyone_at',
         'deleted_for',
+        'reply_to_id',
     ];
 
     protected $casts = [
@@ -34,4 +35,9 @@ public function reads()
 {
     return $this->hasMany(OrderMessageRead::class);
 }
+public function replyTo()
+{
+    return $this->belongsTo(OrderMessage::class, 'reply_to_id');
+}
+
 }
