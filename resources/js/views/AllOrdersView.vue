@@ -540,6 +540,7 @@
               <label>Ship Date</label>
               <input v-model="newOrder.shipDate" type="date" class="field-input" />
             </div>
+
           </div>
           <div class="field-row">
             <div class="field-group">
@@ -562,6 +563,16 @@
             <label>TRK #</label>
             <input v-model="newOrder.trk" class="field-input" placeholder="e.g. 03316566200" />
           </div>
+           <div class="field-group">
+  <label>Shipping Address</label>
+
+  <textarea
+    v-model="newOrder.shippingAddress"
+    class="field-input"
+    rows="3"
+    placeholder="Shipping Address"
+  ></textarea>
+</div>
           <div class="field-group">
             <label>Add Members</label>
             <div class="member-select-actions">
@@ -583,16 +594,7 @@
   />
 </div>
 
-<div class="field-group">
-  <label>Shipping Address</label>
 
-  <textarea
-    v-model="newOrder.shippingAddress"
-    class="field-input"
-    rows="3"
-    placeholder="Shipping Address"
-  ></textarea>
-</div>
         </div>
         <div class="add-order-footer">
           <button class="btn-cancel" @click="closeOrderModal">Cancel</button>
