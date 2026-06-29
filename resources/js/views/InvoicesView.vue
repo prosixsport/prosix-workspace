@@ -666,7 +666,7 @@ alert('Item description and quantity are required')
                         },
                     })
                 }
-                                              
+
                 this.closeModal()
                 this.fetchInvoices()
             } catch (e) {
@@ -705,6 +705,7 @@ th { background:#fafafa; color:#6b7280; font-size:12px; text-transform:uppercase
 .badge { background:#111; color:#fff; border-radius:999px; padding:5px 10px; font-size:11px; font-weight:800; }
 .empty { padding:40px; text-align:center; color:#6b7280; }
 .actions { display:flex; justify-content:flex-end; gap:8px; }
+
 
 /* MONTH WISE CARDS */
 .month-cards {

@@ -273,6 +273,7 @@ textarea { min-height: 80px; resize: vertical; }
     .head { flex-direction: column; align-items: stretch; }
     .add-btn { width: 100%; }
 }
+
 @media (max-width: 768px) {
     .page { padding: 14px; }
     .head { flex-direction: column; align-items: stretch; gap: 12px; }

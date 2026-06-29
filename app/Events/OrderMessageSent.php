@@ -26,9 +26,7 @@ class OrderMessageSent implements ShouldBroadcastNow
             'order_id' => $message->order_id,
             'user_id' => $message->user_id,
             'message' => $message->message,
-
             'reply_to_id' => $message->reply_to_id,
-
             'reply_to' => $message->replyTo ? [
                 'id' => $message->replyTo->id,
                 'message' => $message->replyTo->message,
@@ -45,10 +43,8 @@ class OrderMessageSent implements ShouldBroadcastNow
             'edited_at' => $message->edited_at,
             'created_at' => $message->created_at,
             'updated_at' => $message->updated_at,
-
             'is_seen' => false,
             'reads' => [],
-
             'user' => [
                 'id' => $message->user?->id,
                 'name' => $message->user?->name,

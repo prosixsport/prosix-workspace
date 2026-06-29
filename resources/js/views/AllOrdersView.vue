@@ -306,32 +306,78 @@
             </button>
             <input ref="invoiceInput" type="file" accept="image/*,.pdf" class="hidden-file-input" @change="onInvoiceFileChange" />
           </div>
-          <div class="detail-info-item tracking-info-item" style="position:relative" @click.stop>
-            <span class="info-label">trk# :</span>
-          <span class="trk-badge trk-clickable" @click="!isClient && openTrackingMenu()">
-                  <img v-if="trackingLogo(selectedOrder.trk)" :src="trackingLogo(selectedOrder.trk)" class="trk-logo" />
-              {{ selectedOrder.trk || 'N/A' }}
-              <i class="fa-solid fa-pen" style="font-size:9px;margin-left:6px"></i>
-            </span>
-             <div v-if="showTrackingMenu && !isClient" class="tracking-dropdown">
-                  <div class="tracking-dropdown-header">Tracking Details</div>
-              <div class="payment-field">
-                <label class="payment-label">Tracking Number</label>
-                <input v-model="trackingEdit.number" class="payment-input" placeholder="e.g. 123456789" />
-              </div>
-              <div class="payment-field">
-                <label class="payment-label">Company Website</label>
-                <input v-model="trackingEdit.company" class="payment-input" placeholder="e.g. www.dhl.com or www.ups.com" />
-              </div>
-              <div v-if="trackingLogo(trackingEdit.company)" class="tracking-preview-row">
-                <img :src="trackingLogo(trackingEdit.company)" class="tracking-preview-logo" />
-                <span>{{ trackingCompanyName(trackingEdit.company) }}</span>
-              </div>
-              <button class="payment-save-btn" @click="saveTracking">
-                <i class="fa-solid fa-floppy-disk me-1"></i>Save Tracking
-              </button>
-            </div>
-          </div>
+    <div class="detail-info-item tracking-info-item" style="position:relative" @click.stop>
+  <span class="info-label">trk# :</span>
+
+  <div class="trk-slider-box">
+    <button class="trk-arrow" @click="prevTracking" :disabled="trackingList.length <= 1">
+      <i class="fa-solid fa-chevron-left"></i>
+    </button>
+
+    <span class="trk-badge trk-clickable" @click="!isClient && openTrackingMenu()">
+      <img v-if="trackingLogo(activeTracking.company)" :src="trackingLogo(activeTracking.company)" class="trk-logo" />
+      {{ activeTracking.number || 'N/A' }}
+      <small v-if="trackingList.length > 1">({{ activeTrackingIndex + 1 }}/{{ trackingList.length }})</small>
+      <i class="fa-solid fa-pen" style="font-size:9px;margin-left:6px"></i>
+    </span>
+
+    <button class="trk-arrow" @click="nextTracking" :disabled="trackingList.length <= 1">
+      <i class="fa-solid fa-chevron-right"></i>
+    </button>
+  </div>
+
+  <div v-if="showTrackingMenu && !isClient" class="tracking-dropdown tracking-dropdown-wide">
+    <div class="tracking-dropdown-header">All Tracking Details</div>
+
+    <div
+      v-for="(item, index) in trackingEditList"
+      :key="index"
+      class="tracking-multi-row"
+    >
+      <div class="payment-field">
+        <label class="payment-label">Tracking Number {{ index + 1 }}</label>
+        <input
+          v-model="item.number"
+          class="payment-input"
+          placeholder="e.g. 123456789"
+          @keydown.enter.prevent="addTrackingRow"
+        />
+      </div>
+
+      <div class="payment-field">
+        <label class="payment-label">Company Website</label>
+        <input
+          v-model="item.company"
+          class="payment-input"
+          placeholder="e.g. www.dhl.com or www.ups.com"
+          @keydown.enter.prevent="addTrackingRow"
+        />
+      </div>
+
+      <div v-if="trackingLogo(item.company)" class="tracking-preview-row">
+        <img :src="trackingLogo(item.company)" class="tracking-preview-logo" />
+        <span>{{ trackingCompanyName(item.company) }}</span>
+      </div>
+
+  <button
+  v-if="trackingEditList.length > 1"
+  class="tracking-close-btn"
+  @click="removeTrackingRow(index)"
+>
+  <i class="fa-solid fa-xmark"></i>
+</button>
+    </div>
+
+ <button class="tracking-add-btn" @click="addTrackingRow">
+  <i class="fa-solid fa-plus"></i>
+  <span>Add Tracking</span>
+</button>
+
+    <button class="payment-save-btn" @click="saveTracking">
+      <i class="fa-solid fa-floppy-disk me-1"></i>Save All Tracking
+    </button>
+  </div>
+</div>
           <div class="detail-info-item" style="position:relative" @click.stop>
             <span class="info-label">Payment :</span>
             <span class="payment-badge payment-summary-badge" @click="!isClient && (showPaymentMenu = !showPaymentMenu)">
@@ -645,12 +691,12 @@ Saving will update the selected members for all selected orders.
           <h5>{{ viewAllCard.title }}</h5>
           <div class="view-all-head-actions">
             <button v-if="viewAllCard.files && viewAllCard.files.length" class="download-all-btn" @click="downloadAllFiles(viewAllCard)">
-              <i class="fa-solid fa-file-zipper me-1"></i> Download All
+            <i class="fa-solid fa-file-zipper me-1"></i> Download All
             </button>
-<button v-if="canUploadFiles && viewAllCard.type !== 'notes'" class="upload-small-btn" @click="triggerUpload(viewAllCard)">
-                  <i class="fa-solid fa-upload me-1"></i> Upload
+            <button v-if="canUploadFiles && viewAllCard.type !== 'notes'" class="upload-small-btn" @click="triggerUpload(viewAllCard)">
+            <i class="fa-solid fa-upload me-1"></i> Upload
             </button>
-<input v-if="canUploadFiles && viewAllCard.type !== 'notes'" type="file" multiple :ref="'fileInput_modal_' + viewAllCard.title" class="hidden-file-input" @change="onFileChange($event, viewAllCard)" />
+            <input v-if="canUploadFiles && viewAllCard.type !== 'notes'" type="file" multiple :ref="'fileInput_modal_' + viewAllCard.title" class="hidden-file-input" @change="onFileChange($event, viewAllCard)" />
             <button class="modal-close" @click="viewAllCard = null"><i class="fa-solid fa-xmark"></i></button>
           </div>
         </div>
@@ -665,15 +711,16 @@ Saving will update the selected members for all selected orders.
               <div class="view-file-actions">
                 <a :href="file.url" :download="file.name" class="vf-btn download-btn"><i class="fa-solid fa-download"></i></a>
              <button v-if="canDeleteFile(file)"
-class="vf-btn remove-btn"
-@click="removeFile(viewAllCard, fi)"><i class="fa-solid fa-trash"></i></button>
+                class="vf-btn remove-btn"
+                @click="removeFile(viewAllCard, fi)"><i class="fa-solid fa-trash"></i>
+             </button>
               </div>
             </div>
           </div>
           <div v-else class="view-all-empty">
             <i class="fa-solid fa-inbox" style="font-size:40px;opacity:0.3"></i>
             <p>No files uploaded yet</p>
-<button v-if="canUploadFiles && viewAllCard.type !== 'notes'" class="upload-btn-big" @click="triggerUpload(viewAllCard)">
+            <button v-if="canUploadFiles && viewAllCard.type !== 'notes'" class="upload-btn-big" @click="triggerUpload(viewAllCard)">
                   <i class="fa-solid fa-upload me-2"></i>Upload Files
             </button>
           </div>
@@ -745,10 +792,10 @@ export default {
   name: 'AllOrdersView',
   components: { Multiselect, OrderChatPanel },
   data() {
-    return {
-    showShippingAddressMenu: false,
-shippingAddressEdit: '',
-    sidebarLightMode: false,
+      return {
+      showShippingAddressMenu: false,
+      shippingAddressEdit: '',
+      sidebarLightMode: false,
       leftWidth: 370,
       isResizing: false,
       mobileLeftOpen: false,
@@ -771,24 +818,24 @@ shippingAddressEdit: '',
       orders: [],
       availableMembers: [],
       availableClients: [],
-clientModal: false,
-clientSaving: false,
-clientForm: {
-  name: '',
-  email: '',
-  phone: '',
-  company: '',
-  address: '',
-  status: 'active'},
+      clientModal: false,
+      clientSaving: false,
+      clientForm: {
+      name: '',
+      email: '',
+      phone: '',
+      company: '',
+      address: '',
+      status: 'active'},
       teamMembers: [],
       chatMessages: [],
       unreadChatCount: 0,
       unreadTimer: null,
-notificationTimer: null,
-notifications: [],
-notificationCount: 0,
-lastNotificationId: null,
-    searchOrder: '',
+      notificationTimer: null,
+      notifications: [],
+      notificationCount: 0,
+      lastNotificationId: null,
+      searchOrder: '',
       selectedOrders: [],
       selectAll: false,
       bulkMembersModal: false,
@@ -801,20 +848,20 @@ lastNotificationId: null,
       profileModal: false,
       profileUser: null,
       profileForm: { name: '', about: '', profile_photo: null, preview: '' },
-
       trackingEdit: { number: '', company: '' },
+      trackingEditList: [{ number: '', company: '' }],
+activeTrackingIndex: 0,
       paymentEdit: { percent: '', received: '', balance: '' },
-
-    newOrder: {
-  name: '',
-  po: '',
-  selectedMembers: [],
-  selectedClients: [],
-  shippingAddress: '',
-  shipDate: '',
-  status: 'Pending',
-  payment: '0 % Paid',
-  trk: 'N/A'
+      newOrder: {
+      name: '',
+      po: '',
+      selectedMembers: [],
+      selectedClients: [],
+      shippingAddress: '',
+      shipDate: '',
+      status: 'Pending',
+      payment: '0 % Paid',
+      trk: 'N/A'
 },
 
       groups: [
@@ -835,6 +882,13 @@ lastNotificationId: null,
   },
 
   computed: {
+    trackingList() {
+  return this.parseTrackingList(this.selectedOrder?.trk)
+},
+
+activeTracking() {
+  return this.trackingList[this.activeTrackingIndex] || { number: '', company: '' }
+},
     isClient() {
   return this.currentUser?.role === 'client'
 },
@@ -1157,13 +1211,108 @@ alert(e.response?.data?.message || 'Orders were not deleted')
       } catch (e) { console.error('invoice upload error:', e); alert(e.response?.data?.message || 'Invoice was not uploaded') }
     },
 
-    parseTracking(value) {
-      const raw = (value || '').trim()
-      const urlMatch = raw.match(/(https?:\/\/)?(www\.)?[a-z0-9.-]+\.[a-z]{2,}(\/\S*)?/i)
-      const company = urlMatch ? urlMatch[0] : ''
-      const number = company ? raw.replace(company, '').trim() : raw
-      return { number, company }
-    },
+ parseTracking(value) {
+  const raw = (value || '').trim()
+  const urlMatch = raw.match(/(https?:\/\/)?(www\.)?[a-z0-9.-]+\.[a-z]{2,}(\/\S*)?/i)
+  const company = urlMatch ? urlMatch[0] : ''
+  const number = company ? raw.replace(company, '').trim() : raw
+  return { number, company }
+},
+
+parseTrackingList(value) {
+  if (!value || value === 'N/A') return [{ number: '', company: '' }]
+
+  try {
+    const parsed = JSON.parse(value)
+
+    if (Array.isArray(parsed)) {
+      const clean = parsed
+        .map(t => ({
+          number: t.number || '',
+          company: t.company || ''
+        }))
+        .filter(t => t.number || t.company)
+
+      return clean.length ? clean : [{ number: '', company: '' }]
+    }
+  } catch (e) {}
+
+  return [this.parseTracking(value)]
+},
+
+buildTrackingValue(list) {
+  const clean = (list || [])
+    .map(t => ({
+      number: (t.number || '').trim(),
+      company: (t.company || '').trim()
+    }))
+    .filter(t => t.number || t.company)
+
+  return clean.length ? JSON.stringify(clean) : 'N/A'
+},
+
+openTrackingMenu() {
+  if (!this.selectedOrder) return
+
+  this.trackingEditList = this.parseTrackingList(this.selectedOrder.trk)
+  this.showTrackingMenu = !this.showTrackingMenu
+},
+
+addTrackingRow() {
+  this.trackingEditList.push({ number: '', company: '' })
+},
+
+removeTrackingRow(index) {
+  this.trackingEditList.splice(index, 1)
+
+  if (!this.trackingEditList.length) {
+    this.trackingEditList.push({ number: '', company: '' })
+  }
+},
+
+nextTracking() {
+  if (this.trackingList.length <= 1) return
+
+  this.activeTrackingIndex =
+    (this.activeTrackingIndex + 1) % this.trackingList.length
+},
+
+prevTracking() {
+  if (this.trackingList.length <= 1) return
+
+  this.activeTrackingIndex =
+    (this.activeTrackingIndex - 1 + this.trackingList.length) % this.trackingList.length
+},
+
+async saveTracking() {
+  if (!this.selectedOrder) return
+
+  const trk = this.buildTrackingValue(this.trackingEditList)
+
+  try {
+    await axios.put(
+      `/api/orders/${this.selectedOrder.id}`,
+      { trk },
+      { headers: this.headers() }
+    )
+
+    this.selectedOrder.trk = trk
+
+    const idx = this.orders.findIndex(
+      o => Number(o.id) === Number(this.selectedOrder.id)
+    )
+
+    if (idx !== -1) {
+      this.orders[idx].trk = trk
+    }
+
+    this.activeTrackingIndex = 0
+    this.showTrackingMenu = false
+  } catch (e) {
+    console.error('saveTracking error:', e)
+    alert(e.response?.data?.message || 'Tracking was not saved')
+  }
+},
 
     normalizeTrackingCompany(value) {
       if (!value) return ''
@@ -1190,26 +1339,6 @@ alert(e.response?.data?.message || 'Orders were not deleted')
       if (domain.includes('fedex')) return 'FedEx'
       if (domain.includes('usps')) return 'USPS'
       return domain
-    },
-
-    openTrackingMenu() {
-      if (!this.selectedOrder) return
-      this.trackingEdit = this.parseTracking(this.selectedOrder.trk)
-      this.showTrackingMenu = !this.showTrackingMenu
-    },
-
-    async saveTracking() {
-      if (!this.selectedOrder) return
-      const number = (this.trackingEdit.number || '').trim()
-      const company = (this.trackingEdit.company || '').trim()
-      const trk = [number, company].filter(Boolean).join(' ') || 'N/A'
-      try {
-        await axios.put(`/api/orders/${this.selectedOrder.id}`, { trk }, { headers: this.headers() })
-        this.selectedOrder.trk = trk
-        const idx = this.orders.findIndex(o => Number(o.id) === Number(this.selectedOrder.id))
-        if (idx !== -1) this.orders[idx].trk = trk
-        this.showTrackingMenu = false
-      } catch (e) { console.error('saveTracking error:', e); alert(e.response?.data?.message || 'Tracking was not saved') }
     },
 
 openPreviewFile(file) {
@@ -1441,7 +1570,8 @@ shippingAddress: order.shipping_address || '',
         received: order.paymentReceived || '',
         balance: order.paymentBalance || ''
       }
-      this.trackingEdit = this.parseTracking(order.trk)
+this.trackingEditList = this.parseTrackingList(order.trk)
+this.activeTrackingIndex = 0
       this.shippingAddressEdit = order.shippingAddress || ''
       this.teamMembers = (order.members || []).map(m => ({
         id: m.id, name: m.name, email: m.email,
@@ -1507,9 +1637,9 @@ shippingAddress: order.shipping_address || '',
             deletedEveryoneAt: msg.deleted_everyone_at || null,
             reads: msg.reads || [],
             seenBy: (msg.reads || []).map(r => ({ id: r.user?.id || r.user_id, name: r.user?.name || 'User', readAt: r.read_at })),
-text: msg.deleted_everyone_at ? '' : msg.message,
-reply_to_id: msg.reply_to_id || null,
-reply_to: msg.reply_to || null
+            text: msg.deleted_everyone_at ? '' : msg.message,
+            reply_to_id: msg.reply_to_id || null,
+            reply_to: msg.reply_to || null
           }
         })
       } catch (e) { console.error('fetchMessages error:', e); this.chatMessages = [] }
@@ -1951,6 +2081,7 @@ showDesktopNotification(notification) {
 </script>
 
 <style scoped>
+
 .detail-topbar-wrapper {
   overflow: visible !important;
   position: relative;
@@ -3142,6 +3273,80 @@ grid-template-columns: 32px 1fr 118px 38px;
 
 .tracking-preview-row { display: flex; align-items: center; gap: 8px; margin: 8px 14px 0; padding: 7px 10px; background: #f8f9fc; border-radius: 8px; font-size: 12px; font-weight: 800; color: #172b4d; }
 .tracking-preview-logo { width: 22px; height: 22px; object-fit: contain; border-radius: 5px; }
+
+
+.trk-slider-box {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.trk-arrow {
+  border: 0;
+  background: #f3f4f6;
+  color: #111827;
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  font-size: 10px;
+  cursor: pointer;
+}
+
+.trk-arrow:disabled {
+  opacity: 0.35;
+  cursor: not-allowed;
+}
+
+.tracking-dropdown-wide {
+  min-width: 340px;
+  max-height: 480px;
+  overflow-y: auto;
+}
+
+.tracking-multi-row{
+    position:relative;
+    border:1px solid #e5e7eb;
+    border-radius:12px;
+    padding:16px;
+    margin-bottom:14px;
+    background:#fff;
+}
+
+.tracking-close-btn{
+    position:absolute;
+    right:12px;
+    top:10px;
+    width:26px;
+    height:26px;
+    border:none;
+    background:transparent;
+    color:#ef4444;
+    font-size:18px;
+    cursor:pointer;
+}
+
+.tracking-close-btn:hover{
+    transform:scale(1.1);
+}
+
+.tracking-add-btn{
+  display: block;
+  width: calc(100% - 32px);
+  margin: 10px 16px 12px;
+  background: #6161ff;
+  color: #fff;
+  border: none;
+  border-radius: 8px;
+  padding: 8px;
+  font-size: 13px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: background 0.15s;
+}
+
+.tracking-add-btn:hover{
+    background:#000;
+}
 
 .download-all-btn {
   border: none;
