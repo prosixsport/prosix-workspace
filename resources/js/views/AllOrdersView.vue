@@ -198,7 +198,10 @@
             <span v-else>{{ userInitial }}</span>
           </button>
         </div>
-
+ <div v-if="selectedOrder" class="current-order-title">
+  <i class="fa-solid fa-folder-open"></i>
+  <span>{{ selectedOrder.name }}</span>
+</div>
 
 
 
@@ -240,7 +243,7 @@
   class="info-value"
   @click="!isClient && (showShippingAddressMenu = !showShippingAddressMenu)"
 >
-    {{ selectedOrder?.shippingAddress || 'N/A' }}
+{{ shortShippingAddress(selectedOrder?.shippingAddress) }}
     <i class="fa-solid fa-pen"></i>
   </span>
 
@@ -420,10 +423,7 @@
             </div>
           </div>
         </div>
-        <div v-if="selectedOrder" class="current-order-title">
-  <i class="fa-solid fa-folder-open"></i>
-  <span>{{ selectedOrder.name }}</span>
-</div>
+
       </div>
 
       <!-- BODY -->
@@ -1024,6 +1024,19 @@ beforeUnmount()  {
     alert('Shipping address not saved ')
   }
 },
+
+
+shortShippingAddress(address) {
+  if (!address) return 'N/A'
+
+  const words = String(address).trim().split(/\s+/)
+
+  if (words.length <= 4) return address
+
+  return words.slice(0, 4).join(' ') + '...'
+},
+
+
     editCustomStatus(status) {
 const newName = prompt('Enter new status name', status.label)
   if (!newName || !newName.trim()) return
@@ -2533,7 +2546,7 @@ grid-template-columns: 32px 1fr 118px 38px;
 }
 .current-order-title{
   position:absolute;
-  right:19px;
+  right:100px;
   top:50%;
   transform:translateY(-50%);
 
