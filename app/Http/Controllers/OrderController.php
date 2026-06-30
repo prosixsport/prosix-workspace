@@ -13,11 +13,20 @@ use Illuminate\Support\Facades\DB;
 
 class OrderController extends Controller
 {
- public function index()
+public function index()
 {
     $user = auth()->user();
 
     $orders = Order::with(['members', 'clients', 'reads.user:id,name,email,profile_photo'])
+        ->withCount([
+            'messages as unread_chat_count' => function ($q) use ($user) {
+                $q->where('user_id', '!=', $user?->id)
+                  ->whereDoesntHave('reads', function ($r) use ($user) {
+                      $r->where('user_id', $user?->id);
+                  });
+            }
+        ])
+        ->withMax('messages as last_message_at', 'created_at')
         ->when($user && $user->role === 'client', function ($q) use ($user) {
             $q->whereHas('clients', function ($c) use ($user) {
                 $c->where('clients.user_id', $user->id);
@@ -28,6 +37,7 @@ class OrderController extends Controller
                 $m->where('users.id', $user->id);
             });
         })
+        ->orderByDesc('last_message_at')
         ->latest()
         ->get()
         ->map(function ($order) use ($user) {
