@@ -1478,14 +1478,15 @@ openPreviewFile(file) {
       } catch (e) { console.error('saveProfile error:', e); alert(e.response?.data?.message || 'Profile could not be saved') }
     },
 
-    async toggleChat() {
-      this.showChat = !this.showChat
-      if (this.showChat && this.selectedOrder) {
-        this.unreadChatCount = 0
-        try { await axios.post(`/api/orders/${this.selectedOrder.id}/messages/mark-read`, {}, { headers: this.headers() }) } catch (e) { console.error('mark read error:', e) }
-      } else {
-        await this.fetchUnreadCount()
-      }
+  async toggleChat() {
+  this.showChat = !this.showChat
+
+  if (this.showChat && this.selectedOrder) {
+    await this.markChatRead()
+  } else {
+    await this.fetchUnreadCount()
+  }
+
     },
 
     async fetchUnreadCount() {
@@ -1497,14 +1498,37 @@ openPreviewFile(file) {
       } catch (e) { console.error('fetchUnreadCount error:', e) }
     },
 
-    async markChatRead() {
-      if (!this.selectedOrder) return
-      try {
-        await axios.post(`/api/orders/${this.selectedOrder.id}/messages/mark-read`, {}, { headers: this.headers() })
-        this.unreadChatCount = 0
-        await this.fetchMessages(this.selectedOrder.id)
-      } catch (e) { console.error('markChatRead error:', e) }
-    },
+   async markChatRead() {
+  if (!this.selectedOrder) return
+
+  try {
+    await axios.post(
+      `/api/orders/${this.selectedOrder.id}/messages/mark-read`,
+      {},
+      { headers: this.headers() }
+    )
+
+    this.unreadChatCount = 0
+
+    const orderId = this.selectedOrder.id
+
+    const idx = this.orders.findIndex(
+      o => Number(o.id) === Number(orderId)
+    )
+
+    if (idx !== -1) {
+      this.orders[idx].unread_chat_count = 0
+    }
+
+    if (this.selectedOrder) {
+      this.selectedOrder.unread_chat_count = 0
+    }
+
+    await this.fetchMessages(orderId)
+  } catch (e) {
+    console.error('markChatRead error:', e)
+  }
+},
 
     async fetchOrders() {
       this.loadingOrders = true
