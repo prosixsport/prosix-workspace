@@ -127,8 +127,8 @@
 <span>{{ order.name }}</span>
 
 <span v-if="Number(order.unread_chat_count || 0) > 0" class="order-chat-count">
-  <i class="fa-solid fa-message"></i>
-  {{ order.unread_chat_count }}
+  <i class="fa-solid fa-comments"></i>
+  {{ order.unread_chat_count }} new msgs
 </span>
         </div>
     <div class="col-owner owner-status-images">
@@ -2281,16 +2281,17 @@ overflow: visible !important;
   align-items: center;
 }
 .order-chat-count {
-  margin-left: auto;
-  background: #00c875;
+  margin-left: 6px;
+  background: #ff3b30;
   color: #fff !important;
-  font-size: 11px;
+  font-size: 10px;
   font-weight: 900;
   padding: 3px 7px;
   border-radius: 999px;
   display: inline-flex;
   align-items: center;
   gap: 4px;
+  white-space: nowrap;
 }
 
 .order-chat-count i {
