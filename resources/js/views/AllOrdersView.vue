@@ -124,12 +124,24 @@
         <div class="col-task">
           <span v-if="!order.user_has_seen" class="unread-dot"></span>
           <i v-if="order.hasChildren" class="fa-solid fa-chevron-right row-arrow"></i>
-<span>{{ order.name }}</span>
+<div class="order-title-wrap">
+  <div class="order-title-line">
+    <span>{{ order.name }}</span>
 
-<span v-if="Number(order.unread_chat_count || 0) > 0" class="order-chat-count">
-  <i class="fa-solid fa-comments"></i>
-  {{ order.unread_chat_count }} new msgs
-</span>
+    <span v-if="Number(order.unread_chat_count || 0) > 0" class="order-chat-count">
+      {{ order.unread_chat_count }}
+    </span>
+  </div>
+
+  <div v-if="order.last_message_text" class="order-last-chat">
+    <i class="fa-solid fa-comments"></i>
+    <span>
+      {{ order.last_message_sender ? order.last_message_sender + ': ' : '' }}
+      {{ shortLastMessage(order.last_message_text) }}
+    </span>
+    <small>{{ order.last_message_time }}</small>
+  </div>
+</div>
         </div>
     <div class="col-owner owner-status-images">
   <span
@@ -999,6 +1011,12 @@ beforeUnmount()  {
 },
 
  methods: {
+shortLastMessage(text) {
+  if (!text) return ''
+  return text.length > 28 ? text.substring(0, 28) + '...' : text
+},
+
+
  async saveShippingAddress() {
   if (!this.selectedOrder) return
 
@@ -2465,6 +2483,53 @@ grid-template-columns: 32px 1fr 118px 38px;
 .order-actions-wrap {
   position: relative;
   display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.order-title-wrap {
+  width: 100%;
+  min-width: 0;
+}
+
+.order-title-line {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.order-last-chat {
+  margin-top: 3px;
+  font-size: 10px;
+  font-weight: 700;
+  color: #9ca3af;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  max-width: 180px;
+  white-space: nowrap;
+  overflow: hidden;
+}
+
+.order-last-chat span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.order-last-chat small {
+  color: #22c55e;
+  font-size: 9px;
+  margin-left: auto;
+}
+
+.order-chat-count {
+  background: #22c55e;
+  color: #fff !important;
+  font-size: 10px;
+  font-weight: 900;
+  min-width: 18px;
+  height: 18px;
+  border-radius: 999px;
+  display: inline-flex;
   align-items: center;
   justify-content: center;
 }

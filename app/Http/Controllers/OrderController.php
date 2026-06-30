@@ -17,7 +17,16 @@ public function index()
 {
     $user = auth()->user();
 
-    $orders = Order::with(['members', 'clients', 'reads.user:id,name,email,profile_photo'])
+    $orders = Order::with([
+            'members',
+            'clients',
+            'reads.user:id,name,email,profile_photo',
+            'messages' => function ($q) {
+                $q->with('user:id,name')
+                  ->latest()
+                  ->limit(1);
+            }
+        ])
         ->withCount([
             'messages as unread_chat_count' => function ($q) use ($user) {
                 $q->where('user_id', '!=', $user?->id)
@@ -45,6 +54,12 @@ public function index()
 
             $order->user_has_seen = !empty($read?->read_at);
             $order->read_at = $read?->read_at;
+
+            $lastMessage = $order->messages->first();
+
+            $order->last_message_text = $lastMessage?->message;
+            $order->last_message_sender = $lastMessage?->user?->name;
+            $order->last_message_time = $lastMessage?->created_at?->diffForHumans();
 
             return $order;
         });
