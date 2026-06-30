@@ -713,6 +713,7 @@ seenBy: []
     }
 
     this.$emit('update-chat-messages', [...this.chatMessages, newMsg])
+    this.$emit('refresh-orders')
     this.newMessage = ''
     this.showTagDropdown = false
     this.replyTarget = null

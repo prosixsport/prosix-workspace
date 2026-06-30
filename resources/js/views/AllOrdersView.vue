@@ -124,7 +124,12 @@
         <div class="col-task">
           <span v-if="!order.user_has_seen" class="unread-dot"></span>
           <i v-if="order.hasChildren" class="fa-solid fa-chevron-right row-arrow"></i>
-          <span>{{ order.name }}</span>
+<span>{{ order.name }}</span>
+
+<span v-if="Number(order.unread_chat_count || 0) > 0" class="order-chat-count">
+  <i class="fa-solid fa-message"></i>
+  {{ order.unread_chat_count }}
+</span>
         </div>
     <div class="col-owner owner-status-images">
   <span
@@ -480,7 +485,6 @@
 <button v-if="canUploadFiles && card.type !== 'notes'" class="card-add-btn" @click="triggerUpload(card)">
                           <i class="fa-solid fa-plus"></i><i class="fa-regular fa-file"></i>
                     </button>
-
 
                     <input type="file" multiple :ref="'fileInput_' + card.title" class="hidden-file-input" @change="onFileChange($event, card)" />
                   </div>
@@ -919,17 +923,21 @@ activeTracking() {
     },
     userPhoto() { return this.currentUser?.profile_photo_url || null },
 filteredOrders() {
-  return this.orders.filter(o => {
-    const groupMatch = o.group === this.activeGroup
+  return this.orders
+    .filter(o => {
+      const groupMatch = o.group === this.activeGroup
 
-    const searchMatch =
-      !this.searchOrder ||
-      o.name.toLowerCase().includes(
-        this.searchOrder.toLowerCase()
-      )
+      const searchMatch =
+        !this.searchOrder ||
+        o.name.toLowerCase().includes(this.searchOrder.toLowerCase())
 
-    return groupMatch && searchMatch
-  })
+      return groupMatch && searchMatch
+    })
+    .sort((a, b) => {
+      const at = new Date(a.last_message_at || a.updated_at || 0).getTime()
+      const bt = new Date(b.last_message_at || b.updated_at || 0).getTime()
+      return bt - at
+    })
 },
     unreadOrdersCount() { return this.orders.filter(o => !o.user_has_seen).length },
     desktopLeftStyle() {
@@ -2272,7 +2280,22 @@ overflow: visible !important;
   display: flex;
   align-items: center;
 }
+.order-chat-count {
+  margin-left: auto;
+  background: #00c875;
+  color: #fff !important;
+  font-size: 11px;
+  font-weight: 900;
+  padding: 3px 7px;
+  border-radius: 999px;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
 
+.order-chat-count i {
+  font-size: 10px;
+}
 .back-btn {
   width: 32px;
   height: 32px;
@@ -2549,27 +2572,20 @@ grid-template-columns: 32px 1fr 118px 38px;
   right:100px;
   top:50%;
   transform:translateY(-50%);
-
   background:#fff;
   color:#000;
-
   border:1px solid #d8d5ff;
   border-radius:8px;
-
   padding:8px 14px;
-
   font-size:13px;
   font-weight:900;
-
   display:flex;
   align-items:center;
   gap:8px;
-
   max-width:450px;
   white-space:nowrap;
   overflow:hidden;
   text-overflow:ellipsis;
-
   z-index:10;
 }
 
