@@ -133,7 +133,10 @@
     </span>
   </div>
 
-  <div v-if="order.last_message_text" class="order-last-chat">
+<div
+  v-if="Number(order.unread_chat_count || 0) > 0 && order.last_message_text"
+  class="order-last-chat"
+>
     <i class="fa-solid fa-comments"></i>
     <span>
       {{ order.last_message_sender ? order.last_message_sender + ': ' : '' }}
@@ -1583,12 +1586,12 @@ async fetchClients() {
         paymentBalance: order.payment_balance || 0,
         members,
         clients: order.clients || [],
-shippingAddress: order.shipping_address || '',
-unread_chat_count: Number(order.unread_chat_count || 0),
-last_message_at: order.last_message_at || null,
-last_message_text: order.last_message_text || '',
-last_message_sender: order.last_message_sender || '',
-last_message_time: order.last_message_time || '',
+        shippingAddress: order.shipping_address || '',
+        unread_chat_count: Number(order.unread_chat_count || 0),
+        last_message_at: order.last_message_at || null,
+        last_message_text: order.last_message_text || '',
+        last_message_sender: order.last_message_sender || '',
+        last_message_time: order.last_message_time || '',
 
         invoiceFiles: [],
         owners: members.map(m => ({
