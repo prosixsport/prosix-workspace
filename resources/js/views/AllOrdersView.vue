@@ -3234,7 +3234,7 @@ grid-template-columns: 32px 1fr 118px 38px;
   color: #fff;
   border: none;
   border-radius: 8px;
-  padding: 8px 18px;
+  padding: 9px 18px;
   font-size: 13px;
   font-weight: 700;
   cursor: pointer;
