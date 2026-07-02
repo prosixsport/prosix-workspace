@@ -561,4 +561,58 @@ if (auth()->user()?->role !== 'super_admin' && !auth()->user()?->can_create_orde
             'message' => 'Orders deleted successfully'
         ]);
     }
+
+
+    public function recycleBin()
+{
+    $orders = Order::onlyTrashed()
+        ->with(['members', 'clients'])
+        ->latest('deleted_at')
+        ->get();
+
+    return response()->json($orders);
+}
+
+public function restore($id)
+{
+    $order = Order::onlyTrashed()->findOrFail($id);
+    $order->restore();
+
+    $this->logActivity($order->id, 'restored', 'Order restored from recycle bin');
+
+    return response()->json(['success' => true]);
+}
+
+public function forceDelete($id)
+{
+    $order = Order::onlyTrashed()->findOrFail($id);
+
+    $this->logActivity($order->id, 'permanent_deleted', 'Order permanently deleted');
+
+    $order->forceDelete();
+
+    return response()->json(['success' => true]);
+}
+
+public function activities(Order $order)
+{
+    $this->checkAccess($order);
+
+    return response()->json([
+        'activities' => $order->activities()
+            ->with('user:id,name,email')
+            ->get()
+    ]);
+}
+
+private function logActivity($orderId, $action, $description = null, $changes = null)
+{
+    \App\Models\OrderActivity::create([
+        'order_id' => $orderId,
+        'user_id' => auth()->id(),
+        'action' => $action,
+        'description' => $description,
+        'changes' => $changes,
+    ]);
+}
 }

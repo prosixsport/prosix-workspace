@@ -101,6 +101,27 @@
     <span class="nav-icon"><i class="fa-solid fa-file-invoice-dollar"></i></span>
     <span>Invoices</span>
 </router-link>
+<router-link
+    v-if="isSuperAdmin"
+    to="/activity-logs"
+    class="nav-link-custom"
+    :class="{ active: $route.path.startsWith('/activity-logs') }"
+    @click="sidebarOpen = false"
+>
+    <span class="nav-icon"><i class="fa-solid fa-clock-rotate-left"></i></span>
+    <span>Activity Logs</span>
+</router-link>
+
+<router-link
+    v-if="isSuperAdmin"
+    to="/recycle-bin"
+    class="nav-link-custom"
+    :class="{ active: $route.path.startsWith('/recycle-bin') }"
+    @click="sidebarOpen = false"
+>
+    <span class="nav-icon"><i class="fa-solid fa-recycle"></i></span>
+    <span>Recycle Bin</span>
+</router-link>
 
             </nav>
 

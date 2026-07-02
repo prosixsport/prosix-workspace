@@ -3243,26 +3243,18 @@ grid-template-columns: 32px 1fr 118px 38px;
 
 .btn-create:hover:not(:disabled) { background: #4f4fd4; }
 .btn-create:disabled { opacity: 0.5; cursor: not-allowed; }
-
 .view-all-body { padding: 16px; overflow-y: auto; }
-
 .view-all-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(130px, 1fr)); gap: 12px; }
-
 .view-file-item { border: 1px solid #e5e7eb; border-radius: 12px; padding: 10px; background: #fff; }
-
 .view-file-img { width: 100%; height: 110px; object-fit: cover; border-radius: 8px; background: #f3f4f6; }
-
 .view-file-doc { width: 100%; height: 110px; display: flex; align-items: center; justify-content: center; background: #f3f4f6; border-radius: 8px; }
 .view-file-icon { font-size: 34px; color: #6b7280; }
 .view-file-name { display: block; margin-top: 7px; font-size: 11px; font-weight: 600; color: #374151; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .view-file-actions { display: flex; justify-content: flex-end; gap: 6px; margin-top: 7px; }
-
 .vf-btn { width: 28px; height: 28px; border-radius: 7px; border: none; display: flex; align-items: center; justify-content: center; font-size: 12px; cursor: pointer; text-decoration: none; }
 .download-btn { background: #e8f3ff; color: #0073ea; }
 .remove-btn { background: #fff0f0; color: #e2445c; }
-
 .view-all-empty { text-align: center; padding: 36px 0; color: #9aa0b8; }
-
 .upload-btn-big {
   background: #6161ff;
   color: #fff;
@@ -3273,14 +3265,12 @@ grid-template-columns: 32px 1fr 118px 38px;
   font-weight: 700;
   cursor: pointer;
 }
-
 /* MULTISELECT */
 :deep(.multiselect) { min-height: 38px; }
 :deep(.multiselect__tags) { border: 1.5px solid #e5e7eb; border-radius: 8px; min-height: 38px; padding: 6px 40px 0 8px; }
 :deep(.multiselect__content-wrapper) { z-index: 9999999; }
 :deep(.multiselect__tag) { background: #6161ff; }
 :deep(.multiselect__tag-icon::after) { color: #fff; }
-
 .notes-textarea[readonly] { background: #f7f7f7; cursor: not-allowed; }
 
 .view-all-head-actions { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }

@@ -3,9 +3,12 @@
 namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\SoftDeletes;
 
 class Order extends Model
 {
+    use SoftDeletes;
+
     protected $fillable = [
         'name',
         'po',
@@ -33,30 +36,39 @@ class Order extends Model
             ->withPivot('role')
             ->withTimestamps();
     }
-public function orderMembers()
-{
-    return $this->hasMany(OrderMember::class);
-}
+
+    public function orderMembers()
+    {
+        return $this->hasMany(OrderMember::class);
+    }
+
     public function messages()
     {
         return $this->hasMany(OrderMessage::class);
     }
-public function files()
-{
-    return $this->hasMany(\App\Models\OrderFile::class);
-}
+
+    public function files()
+    {
+        return $this->hasMany(OrderFile::class);
+    }
 
     public function creator()
     {
         return $this->belongsTo(User::class, 'created_by');
     }
-    public function reads()
-{
-    return $this->hasMany(\App\Models\OrderRead::class);
-}
-public function clients()
-{
-    return $this->belongsToMany(Client::class, 'client_order');
-}
-}
 
+    public function reads()
+    {
+        return $this->hasMany(OrderRead::class);
+    }
+
+    public function clients()
+    {
+        return $this->belongsToMany(Client::class, 'client_order');
+    }
+
+    public function activities()
+    {
+        return $this->hasMany(OrderActivity::class)->latest();
+    }
+}

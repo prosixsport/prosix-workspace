@@ -36,7 +36,17 @@ const routes = [
         meta: { requiresAuth: true, superAdmin: true }
     },
 
+    {
+        path: '/activity-logs',
+        component: () => import('./views/ActivityLogsView.vue'),
+        meta: { requiresAuth: true, superAdmin: true }
+    },
 
+    {
+        path: '/recycle-bin',
+        component: () => import('./views/RecycleBinView.vue'),
+        meta: { requiresAuth: true, superAdmin: true }
+    },
 ]
 
 const router = createRouter({
@@ -45,7 +55,6 @@ const router = createRouter({
 })
 
 router.beforeEach((to, from, next) => {
-
     const token = localStorage.getItem('token')
 
     let user = null

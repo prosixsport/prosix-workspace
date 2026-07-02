@@ -95,4 +95,11 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::post('/notifications/{id}/read', [NotificationController::class, 'markRead']);
     Route::post('/notifications/mark-all-read', [NotificationController::class, 'markAllRead']);
 
+
+    Route::get('/orders/recycle-bin', [OrderController::class, 'recycleBin']);
+Route::post('/orders/{id}/restore', [OrderController::class, 'restore']);
+Route::delete('/orders/{id}/force-delete', [OrderController::class, 'forceDelete']);
+Route::get('/orders/{order}/activities', [OrderController::class, 'activities']);
+
+
 });
