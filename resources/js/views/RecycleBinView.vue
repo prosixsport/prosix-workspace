@@ -44,7 +44,7 @@
 
 <script>
 import axios from 'axios'
-import AppLayout from '../Layouts/AppLayout.vue'
+import AppLayout from '../layouts/AppLayout.vue'
 
 export default {
   name: 'RecycleBinView',
