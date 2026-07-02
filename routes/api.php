@@ -67,6 +67,8 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::delete('/orders/{id}/force-delete', [OrderController::class, 'forceDelete']);
     Route::get('/orders/{order}/activities', [OrderController::class, 'activities']);
 
+    Route::delete('/order-activities/{activity}', [OrderController::class, 'deleteActivity']);
+
     // Order Members
     Route::post('/orders/{order}/members', [OrderController::class, 'addMember']);
     Route::delete('/orders/{order}/members/{user}', [OrderController::class, 'removeMember']);
@@ -92,6 +94,7 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::post('/orders/{order}/files', [OrderFileController::class, 'store']);
     Route::post('/orders/{order}/chat-files', [OrderFileController::class, 'storeChatFile']);
     Route::delete('/order-files/{file}', [OrderFileController::class, 'destroy']);
+
 
     Route::middleware('superadmin')->group(function () {
         Route::apiResource('clients', ClientController::class);

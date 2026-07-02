@@ -667,4 +667,14 @@ private function logActivity($orderId, $action, $description = null, $changes = 
         'changes' => $changes,
     ]);
 }
+public function deleteActivity(\App\Models\OrderActivity $activity)
+{
+    if (auth()->user()?->role !== 'super_admin') {
+        return response()->json(['message' => 'Unauthorized'], 403);
+    }
+
+    $activity->delete();
+
+    return response()->json(['success' => true]);
+}
 }
