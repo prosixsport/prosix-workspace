@@ -4,7 +4,7 @@
       <div class="page-head">
         <div>
           <h2>Activity Logs</h2>
-          <p>Har user ka create, update, delete aur restore record</p>
+          <p>All user create, update, delete and restore record</p>
         </div>
       </div>
 
