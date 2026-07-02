@@ -80,7 +80,7 @@ export default {
         this.orders = Array.isArray(res.data) ? res.data : (res.data?.data || [])
       } catch (e) {
         console.error(e)
-        alert('Recycle bin load nahi hui')
+        alert('Not load Recycle bin ')
       } finally {
         this.loading = false
       }
