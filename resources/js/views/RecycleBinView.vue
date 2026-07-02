@@ -97,7 +97,7 @@ export default {
     },
 
     async forceDelete(order) {
-      if (!confirm('Permanent delete karna hai? Ye wapas nahi ayega.')) return
+      if (!confirm('Are you sure you want to permanently delete this order? It cannot be recovered.')) return
 
       try {
         await axios.delete(`/api/orders/${order.id}/force-delete`, {
