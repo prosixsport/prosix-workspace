@@ -1,6 +1,7 @@
 <?php
 
 namespace App\Http\Controllers;
+use App\Models\OrderActivity;
 use App\Models\OrderNotification;
 use App\Models\Order;
 use App\Models\OrderRead;
@@ -584,12 +585,28 @@ foreach ($orders as $order) {
     }
 
 
-    public function recycleBin()
+public function recycleBin()
 {
+    if (auth()->user()?->role !== 'super_admin') {
+        return response()->json(['message' => 'Unauthorized'], 403);
+    }
+
     $orders = Order::onlyTrashed()
         ->with(['members', 'clients'])
         ->latest('deleted_at')
-        ->get();
+        ->get()
+        ->map(function ($order) {
+            $deletedActivity = OrderActivity::with('user:id,name,email')
+                ->where('order_id', $order->id)
+                ->where('action', 'deleted')
+                ->latest()
+                ->first();
+
+            $order->deleted_by = $deletedActivity?->user?->name ?? 'Unknown';
+            $order->deleted_by_email = $deletedActivity?->user?->email ?? null;
+
+            return $order;
+        });
 
     return response()->json($orders);
 }
@@ -642,7 +659,7 @@ public function allActivities()
 }
 private function logActivity($orderId, $action, $description = null, $changes = null)
 {
-    \App\Models\OrderActivity::create([
+    OrderActivity::create([
         'order_id' => $orderId,
         'user_id' => auth()->id(),
         'action' => $action,
