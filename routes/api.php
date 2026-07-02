@@ -100,6 +100,7 @@ Route::middleware('auth:sanctum')->group(function () {
 Route::post('/orders/{id}/restore', [OrderController::class, 'restore']);
 Route::delete('/orders/{id}/force-delete', [OrderController::class, 'forceDelete']);
 Route::get('/orders/{order}/activities', [OrderController::class, 'activities']);
+Route::get('/order-activities', [OrderController::class, 'allActivities']);
 
 
 });

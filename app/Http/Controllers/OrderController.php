@@ -118,6 +118,11 @@ public function index()
     }
 
     $order->clients()->sync($request->client_ids ?? []);
+    $this->logActivity(
+    $order->id,
+    'created',
+    auth()->user()->name . ' created order "' . $order->name . '"'
+);
 
     $this->sendNewOrderNotifications($order, $request->member_ids ?? [], $user->id);
 
@@ -306,6 +311,11 @@ if (auth()->user()?->role !== 'super_admin' && !auth()->user()?->can_create_orde
             ], 403);
         }
 
+$this->logActivity(
+    $order->id,
+    'deleted',
+    auth()->user()->name . ' moved order "' . $order->name . '" to Recycle Bin'
+);
         $order->delete();
 
         return response()->json(['success' => true]);
@@ -554,7 +564,18 @@ if (auth()->user()?->role !== 'super_admin' && !auth()->user()?->can_create_orde
             'order_ids' => 'required|array',
         ]);
 
-        Order::whereIn('id', $request->order_ids)->delete();
+$orders = Order::whereIn('id', $request->order_ids)->get();
+
+foreach ($orders as $order) {
+
+    $this->logActivity(
+        $order->id,
+        'deleted',
+        auth()->user()->name . ' moved order "' . $order->name . '" to Recycle Bin'
+    );
+
+    $order->delete();
+}
 
         return response()->json([
             'success' => true,
