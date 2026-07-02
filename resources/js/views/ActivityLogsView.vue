@@ -186,7 +186,7 @@ export default {
     },
 
     async deleteLog(log) {
-      if (!confirm('Ye activity log delete karna hai?')) return
+      if (!confirm('confirm this activity log delete?')) return
 
       try {
         await axios.delete(`/api/order-activities/${log.id}`, {
