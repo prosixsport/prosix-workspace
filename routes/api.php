@@ -16,15 +16,16 @@ Route::get('/dashboard', [DashboardController::class, 'index']);
 
 Route::post('/login', [AuthController::class, 'login']);
 Route::post('/register', [AuthController::class, 'register']);
+
 Route::get('/notifications-test', function () {
     return \App\Models\OrderNotification::latest()->get();
 });
+
 Route::middleware('auth:sanctum')->group(function () {
 
     Route::post('/logout', [AuthController::class, 'logout']);
     Route::get('/me', [AuthController::class, 'me']);
 
-    // FCM Token Save
     Route::post('/save-fcm-token', function (Request $request) {
         $request->validate([
             'fcm_token' => 'required|string',
@@ -44,6 +45,10 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::get('/users/{user}/profile', [MemberController::class, 'profile']);
     Route::post('/me/profile', [MemberController::class, 'updateProfile']);
 
+    // IMPORTANT: Special order routes must be before /orders/{order}
+    Route::get('/orders/recycle-bin', [OrderController::class, 'recycleBin']);
+    Route::get('/order-activities', [OrderController::class, 'allActivities']);
+
     // Orders
     Route::get('/orders', [OrderController::class, 'index']);
     Route::post('/orders', [OrderController::class, 'store']);
@@ -55,8 +60,12 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::get('/orders/{order}/read-info', [OrderController::class, 'readInfo']);
 
     Route::post('/orders/bulk-members', [OrderController::class, 'bulkMembers']);
-  Route::post('/orders/bulk-duplicate', [OrderController::class, 'bulkDuplicate']);
-  Route::post('/orders/bulk-delete', [OrderController::class, 'bulkDelete']);
+    Route::post('/orders/bulk-duplicate', [OrderController::class, 'bulkDuplicate']);
+    Route::post('/orders/bulk-delete', [OrderController::class, 'bulkDelete']);
+
+    Route::post('/orders/{id}/restore', [OrderController::class, 'restore']);
+    Route::delete('/orders/{id}/force-delete', [OrderController::class, 'forceDelete']);
+    Route::get('/orders/{order}/activities', [OrderController::class, 'activities']);
 
     // Order Members
     Route::post('/orders/{order}/members', [OrderController::class, 'addMember']);
@@ -78,8 +87,6 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::post('/members/{user}/order-create-permission', [MemberController::class, 'toggleOrderCreatePermission']);
     Route::delete('/members/{id}', [MemberController::class, 'destroy']);
 
-
-
     // Files
     Route::get('/orders/{order}/files', [OrderFileController::class, 'index']);
     Route::post('/orders/{order}/files', [OrderFileController::class, 'store']);
@@ -94,13 +101,4 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::get('/notifications', [NotificationController::class, 'index']);
     Route::post('/notifications/{id}/read', [NotificationController::class, 'markRead']);
     Route::post('/notifications/mark-all-read', [NotificationController::class, 'markAllRead']);
-
-
-    Route::get('/orders/recycle-bin', [OrderController::class, 'recycleBin']);
-Route::post('/orders/{id}/restore', [OrderController::class, 'restore']);
-Route::delete('/orders/{id}/force-delete', [OrderController::class, 'forceDelete']);
-Route::get('/orders/{order}/activities', [OrderController::class, 'activities']);
-Route::get('/order-activities', [OrderController::class, 'allActivities']);
-
-
 });

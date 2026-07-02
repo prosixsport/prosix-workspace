@@ -625,7 +625,21 @@ public function activities(Order $order)
             ->get()
     ]);
 }
+public function allActivities()
+{
+    if (auth()->user()?->role !== 'super_admin') {
+        return response()->json(['message' => 'Unauthorized'], 403);
+    }
 
+    return response()->json(
+        \App\Models\OrderActivity::with([
+            'user:id,name,email',
+            'order:id,name,po'
+        ])
+        ->latest()
+        ->get()
+    );
+}
 private function logActivity($orderId, $action, $description = null, $changes = null)
 {
     \App\Models\OrderActivity::create([
