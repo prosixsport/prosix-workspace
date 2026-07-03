@@ -102,7 +102,7 @@ class OrderFileController extends Controller
         {$filesHtml}
         ",
         function ($message) use ($order) {
-            $message->to('itbilal78@gmail.com')
+            $message->to('prosixsports@gmail.com')
                 ->subject('Client Uploaded Files: ' . $order->name);
         }
     );

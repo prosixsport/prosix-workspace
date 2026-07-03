@@ -144,7 +144,7 @@ if ($user->role === 'client') {
     "Payment: {$order->payment}\n" .
     "Notes: {$order->notes}\n",
     function ($message) use ($order) {
-        $message->to('itbilal78@gmail.com')
+        $message->to('prosixsports@gmail.com')
             ->subject('New Client Order: ' . $order->name);
     }
 );
