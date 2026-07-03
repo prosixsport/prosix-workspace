@@ -114,7 +114,6 @@ class OrderFileController extends Controller
             'files' => $saved,
         ]);
     }
-
     public function storeChatFile(Request $request, Order $order)
     {
         $user = auth()->user();

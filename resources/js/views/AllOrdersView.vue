@@ -93,9 +93,18 @@
 
 
 
-<div v-if="canCreateOrder" class="add-row" @click="addNewOrder">
-            <i class="fa-solid fa-plus me-1"></i> Add New Order
-      </div>
+<div class="add-filter-row">
+  <div v-if="canCreateOrder" class="add-row" @click="addNewOrder">
+    <i class="fa-solid fa-plus me-1"></i> Add New Order
+  </div>
+
+  <select v-if="!isClient" v-model="selectedClient" class="client-filter-select">
+    <option value="">All Clients</option>
+    <option v-for="client in availableClients" :key="client.id" :value="client.id">
+      {{ client.name }}
+    </option>
+  </select>
+</div>
 
 
       <div v-if="loadingOrders" class="orders-loading">Loading orders...</div>
@@ -861,6 +870,7 @@ export default {
       notificationCount: 0,
       lastNotificationId: null,
       searchOrder: '',
+      selectedClient: '',
       selectedOrders: [],
       selectAll: false,
       bulkMembersModal: false,
@@ -954,7 +964,11 @@ filteredOrders() {
         !this.searchOrder ||
         o.name.toLowerCase().includes(this.searchOrder.toLowerCase())
 
-      return groupMatch && searchMatch
+      const clientMatch =
+        !this.selectedClient ||
+        (o.clients || []).some(c => Number(c.id) === Number(this.selectedClient))
+
+      return groupMatch && searchMatch && clientMatch
     })
     .sort((a, b) => {
       const at = new Date(a.last_message_at || a.updated_at || 0).getTime()
@@ -3871,7 +3885,23 @@ grid-template-columns: 32px 1fr 118px 38px;
   background: #444 !important;
   color: #fff !important;
 }
+.add-filter-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 12px;
+}
 
+.client-filter-select {
+  flex: 1;
+  height: 30px;
+  border-radius: 6px;
+  border: 1px solid #444;
+  background: #111827;
+  color: #fff;
+  font-size: 12px;
+  padding: 0 6px;
+}
 .orders-left.sidebar-light .order-dots-btn {
   opacity: 1;
   background: #f3f4f6 !important;
