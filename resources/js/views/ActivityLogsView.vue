@@ -16,7 +16,6 @@
             <option v-for="u in users" :key="u" :value="u">{{ u }}</option>
           </select>
         </div>
-
         <div class="field">
           <label>Action</label>
           <select v-model="filters.action">

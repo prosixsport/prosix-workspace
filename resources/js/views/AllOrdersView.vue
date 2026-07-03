@@ -7,7 +7,7 @@
         <i class="fa-solid fa-bars"></i>
       </button>
       <span class="mobile-order-name">{{ selectedOrder ? selectedOrder.name : 'Orders' }}</span>
-      <button v-if="selectedOrder" class="mobile-chat-btn" @click.stop="toggleChat" :class="{ active: showChat }">
+      <button v-if="selectedOrder && !isClient" class="mobile-chat-btn"> @click.stop="toggleChat" :class="{ active: showChat }">
         <i class="fa-solid fa-comments"></i>
         <span v-if="unreadChatCount > 0" class="chat-badge">{{ unreadChatCount }}</span>
       </button>
@@ -209,8 +209,12 @@
           <img src="/public/assets/images/PROSIX SPORTS LOGO PNG WHITE.png" alt="Prosix" class="prosix-main-logo" />
         </div>
         <div class="header-right-icons">
-          <button class="header-icon-btn" @click.stop="toggleChat" :class="{ active: showChat }">
-            <i class="fa-solid fa-comments"></i>
+<button
+    v-if="!isClient"
+    class="header-icon-btn"
+    @click.stop="toggleChat"
+    :class="{ active: showChat }">
+                <i class="fa-solid fa-comments"></i>
             <span v-if="unreadChatCount > 0" class="chat-badge">{{ unreadChatCount }}</span>
           </button>
           <button class="user-avatar-top" type="button" title="Open profile" @click.stop="openProfile(currentUser)">
@@ -518,8 +522,8 @@
         </div>
 
         <!-- CHAT PANEL -->
-        <OrderChatPanel
-          v-if="showChat"
+     <OrderChatPanel
+    v-if="showChat && !isClient"
           :selected-order="selectedOrder"
           :team-members="teamMembers"
           :available-members="availableMembers"
