@@ -1589,9 +1589,13 @@ async fetchClients() {
   try {
     const res = await axios.get('/api/clients', { headers: this.headers() })
 
+    console.log('CLIENTS DATA:', res.data)
+
     this.availableClients = Array.isArray(res.data)
       ? res.data
       : (res.data?.data || [])
+
+    console.log('availableClients:', this.availableClients)
 
   } catch (e) {
     console.error('fetchClients error:', e)
