@@ -98,12 +98,21 @@
     <i class="fa-solid fa-plus me-1"></i> Add New Order
   </div>
 
-  <select v-if="!isClient" v-model="selectedClient" class="client-filter-select">
+ <select
+    v-if="currentUser?.role !== 'client'"
+    v-model="selectedClient"
+    class="client-filter-select"
+>
     <option value="">All Clients</option>
-    <option v-for="client in availableClients" :key="client.id" :value="client.id">
-      {{ client.name }}
+
+    <option
+        v-for="client in availableClients"
+        :key="client.id"
+        :value="client.id"
+    >
+        {{ client.name }}
     </option>
-  </select>
+</select>
 </div>
 
 
@@ -3751,7 +3760,6 @@ grid-template-columns: 32px 1fr 118px 38px;
   gap:7px !important;
   overflow:visible !important;
     padding-left:10px !important;
-
 }
 
 .owner-status-badge{
@@ -3907,9 +3915,11 @@ grid-template-columns: 32px 1fr 118px 38px;
   background: #f3f4f6 !important;
   color: #000 !important;
 }
+
 /* ===========================
    RESPONSIVE — TABLET (768px)
    =========================== */
+
 @media (max-width: 900px) {
   .cards-grid { grid-template-columns: 1fr 1fr; }
   .prosix-main-logo { width: 120px; }
