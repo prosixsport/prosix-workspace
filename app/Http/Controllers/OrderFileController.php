@@ -62,22 +62,51 @@ class OrderFileController extends Controller
                 'New File Added'
             );
 
-            if ($user->role === 'client') {
-                $fileNames = collect($saved)->pluck('original_name')->implode(', ');
+        if ($user->role === 'client') {
+    $filesHtml = collect($saved)->map(function ($file) {
+        $url = asset('storage/' . $file->file_path);
+        $name = e($file->original_name);
+        $isImage = str_starts_with($file->mime_type, 'image/');
 
-                Mail::raw(
-                    "Client uploaded file/image\n\n" .
-                    "Client: {$user->name}\n" .
-                    "Email: {$user->email}\n" .
-                    "Order: {$order->name}\n" .
-                    "Card: {$request->card_type}\n" .
-                    "Files: {$fileNames}\n",
-                    function ($message) use ($order) {
-                        $message->to('itbilal78@gmail.com')
-                            ->subject('Client Uploaded Files: ' . $order->name);
-                    }
-                );
-            }
+        if ($isImage) {
+            return "
+                <div style='margin:12px 0;padding:10px;border:1px solid #ddd;border-radius:8px;'>
+                    <strong>{$name}</strong><br>
+                    <img src='{$url}' style='max-width:320px;margin-top:8px;border-radius:8px;border:1px solid #ccc;'>
+                    <br>
+                    <a href='{$url}' target='_blank'>Open / Download</a>
+                </div>
+            ";
+        }
+
+        return "
+            <div style='margin:12px 0;padding:10px;border:1px solid #ddd;border-radius:8px;'>
+                <strong>{$name}</strong><br>
+                <a href='{$url}' target='_blank'>Open / Download File</a>
+            </div>
+        ";
+    })->implode('');
+
+    Mail::html(
+        "
+        <h2>Client Uploaded Files</h2>
+        <p><strong>Client:</strong> {$user->name}</p>
+        <p><strong>Email:</strong> {$user->email}</p>
+        <p><strong>Order:</strong> {$order->name}</p>
+        <p><strong>PO:</strong> {$order->po}</p>
+        <p><strong>Card:</strong> {$request->card_type}</p>
+
+        <hr>
+
+        <h3>Uploaded Files</h3>
+        {$filesHtml}
+        ",
+        function ($message) use ($order) {
+            $message->to('prosixsports@gmail.com')
+                ->subject('Client Uploaded Files: ' . $order->name);
+        }
+    );
+}
         }
 
         return response()->json([
