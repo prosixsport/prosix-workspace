@@ -87,8 +87,8 @@ public function index()
         ], 401);
     }
 
-    if ($user->role !== 'super_admin' && !$user->can_create_orders) {
-        return response()->json([
+if ($user->role !== 'super_admin' && !$user->can_create_orders && $user->role !== 'client') {
+            return response()->json([
             'message' => 'You do not have permission to create orders.'
         ], 403);
     }
@@ -118,7 +118,39 @@ public function index()
         ]);
     }
 
+if ($user->role === 'client') {
+    $client = \App\Models\Client::where('user_id', $user->id)->first();
+
+    if (!$client) {
+        $client = \App\Models\Client::create([
+            'user_id' => $user->id,
+            'name' => $user->name,
+            'email' => $user->email,
+            'status' => 'active',
+        ]);
+    }
+
+    $order->clients()->sync([$client->id]);
+    Mail::raw(
+    "New Client Order Created\n\n" .
+    "Client Name: {$user->name}\n" .
+    "Client Email: {$user->email}\n\n" .
+    "Order Name: {$order->name}\n" .
+    "PO: {$order->po}\n" .
+    "Ship Date: {$order->ship_date}\n" .
+    "Shipping Address: {$order->shipping_address}\n" .
+    "Status: {$order->status}\n" .
+    "Tracking: {$order->trk}\n" .
+    "Payment: {$order->payment}\n" .
+    "Notes: {$order->notes}\n",
+    function ($message) use ($order) {
+        $message->to('itbilal78@gmail.com')
+            ->subject('New Client Order: ' . $order->name);
+    }
+);
+} else {
     $order->clients()->sync($request->client_ids ?? []);
+}
     $this->logActivity(
     $order->id,
     'created',

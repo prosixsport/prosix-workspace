@@ -596,16 +596,16 @@
     placeholder="Shipping Address"
   ></textarea>
 </div>
-          <div class="field-group">
-            <label>Add Members</label>
+<div v-if="!isClient" class="field-group">
+                <label>Add Members</label>
             <div class="member-select-actions">
               <button type="button" class="select-all-members-btn" @click="selectAllMembers"><i class="fa-solid fa-check-double me-1"></i>Select All</button>
               <button type="button" class="select-all-members-btn clear" @click="clearSelectedMembers">Clear</button>
             </div>
             <Multiselect v-model="newOrder.selectedMembers" :options="availableMembers" :multiple="true" placeholder="Select members" label="name" track-by="id" />
           </div>
-          <div class="field-group">
-  <label>Assign Clients</label>
+<div v-if="!isClient" class="field-group">
+      <label>Assign Clients</label>
 
   <Multiselect
     v-model="newOrder.selectedClients"
@@ -932,9 +932,12 @@ activeTracking() {
       try { return JSON.parse(localStorage.getItem('user')) || null } catch { return null }
     },
     isSuperAdmin() { return this.currentUser?.role === 'super_admin' },
-     canCreateOrder() {
-    return this.currentUser?.role === 'super_admin' || this.currentUser?.can_create_orders === true
-  },
+   canCreateOrder() {
+  return this.currentUser?.role === 'super_admin'
+    || this.currentUser?.can_create_orders === true
+    || this.isClient
+},
+
     userInitial() {
       const raw = localStorage.getItem('user')
       if (!raw) return 'A'

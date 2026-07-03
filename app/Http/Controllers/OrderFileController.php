@@ -6,6 +6,7 @@ use App\Models\Order;
 use App\Models\OrderFile;
 use App\Services\FcmService;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Facades\Storage;
 
 class OrderFileController extends Controller
@@ -22,12 +23,10 @@ class OrderFileController extends Controller
     public function store(Request $request, Order $order)
     {
         $user = auth()->user();
-        if ($user->role === 'client') {
-    abort(403, 'Clients cannot delete files.');
-}
+
         $this->checkAccess($order);
 
-        if ($user->role !== 'super_admin' && !$user->can_create_orders) {
+        if ($user->role !== 'super_admin' && !$user->can_create_orders && $user->role !== 'client') {
             abort(403, 'You do not have permission to upload files.');
         }
 
@@ -62,6 +61,23 @@ class OrderFileController extends Controller
                 $user->name . ' added ' . count($saved) . ' new file/image in order: ' . $order->name,
                 'New File Added'
             );
+
+            if ($user->role === 'client') {
+                $fileNames = collect($saved)->pluck('original_name')->implode(', ');
+
+                Mail::raw(
+                    "Client uploaded file/image\n\n" .
+                    "Client: {$user->name}\n" .
+                    "Email: {$user->email}\n" .
+                    "Order: {$order->name}\n" .
+                    "Card: {$request->card_type}\n" .
+                    "Files: {$fileNames}\n",
+                    function ($message) use ($order) {
+                        $message->to('itbilal78@gmail.com')
+                            ->subject('Client Uploaded Files: ' . $order->name);
+                    }
+                );
+            }
         }
 
         return response()->json([
@@ -73,6 +89,11 @@ class OrderFileController extends Controller
     public function storeChatFile(Request $request, Order $order)
     {
         $user = auth()->user();
+
+        if ($user->role === 'client') {
+            abort(403, 'Clients cannot upload chat files.');
+        }
+
         $this->checkAccess($order);
 
         $request->validate([
@@ -117,6 +138,10 @@ class OrderFileController extends Controller
     {
         $user = auth()->user();
 
+        if ($user->role === 'client') {
+            abort(403, 'Clients cannot delete files.');
+        }
+
         $order = Order::findOrFail($file->order_id);
         $this->checkAccess($order);
 
@@ -153,21 +178,32 @@ class OrderFileController extends Controller
         }
     }
 
- private function checkAccess(Order $order)
-{
-    $user = auth()->user();
+    private function checkAccess(Order $order)
+    {
+        $user = auth()->user();
 
-    if (!$user) {
-        abort(401, 'Unauthenticated');
-    }
+        if (!$user) {
+            abort(401, 'Unauthenticated');
+        }
 
-    if ($user->role === 'super_admin') {
-        return true;
-    }
+        if ($user->role === 'super_admin') {
+            return true;
+        }
 
-    if ($user->role === 'client') {
-        $allowed = $order->clients()
-            ->where('clients.user_id', $user->id)
+        if ($user->role === 'client') {
+            $allowed = $order->clients()
+                ->where('clients.user_id', $user->id)
+                ->exists();
+
+            if (!$allowed) {
+                abort(403, 'Access denied');
+            }
+
+            return true;
+        }
+
+        $allowed = $order->members()
+            ->where('users.id', $user->id)
             ->exists();
 
         if (!$allowed) {
@@ -176,15 +212,4 @@ class OrderFileController extends Controller
 
         return true;
     }
-
-    $allowed = $order->members()
-        ->where('users.id', $user->id)
-        ->exists();
-
-    if (!$allowed) {
-        abort(403, 'Access denied');
-    }
-
-    return true;
-}
 }
