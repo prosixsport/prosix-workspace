@@ -96,10 +96,16 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::delete('/order-files/{file}', [OrderFileController::class, 'destroy']);
 
 
-    Route::middleware('superadmin')->group(function () {
-        Route::apiResource('clients', ClientController::class);
-        Route::apiResource('invoices', InvoiceController::class);
-    });
+   Route::get('/clients', [ClientController::class, 'index']);
+
+Route::middleware('superadmin')->group(function () {
+    Route::post('/clients', [ClientController::class, 'store']);
+    Route::get('/clients/{client}', [ClientController::class, 'show']);
+    Route::put('/clients/{client}', [ClientController::class, 'update']);
+    Route::delete('/clients/{client}', [ClientController::class, 'destroy']);
+
+    Route::apiResource('invoices', InvoiceController::class);
+});
 
     Route::get('/notifications', [NotificationController::class, 'index']);
     Route::post('/notifications/{id}/read', [NotificationController::class, 'markRead']);
