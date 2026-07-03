@@ -924,9 +924,10 @@ activeTracking() {
 
   return this.currentUser.can_create_orders === true
 },
-  canUploadFiles() {
+canUploadFiles() {
   return this.currentUser?.role === 'super_admin'
     || this.currentUser?.can_create_orders === true
+    || this.isClient
 },
     currentUser() {
       try { return JSON.parse(localStorage.getItem('user')) || null } catch { return null }
