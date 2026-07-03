@@ -22,6 +22,9 @@ class OrderFileController extends Controller
     public function store(Request $request, Order $order)
     {
         $user = auth()->user();
+        if ($user->role === 'client') {
+    abort(403, 'Clients cannot delete files.');
+}
         $this->checkAccess($order);
 
         if ($user->role !== 'super_admin' && !$user->can_create_orders) {
@@ -150,18 +153,38 @@ class OrderFileController extends Controller
         }
     }
 
-    private function checkAccess(Order $order)
-    {
-        $user = auth()->user();
+ private function checkAccess(Order $order)
+{
+    $user = auth()->user();
 
-        if ($user && $user->role === 'super_admin') return true;
+    if (!$user) {
+        abort(401, 'Unauthenticated');
+    }
 
-        $allowed = $order->members()
-            ->where('users.id', $user?->id)
+    if ($user->role === 'super_admin') {
+        return true;
+    }
+
+    if ($user->role === 'client') {
+        $allowed = $order->clients()
+            ->where('clients.user_id', $user->id)
             ->exists();
 
-        if (!$allowed) abort(403, 'Access denied');
+        if (!$allowed) {
+            abort(403, 'Access denied');
+        }
 
         return true;
     }
+
+    $allowed = $order->members()
+        ->where('users.id', $user->id)
+        ->exists();
+
+    if (!$allowed) {
+        abort(403, 'Access denied');
+    }
+
+    return true;
+}
 }

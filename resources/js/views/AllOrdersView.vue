@@ -1093,9 +1093,11 @@ deleteCustomStatus(status) {
   )
 },
   canDeleteFile(file) {
-    return this.isSuperAdmin || Number(file?.senderId) === Number(this.currentUser?.id)
-  },
+  // Client sirf view/download karega
+  if (this.isClient) return false;
 
+  return this.isSuperAdmin || Number(file?.senderId) === Number(this.currentUser?.id);
+},
   toggleSelectAll() {
   this.selectedOrders = this.selectAll
     ? this.filteredOrders.map(o => o.id)
