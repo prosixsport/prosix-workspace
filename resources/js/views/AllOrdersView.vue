@@ -1729,32 +1729,64 @@ this.activeTrackingIndex = 0
       return d.toLocaleString('en-US', { month: 'short', day: 'numeric', year: 'numeric', hour: '2-digit', minute: '2-digit' })
     },
 
-    async fetchMessages(orderId) {
-      try {
-        const res = await axios.get(`/api/orders/${orderId}/messages`, { headers: this.headers() })
-        const list = Array.isArray(res.data) ? res.data : (res.data?.data || [])
-        this.chatMessages = list.map(msg => {
-          const createdDate = msg.created_at ? new Date(msg.created_at) : new Date()
-          return {
-            id: msg.id, localKey: `msg-${msg.id}`,
-            senderId: msg.user?.id || null,
-            sender: msg.user?.name || 'User',
-            senderInitial: this.initial(msg.user?.name),
-            senderColor: this.memberColor(msg.user?.id),
-            senderPhoto: msg.user?.profile_photo_url || null,
-            time: createdDate.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-            sortAt: createdDate.getTime(),
-            editedAt: msg.edited_at || null,
-            deletedEveryoneAt: msg.deleted_everyone_at || null,
-            reads: msg.reads || [],
-            seenBy: (msg.reads || []).map(r => ({ id: r.user?.id || r.user_id, name: r.user?.name || 'User', readAt: r.read_at })),
-            text: msg.deleted_everyone_at ? '' : msg.message,
-            reply_to_id: msg.reply_to_id || null,
-            reply_to: msg.reply_to || null
-          }
-        })
-      } catch (e) { console.error('fetchMessages error:', e); this.chatMessages = [] }
-    },
+async fetchMessages(orderId) {
+  try {
+    const res = await axios.get(`/api/orders/${orderId}/messages`, {
+      headers: this.headers()
+    })
+
+    const list = Array.isArray(res.data) ? res.data : (res.data?.data || [])
+
+    this.chatMessages = list.map(msg => {
+      const createdDate = msg.created_at ? new Date(msg.created_at) : new Date()
+
+      const files = (msg.files || []).map(f => ({
+        ...this.normalizeOrderFile(f),
+        cardType: f.card_type || f.cardType || 'chat_files',
+        senderId: msg.user?.id || msg.user_id || f.user?.id || f.user_id || null,
+        sender: msg.user?.name || f.user?.name || 'Shared file',
+        senderPhoto: msg.user?.profile_photo_url || f.user?.profile_photo_url || null
+      }))
+
+      return {
+        id: msg.id,
+        localKey: msg.file_message_id ? `file-${msg.file_message_id}` : `msg-${msg.id}`,
+        fileMessageId: msg.file_message_id || null,
+
+        senderId: msg.user?.id || msg.user_id || null,
+        sender: msg.user?.name || 'User',
+        senderInitial: this.initial(msg.user?.name || 'User'),
+        senderColor: this.memberColor(msg.user?.id || msg.user_id || 0),
+        senderPhoto: msg.user?.profile_photo_url || null,
+
+        time: createdDate.toLocaleTimeString([], {
+          hour: '2-digit',
+          minute: '2-digit'
+        }),
+
+        sortAt: createdDate.getTime(),
+        editedAt: msg.edited_at || null,
+        deletedEveryoneAt: msg.deleted_everyone_at || null,
+
+        reads: msg.reads || [],
+        seenBy: (msg.reads || []).map(r => ({
+          id: r.user?.id || r.user_id,
+          name: r.user?.name || r.name || 'User',
+          readAt: r.read_at
+        })),
+
+        text: msg.deleted_everyone_at ? '' : (msg.message || ''),
+        files: files,
+
+        reply_to_id: msg.reply_to_id || null,
+        reply_to: msg.reply_to || null
+      }
+    })
+  } catch (e) {
+    console.error('fetchMessages error:', e)
+    this.chatMessages = []
+  }
+},
 
     addNewOrder() {
   if (!this.canCreateOrder) return
