@@ -17,7 +17,7 @@
         </button>
       </div>
     </div>
-
+    
     <div v-if="isSuperAdmin" class="order-member-add">
       <button class="btn btn-sm btn-dark" @click.stop="showAddMemberBox = !showAddMemberBox">
         + Add Member
@@ -828,6 +828,7 @@ seenBy: []
     }
   }
 }
+
 </script>
 
 <style scoped>
@@ -858,9 +859,6 @@ seenBy: []
   gap: 8px;
   z-index: 100;
 }
-
-
-
 .rec-dot {
   width: 10px;
   height: 10px;
@@ -880,7 +878,6 @@ seenBy: []
   position: relative;
   height: 100%;
 }
-
 /* Mobile: full width overlay */
 .chat-panel.mobile-fullscreen {
   position: fixed;
@@ -891,7 +888,6 @@ seenBy: []
   z-index: 997;
   border-left: none;
 }
-
 .chat-resize-bar {
   position: absolute;
   left: 0;
@@ -901,7 +897,6 @@ seenBy: []
   cursor: col-resize;
   z-index: 999;
 }
-
 .chat-resize-bar:hover { background: #6161ff; }
 
 .chat-header {
@@ -1130,7 +1125,6 @@ seenBy: []
 .chat-file-info { min-width: 0; display: flex; flex-direction: column; gap: 2px; }
 .chat-file-name { font-size: 12px; font-weight: 800; color: #172b4d; max-width: 160px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .chat-file-type { font-size: 10px; color: #9aa0b8; }
-
 .hidden-file-input { display: none; }
 
 /* MESSAGE ACTIONS */
@@ -1246,8 +1240,6 @@ seenBy: []
 .seen-info-empty { background: #f3f4f6; color: #6b7280; border-radius: 10px; padding: 10px; font-size: 13px; font-weight: 700; text-align: center; }
 
 .seen-row { font-size: 10px; color: #9aa0b8; margin-top: 2px; text-align: right; }
-
-
 
 .chat-input-area {
   position: sticky;

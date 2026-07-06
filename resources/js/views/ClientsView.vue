@@ -238,10 +238,7 @@ export default {
 .head { display: flex; justify-content: space-between; gap: 15px; align-items: center; margin-bottom: 18px; }
 .head h2 { margin: 0; font-size: 28px; font-weight: 900; color: #111; }
 .head p { margin: 4px 0 0; color: #6b7280; }
-.add-btn, .save-btn {
-    border: none; background: #111; color: #fff; border-radius: 12px;
-    padding: 12px 18px; font-weight: 900; cursor: pointer;
-}
+.add-btn, .save-btn {border: none; background: #111; color: #fff; border-radius: 12px;padding: 12px 18px; font-weight: 900; cursor: pointer;}
 .card { background: #fff; border: 1px solid #e5e7eb; border-radius: 18px; overflow: hidden; }
 .table-wrap { overflow-x: auto; }
 table { width: 100%; border-collapse: collapse; min-width: 760px; }
@@ -258,16 +255,7 @@ label { display: block; margin: 12px 0 6px; font-size: 13px; font-weight: 800; }
 input, textarea, select { width: 100%; border: 1.5px solid #d1d5db; border-radius: 10px; padding: 11px 12px; outline: none; }
 textarea { min-height: 80px; resize: vertical; }
 .save-btn { width: 100%; margin-top: 18px; }
-.client-modal-box {
-    display: block;
-    background: #fff;
-    width: 460px;
-    max-width: 100%;
-    border-radius: 20px;
-    padding: 24px;
-    position: relative;
-    z-index: 100000;
-}
+.client-modal-box {display: block; background: #fff; width: 460px; max-width: 100%; border-radius: 20px; padding: 24px; position: relative; z-index: 100000;}
 @media (max-width: 600px) {
     .page { padding: 16px; }
     .head { flex-direction: column; align-items: stretch; }

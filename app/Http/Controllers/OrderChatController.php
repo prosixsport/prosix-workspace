@@ -7,83 +7,118 @@ use App\Events\OrderMessageSent;
 use App\Models\Order;
 use App\Models\OrderMessage;
 use App\Models\User;
+use App\Models\OrderFile;
 use App\Services\FcmService;
 use Illuminate\Http\Request;
 
 class OrderChatController extends Controller
 {
-    public function index(Order $order)
-    {
-        $this->checkAccess($order);
+   public function index(Order $order)
+{
+    $this->checkAccess($order);
 
-        $userId = auth()->id();
+    $userId = auth()->id();
 
-        $messages = OrderMessage::with([
-                'user:id,name,email,profile_photo',
-                'reads.user:id,name,email,profile_photo',
-                'replyTo.user:id,name,email,profile_photo',
-            ])
-            ->where('order_id', $order->id)
-            ->oldest()
-            ->get()
-            ->filter(function ($msg) use ($userId) {
-                return !in_array($userId, $msg->deleted_for ?? []);
-            })
-            ->map(function ($msg) {
-                $reads = $msg->reads
-                    ->filter(function ($read) use ($msg) {
-                        return (int) $read->user_id !== (int) $msg->user_id;
-                    })
-                    ->map(function ($read) {
-                        return [
-                            'user_id' => $read->user_id,
-                            'name' => $read->user?->name,
-                            'email' => $read->user?->email,
-                            'profile_photo_url' => $read->user?->profile_photo_url,
-                            'read_at' => $read->read_at
-                                ? $read->read_at->format('M d, Y h:i A')
-                                : null,
-                        ];
-                    })
-                    ->values();
+    $messages = OrderMessage::with([
+            'user:id,name,email,profile_photo',
+            'reads.user:id,name,email,profile_photo',
+            'replyTo.user:id,name,email,profile_photo',
+        ])
+        ->where('order_id', $order->id)
+        ->oldest()
+        ->get()
+        ->filter(function ($msg) use ($userId) {
+            return !in_array($userId, $msg->deleted_for ?? []);
+        })
+        ->map(function ($msg) {
+            $reads = $msg->reads
+                ->filter(fn ($read) => (int) $read->user_id !== (int) $msg->user_id)
+                ->map(function ($read) {
+                    return [
+                        'user_id' => $read->user_id,
+                        'name' => $read->user?->name,
+                        'email' => $read->user?->email,
+                        'profile_photo_url' => $read->user?->profile_photo_url,
+                        'read_at' => $read->read_at ? $read->read_at->format('M d, Y h:i A') : null,
+                    ];
+                })
+                ->values();
 
-                return [
-                    'id' => $msg->id,
-                    'order_id' => $msg->order_id,
-                    'user_id' => $msg->user_id,
-                    'message' => $msg->message,
-                    'reply_to_id' => $msg->reply_to_id,
-                    'reply_to' => $msg->replyTo ? [
-                        'id' => $msg->replyTo->id,
-                        'message' => $msg->replyTo->message,
-                        'user' => [
-                            'id' => $msg->replyTo->user?->id,
-                            'name' => $msg->replyTo->user?->name,
-                            'email' => $msg->replyTo->user?->email,
-                            'profile_photo_url' => $msg->replyTo->user?->profile_photo_url,
-                        ],
-                    ] : null,
-                    'deleted_for' => $msg->deleted_for,
-                    'deleted_everyone_at' => $msg->deleted_everyone_at,
-                    'edited_at' => $msg->edited_at,
-                    'created_at' => $msg->created_at,
-                    'updated_at' => $msg->updated_at,
-
+            return [
+                'id' => $msg->id,
+                'order_id' => $msg->order_id,
+                'user_id' => $msg->user_id,
+                'message' => $msg->message,
+                'reply_to_id' => $msg->reply_to_id,
+                'reply_to' => $msg->replyTo ? [
+                    'id' => $msg->replyTo->id,
+                    'message' => $msg->replyTo->message,
                     'user' => [
-                        'id' => $msg->user?->id,
-                        'name' => $msg->user?->name,
-                        'email' => $msg->user?->email,
-                        'profile_photo_url' => $msg->user?->profile_photo_url,
+                        'id' => $msg->replyTo->user?->id,
+                        'name' => $msg->replyTo->user?->name,
+                        'email' => $msg->replyTo->user?->email,
+                        'profile_photo_url' => $msg->replyTo->user?->profile_photo_url,
                     ],
+                ] : null,
+                'deleted_for' => $msg->deleted_for,
+                'deleted_everyone_at' => $msg->deleted_everyone_at,
+                'edited_at' => $msg->edited_at,
+                'created_at' => $msg->created_at,
+                'updated_at' => $msg->updated_at,
+                'user' => [
+                    'id' => $msg->user?->id,
+                    'name' => $msg->user?->name,
+                    'email' => $msg->user?->email,
+                    'profile_photo_url' => $msg->user?->profile_photo_url,
+                ],
+                'is_seen' => $reads->count() > 0,
+                'reads' => $reads,
+                'type' => 'message',
+            ];
+        });
 
-                    'is_seen' => $reads->count() > 0,
-                    'reads' => $reads,
-                ];
-            })
-            ->values();
+    $chatFiles = OrderFile::with('user:id,name,email,profile_photo')
+        ->where('order_id', $order->id)
+        ->where('card_type', 'chat_files')
+        ->oldest()
+        ->get()
+        ->map(function ($file) use ($order) {
+            return [
+                'id' => 'file-' . $file->id,
+                'file_message_id' => $file->id,
+                'order_id' => $order->id,
+                'user_id' => $file->user_id,
+                'message' => '',
+                'created_at' => $file->created_at,
+                'updated_at' => $file->updated_at,
+                'user' => [
+                    'id' => $file->user?->id,
+                    'name' => $file->user?->name,
+                    'email' => $file->user?->email,
+                    'profile_photo_url' => $file->user?->profile_photo_url,
+                ],
+                'files' => [[
+                    'id' => $file->id,
+                    'original_name' => $file->original_name,
+                    'name' => $file->original_name,
+                    'file_path' => $file->file_path,
+                    'url' => asset('storage/' . $file->file_path),
+                    'mime_type' => $file->mime_type,
+                    'type' => $file->mime_type,
+                    'size' => $file->size,
+                    'card_type' => $file->card_type,
+                ]],
+                'type' => 'file',
+            ];
+        });
 
-        return response()->json($messages);
-    }
+    return response()->json(
+        $messages
+            ->concat($chatFiles)
+            ->sortBy('created_at')
+            ->values()
+    );
+}
 
     public function store(Request $request, Order $order)
     {

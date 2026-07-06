@@ -40,7 +40,6 @@ Route::middleware('auth:sanctum')->group(function () {
             'message' => 'FCM token saved',
         ]);
     });
-
     // Profile
     Route::get('/users/{user}/profile', [MemberController::class, 'profile']);
     Route::post('/me/profile', [MemberController::class, 'updateProfile']);
@@ -111,3 +110,22 @@ Route::middleware('superadmin')->group(function () {
     Route::post('/notifications/{id}/read', [NotificationController::class, 'markRead']);
     Route::post('/notifications/mark-all-read', [NotificationController::class, 'markAllRead']);
 });
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
