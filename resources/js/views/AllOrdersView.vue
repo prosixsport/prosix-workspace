@@ -969,20 +969,49 @@ filteredOrders() {
     .filter(o => {
       const groupMatch = o.group === this.activeGroup
 
+      const searchText = String(this.searchOrder || '').trim().toLowerCase()
+      const orderName = String(o.name || '').toLowerCase()
+
       const searchMatch =
-        !this.searchOrder ||
-        o.name.toLowerCase().includes(this.searchOrder.toLowerCase())
+        !searchText || orderName.includes(searchText)
 
       const clientMatch =
         !this.selectedClient ||
-        (o.clients || []).some(c => Number(c.id) === Number(this.selectedClient))
+        (o.clients || []).some(
+          c => Number(c.id) === Number(this.selectedClient)
+        )
 
       return groupMatch && searchMatch && clientMatch
     })
     .sort((a, b) => {
-      const at = new Date(a.last_message_at || a.updated_at || 0).getTime()
-      const bt = new Date(b.last_message_at || b.updated_at || 0).getTime()
-      return bt - at
+      const aUnread = Number(a.unread_chat_count || 0) > 0
+      const bUnread = Number(b.unread_chat_count || 0) > 0
+
+      // 1) Unread chat wala order hamesha top par rahega
+      if (aUnread !== bUnread) {
+        return aUnread ? -1 : 1
+      }
+
+      // 2) Agar dono unread hain to latest chat pehle show hogi
+      if (aUnread && bUnread) {
+        const aTime = new Date(a.last_message_at || 0).getTime()
+        const bTime = new Date(b.last_message_at || 0).getTime()
+
+        if (aTime !== bTime) {
+          return bTime - aTime
+        }
+      }
+
+      // 3) Read chat aur normal tamam orders A-Z mein show honge
+      return String(a.name || '').localeCompare(
+        String(b.name || ''),
+        'en',
+        {
+          sensitivity: 'base',
+          numeric: true,
+          ignorePunctuation: true
+        }
+      )
     })
 },
     unreadOrdersCount() { return this.orders.filter(o => !o.user_has_seen).length },
@@ -1851,7 +1880,7 @@ if (!this.isSuperAdmin && this.currentUser?.can_create_orders !== true) return
 if (!this.isSuperAdmin && this.currentUser?.can_create_orders !== true) return
       if (!confirm('Delete this order?')) return
       try {
-        await axios.delete(`/api/orders/${order.id}`, { headers: this.headers() })
+        await axios.delete(`/api/orders/${order.id}`, { headers:  this.headers() })
         this.orders = this.orders.filter(o => o.id !== order.id)
         if (this.selectedOrder?.id === order.id) {
           this.selectedOrder = this.orders[0] || null
@@ -1941,7 +1970,7 @@ shipping_address: this.newOrder.shippingAddress,
   } catch (e) {
     console.error('updateShipDate error:', e)
   }
-},
+    },
 
     async savePayment() {
       if (!this.selectedOrder) return
@@ -1969,7 +1998,7 @@ shipping_address: this.newOrder.shippingAddress,
     console.error('saveNote error:', e)
     alert(e.response?.data?.message || 'Note save nahi hua')
   }
-},
+    },
 
     normalizeOrderFile(file) {
       const mime = file.mime_type || file.type || ''
