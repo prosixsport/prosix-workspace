@@ -61,7 +61,7 @@
         <!-- <div class="col-owner">OWNER</div> -->
         <div class="col-actions"></div>
       </div>
-<div v-if="(isSuperAdmin || currentUser?.can_create_orders === true) && selectedOrders.length > 1" class="bulk-actions" @click.stop>
+<div v-if="(hasFullOrderAccess || currentUser?.can_create_orders === true) && selectedOrders.length > 1" class="bulk-actions" @click.stop>
         <strong>{{ selectedOrders.length }}</strong>
 
   <button class="bulk-btn" @click="openBulkMembersModal" :disabled="bulkActionLoading">
@@ -203,7 +203,7 @@
             <div class="order-menu-item" @click="openOrderInfo(order)">
               <i class="fa-solid fa-circle-info"></i> Info
             </div>
-<template v-if="isSuperAdmin || currentUser?.can_create_orders === true">
+<template v-if="hasFullOrderAccess || currentUser?.can_create_orders === true">
                   <div class="order-menu-item" @click="openEditOrder(order)"><i class="fa-solid fa-pen"></i> Edit</div>
               <div class="order-menu-item" @click="duplicateOrder(order)"><i class="fa-solid fa-copy"></i> Duplicate</div>
               <div class="order-menu-item danger" @click="deleteOrder(order)"><i class="fa-solid fa-trash"></i> Delete</div>
@@ -342,7 +342,7 @@
               </div>
             </div>
           </div>
-          <div v-if="isSuperAdmin" class="detail-info-item invoice-info-item" style="position:relative" @click.stop>
+          <div v-if="hasFullOrderAccess" class="detail-info-item invoice-info-item" style="position:relative" @click.stop>
             <button class="invoice-btn" @click="triggerInvoiceUpload">
               <i class="fa-solid fa-file-invoice me-1"></i>Add Invoice
             </button>
@@ -442,7 +442,7 @@
               <div class="payment-read-row balance-row">
                 <span>Balance</span><strong>${{ selectedOrder.paymentBalance || 0 }}</strong>
               </div>
-<div v-if="isSuperAdmin || currentUser?.can_create_orders === true" class="payment-admin-editor">
+<div v-if="hasFullOrderAccess || currentUser?.can_create_orders === true" class="payment-admin-editor">
                     <div class="payment-field">
                   <label class="payment-label">Paid %</label>
                   <div class="payment-percent-row">
@@ -939,12 +939,12 @@ activeTracking() {
  canEditNotes() {
   if (!this.selectedOrder || !this.currentUser) return false
 
-  if (this.currentUser.role === 'super_admin') return true
+  if (this.hasFullOrderAccess) return true
 
   return this.currentUser.can_create_orders === true
 },
 canUploadFiles() {
-  return this.currentUser?.role === 'super_admin'
+  return this.hasFullOrderAccess
     || this.currentUser?.can_create_orders === true
     || this.isClient
 },
@@ -952,6 +952,8 @@ canUploadFiles() {
       try { return JSON.parse(localStorage.getItem('user')) || null } catch { return null }
     },
     isSuperAdmin() { return this.currentUser?.role === 'super_admin' },
+    isAdmin() { return this.currentUser?.role === 'admin' },
+    hasFullOrderAccess() { return this.isSuperAdmin || this.isAdmin },
    canCreateOrder() {
   const role = this.currentUser?.role
 
@@ -1156,7 +1158,7 @@ deleteCustomStatus(status) {
   // Client sirf view/download karega
   if (this.isClient) return false;
 
-  return this.isSuperAdmin || Number(file?.senderId) === Number(this.currentUser?.id);
+  return this.hasFullOrderAccess || Number(file?.senderId) === Number(this.currentUser?.id);
 },
   toggleSelectAll() {
   this.selectedOrders = this.selectAll
@@ -1303,14 +1305,14 @@ alert(e.response?.data?.message || 'Orders were not deleted')
     clearSelectedMembers() { this.newOrder.selectedMembers = [] },
 
     triggerInvoiceUpload() {
-      if (!this.isSuperAdmin || !this.selectedOrder) return
+      if (!this.hasFullOrderAccess || !this.selectedOrder) return
       this.$refs.invoiceInput?.click()
     },
 
     async onInvoiceFileChange(event) {
       const files = Array.from(event.target.files || [])
       event.target.value = ''
-      if (!files.length || !this.isSuperAdmin || !this.selectedOrder) return
+      if (!files.length || !this.hasFullOrderAccess || !this.selectedOrder) return
       const formData = new FormData()
       formData.append('card_type', 'invoice_files')
       files.forEach(file => formData.append('files[]', file))
@@ -1862,7 +1864,7 @@ shippingAddress: order.shippingAddress || '',
     getOrderNote(order) { return order.cards?.find(c => c.title === 'Notes')?.noteText || '' },
 
     async duplicateOrder(order) {
-if (!this.isSuperAdmin && this.currentUser?.can_create_orders !== true) return
+if (!this.hasFullOrderAccess && this.currentUser?.can_create_orders !== true) return
       const status = this.statusOptions.find(s => s.label === order.status)
       try {
         const res = await axios.post('/api/orders', {
@@ -1881,7 +1883,7 @@ if (!this.isSuperAdmin && this.currentUser?.can_create_orders !== true) return
     },
 
     async deleteOrder(order) {
-if (!this.isSuperAdmin && this.currentUser?.can_create_orders !== true) return
+if (!this.hasFullOrderAccess && this.currentUser?.can_create_orders !== true) return
       if (!confirm('Delete this order?')) return
       try {
         await axios.delete(`/api/orders/${order.id}`, { headers:  this.headers() })
@@ -2132,7 +2134,7 @@ if (!files.length || !this.canUploadFiles || !card || card.type === 'notes') ret
     openViewAll(card) { this.viewAllCard = card },
 
     openInvoiceFiles() {
-      if (!this.isSuperAdmin || !this.selectedOrder?.invoiceFiles?.length) return
+      if (!this.hasFullOrderAccess || !this.selectedOrder?.invoiceFiles?.length) return
       this.viewAllCard = { title: 'Invoices', type: 'invoice_files', files: this.selectedOrder.invoiceFiles }
     },
 
