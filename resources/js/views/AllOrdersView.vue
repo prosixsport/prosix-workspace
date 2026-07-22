@@ -953,7 +953,11 @@ canUploadFiles() {
     },
     isSuperAdmin() { return this.currentUser?.role === 'super_admin' },
    canCreateOrder() {
-  return this.currentUser?.role === 'super_admin'
+  const role = this.currentUser?.role
+
+  return role === 'super_admin'
+    || role === 'admin'
+    || role === 'member'
     || this.currentUser?.can_create_orders === true
     || this.isClient
 },
