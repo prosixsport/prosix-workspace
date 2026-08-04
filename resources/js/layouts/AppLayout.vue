@@ -64,9 +64,30 @@
                     @click="clearOrderBadge(); sidebarOpen = false"
                 >
                     <span class="nav-icon"><i class="fa-solid fa-clipboard-list"></i></span>
-                    <span>All Orders</span>
+                    <span>Factory Orders</span>
                     <span v-if="showOrderBadge" class="order-badge">{{ orderNotificationCount }}</span>
                 </router-link>
+                <router-link
+                    to="/orders"
+                    class="nav-link-custom"
+                    :class="{ active: $route.path.startsWith('/orders') }"
+                    @click="clearOrderBadge(); sidebarOpen = false"
+                >
+                    <span class="nav-icon"><i class="fa-solid fa-clipboard-list"></i></span>
+                    <span>TeamStore Orders</span>
+                    <span v-if="showOrderBadge" class="order-badge">{{ orderNotificationCount }}</span>
+                </router-link>
+                <router-link
+                    to="/orders"
+                    class="nav-link-custom"
+                    :class="{ active: $route.path.startsWith('/orders') }"
+                    @click="clearOrderBadge(); sidebarOpen = false"
+                >
+                    <span class="nav-icon"><i class="fa-solid fa-clipboard-list"></i></span>
+                    <span>Artwork Request</span>
+                    <span v-if="showOrderBadge" class="order-badge">{{ orderNotificationCount }}</span>
+                </router-link>
+             
 
                 <router-link
                     v-if="isSuperAdmin || isAdmin"
