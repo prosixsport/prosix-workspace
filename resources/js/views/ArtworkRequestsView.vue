@@ -9729,5 +9729,101 @@ grid-template-columns: 32px 1fr 118px 38px;
 .board-avatar-add {
   margin-left: 3px !important;
 }
+/* OWNER AVATARS — NEVER OVERFLOW */
+.board-col-owner {
+  min-width: 0;
+  overflow: hidden;
+}
 
+.board-avatar-stack {
+  width: 100%;
+  min-width: 0;
+  max-width: 100%;
+  overflow: hidden;
+
+  display: flex;
+  align-items: center;
+  justify-content: flex-start;
+  flex-wrap: nowrap;
+  gap: 0;
+}
+
+.board-avatar {
+  flex: 0 0 26px;
+  width: 26px;
+  height: 26px;
+
+  margin-left: -5px;
+  border: 2px solid #ffffff;
+  border-radius: 50%;
+
+  overflow: hidden;
+  position: relative;
+
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+
+  font-size: 8px;
+  font-weight: 800;
+}
+
+.board-avatar:first-child {
+  margin-left: 0;
+}
+
+.board-avatar img {
+  width: 100% !important;
+  height: 100% !important;
+
+  border-radius: 50% !important;
+  object-fit: cover !important;
+  object-position: center !important;
+}
+
+.board-avatar-more {
+  flex: 0 0 28px;
+  width: 28px;
+  height: 28px;
+
+  margin-left: -4px !important;
+
+  background: #252b38 !important;
+  color: #ffffff !important;
+
+  border: 2px solid #ffffff;
+  font-size: 8px;
+}
+
+.board-avatar-add {
+  flex: 0 0 28px;
+  width: 28px;
+  height: 28px;
+
+  margin-left: 4px !important;
+
+  border: 1px dashed #94a3b8;
+  background: #ffffff;
+  color: #111827;
+}
+
+/* Show maximum 4 visible circles cleanly */
+.board-avatar-stack .board-avatar:nth-child(n + 6) {
+  display: none;
+}
+
+/* Dark mode */
+.theme-dark .board-avatar {
+  border-color: #111827;
+}
+
+.theme-dark .board-avatar-more {
+  border-color: #111827;
+}
+
+.theme-dark .board-avatar-add {
+  border-color: #64748b;
+  background: #111827;
+  color: #ffffff;
+}
 </style>
