@@ -87,7 +87,7 @@
                 </router-link>
 
                 <!-- TEAMSTORE ORDERS -->
-                <router-link
+                <!-- <router-link
                     to="/teamstore-orders"
                     class="nav-link-custom"
                     :class="{
@@ -107,10 +107,10 @@
                     >
                         {{ teamStoreNotificationCount }}
                     </span>
-                </router-link>
+                </router-link> -->
 
                 <!-- PLACE ORDERS -->
-                <router-link
+                <!-- <router-link
                     to="/place-orders"
                     class="nav-link-custom"
                     :class="{ active: $route.path === '/place-orders' }"
@@ -128,7 +128,7 @@
                     >
                         {{ placeOrderNotificationCount }}
                     </span>
-                </router-link>
+                </router-link> -->
 
                 <!-- ARTWORK REQUESTS -->
                 <!-- <router-link
@@ -147,7 +147,7 @@
 
                     <span>Artwork Requests</span>
                 </router-link> -->
-                <router-link
+                <!-- <router-link
 to="/artwork-requests"
                     class="nav-link-custom"
                     :class="{
@@ -162,7 +162,7 @@ to="/artwork-requests"
                     </span>
 
                     <span>Artwork Requests</span>
-                </router-link>
+                </router-link> -->
 
 
                 <router-link
