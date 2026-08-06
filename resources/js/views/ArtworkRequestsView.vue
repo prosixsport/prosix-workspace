@@ -473,34 +473,48 @@
           <div class="board-col board-col-owner">
             <div class="board-avatar-stack">
               <button
-                v-for="owner in order.owners.slice(0, 3)"
+                v-for="owner in visibleOrderOwners(order)"
                 :key="owner.id"
                 type="button"
                 class="board-avatar"
-                :style="{ background: owner.profile_photo_url ? '#fff' : owner.color }"
-                :title="owner.name"
+                :style="{
+                  background:
+                    owner.profile_photo_url
+                      ? '#ffffff'
+                      : owner.color
+                }"
+                :title="`${owner.name} · ${formatOwnerRole(owner.role)}`"
                 @click.stop="openProfile(owner)"
               >
                 <img
                   v-if="owner.profile_photo_url"
                   :src="owner.profile_photo_url"
-                  alt=""
+                  :alt="owner.name"
                 />
-                <span v-else>{{ owner.initial }}</span>
+
+                <span v-else>
+                  {{ owner.initial }}
+                </span>
               </button>
 
-              <span
-                v-if="order.owners.length > 3"
+              <button
+                v-if="hiddenOrderOwnersCount(order) > 0"
+                type="button"
                 class="board-avatar board-avatar-more"
+                :title="hiddenOrderOwnersNames(order)"
+                @click.stop="openSingleOrderMembers(order)"
               >
-                +{{ order.owners.length - 3 }}
-              </span>
+                +{{ hiddenOrderOwnersCount(order) }}
+              </button>
 
               <button
-                v-if="hasFullOrderAccess || currentUser?.can_create_orders === true"
+                v-if="
+                  hasFullOrderAccess ||
+                  currentUser?.can_create_orders === true
+                "
                 type="button"
                 class="board-avatar board-avatar-add"
-                title="Add member"
+                title="Add or manage members"
                 @click.stop="openSingleOrderMembers(order)"
               >
                 <i class="fa-solid fa-plus"></i>
@@ -1937,7 +1951,164 @@ beforeUnmount()  {
   },
 
 
+
  methods: {
+    normalizeOwnerRole(role) {
+      return String(role || 'member')
+        .trim()
+        .toLowerCase()
+        .replace(/\s+/g, '_')
+    },
+
+    formatOwnerRole(role) {
+      const normalized = this.normalizeOwnerRole(role)
+
+      if (normalized === 'super_admin') {
+        return 'Super Admin'
+      }
+
+      if (normalized === 'admin') {
+        return 'Admin'
+      }
+
+      return 'Member'
+    },
+
+    allAvailableMembersAssigned(order) {
+      const assignedIds = new Set(
+        (order?.owners || []).map(
+          owner => Number(owner.id)
+        )
+      )
+
+      const availableIds = (
+        this.availableMembers || []
+      )
+        .map(member => Number(member.id))
+        .filter(Boolean)
+
+      return (
+        availableIds.length > 0 &&
+        availableIds.every(id => assignedIds.has(id))
+      )
+    },
+
+    visibleOrderOwners(order) {
+      const owners = [...(order?.owners || [])]
+
+      /*
+       * Jab tamam available members order mein assigned hon:
+       * 1 Super Admin, 1 Admin aur alphabetically pehle
+       * 2 normal Members show honge.
+       */
+      if (this.allAvailableMembersAssigned(order)) {
+        const byName = (first, second) =>
+          String(first.name || '').localeCompare(
+            String(second.name || ''),
+            'en',
+            {
+              sensitivity: 'base',
+              numeric: true
+            }
+          )
+
+        const superAdmin = owners
+          .filter(
+            owner =>
+              this.normalizeOwnerRole(owner.role) ===
+              'super_admin'
+          )
+          .sort(byName)
+          .slice(0, 1)
+
+        const admin = owners
+          .filter(
+            owner =>
+              this.normalizeOwnerRole(owner.role) ===
+              'admin'
+          )
+          .sort(byName)
+          .slice(0, 1)
+
+        const members = owners
+          .filter(owner => {
+            const role =
+              this.normalizeOwnerRole(owner.role)
+
+            return (
+              role !== 'super_admin' &&
+              role !== 'admin'
+            )
+          })
+          .sort(byName)
+          .slice(0, 2)
+
+        return [
+          ...superAdmin,
+          ...admin,
+          ...members
+        ]
+      }
+
+      /*
+       * Normal case:
+       * Sirf profile image wale assigned members show honge.
+       * Bina image wale members + count ke andar rahenge.
+       */
+      return owners
+        .filter(owner => Boolean(owner.profile_photo_url))
+        .sort((first, second) =>
+          String(first.name || '').localeCompare(
+            String(second.name || ''),
+            'en',
+            {
+              sensitivity: 'base',
+              numeric: true
+            }
+          )
+        )
+        .slice(0, 4)
+    },
+
+    hiddenOrderOwners(order) {
+      const visibleIds = new Set(
+        this.visibleOrderOwners(order).map(
+          owner => Number(owner.id)
+        )
+      )
+
+      return (order?.owners || []).filter(
+        owner => !visibleIds.has(Number(owner.id))
+      )
+    },
+
+    hiddenOrderOwnersCount(order) {
+      return this.hiddenOrderOwners(order).length
+    },
+
+    hiddenOrderOwnersNames(order) {
+      const hidden = this.hiddenOrderOwners(order)
+
+      if (!hidden.length) {
+        return ''
+      }
+
+      return hidden
+        .map(owner => owner.name)
+        .filter(Boolean)
+        .sort((first, second) =>
+          String(first).localeCompare(
+            String(second),
+            'en',
+            {
+              sensitivity: 'base',
+              numeric: true
+            }
+          )
+        )
+        .join(', ')
+    },
+
     toggleBoardTheme() {
       this.boardTheme =
         this.boardTheme === 'light'
@@ -9495,6 +9666,41 @@ grid-template-columns: 32px 1fr 118px 38px;
 
 .theme-dark .board-table-row.opened {
   background: #111827 !important;
+}
+
+
+/* FINAL OWNER AVATAR DISPLAY */
+.board-avatar-stack {
+  min-width: 0;
+  flex-wrap: nowrap;
+}
+
+.board-avatar {
+  flex: 0 0 29px;
+}
+
+.board-avatar img {
+  width: 100% !important;
+  height: 100% !important;
+  border-radius: 50% !important;
+  object-fit: cover !important;
+  object-position: center !important;
+}
+
+.board-avatar-more {
+  border: 2px solid #ffffff;
+  background: #2f3542 !important;
+  color: #ffffff !important;
+  cursor: pointer !important;
+}
+
+.board-avatar-more:hover {
+  transform: translateY(-1px);
+  background: #111827 !important;
+}
+
+.board-avatar-add {
+  margin-left: 3px !important;
 }
 
 </style>
