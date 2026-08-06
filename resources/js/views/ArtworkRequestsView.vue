@@ -16,7 +16,7 @@
       </div>
 
       <div class="board-header-center">
-        <span>FACTORY ORDER MANAGEMENT</span>
+        <span>FACTORY All ORDER MANAGEMENT</span>
       </div>
 
       <button
