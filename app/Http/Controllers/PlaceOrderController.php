@@ -35,7 +35,9 @@ class PlaceOrderController extends Controller
 
             return response()->json([
                 'success' => true,
-                'data'    => $responseData['data'] ?? $responseData ?? [],
+                'data'    => $responseData['data']
+                    ?? $responseData
+                    ?? [],
             ]);
         } catch (ConnectionException $exception) {
             Log::error('Prosix Place Orders connection error', [
@@ -61,7 +63,7 @@ class PlaceOrderController extends Controller
     }
 
     /**
-     * Place Orders ka unread count.
+     * Current CRM member ka unread count.
      */
     public function unreadCount(): JsonResponse
     {
@@ -70,13 +72,20 @@ class PlaceOrderController extends Controller
                 ->get('/api/crm/place-orders/unread-count');
 
             if ($response->failed()) {
+                Log::error('Place Orders unread count failed', [
+                    'status' => $response->status(),
+                    'body'   => $response->body(),
+                ]);
+
                 return response()->json([
                     'count' => 0,
                 ]);
             }
 
             return response()->json([
-                'count' => (int) ($response->json('count') ?? 0),
+                'count' => (int) (
+                    $response->json('count') ?? 0
+                ),
             ]);
         } catch (\Throwable $exception) {
             Log::error('Place Orders unread count error', [
@@ -90,15 +99,23 @@ class PlaceOrderController extends Controller
     }
 
     /**
-     * Exact Place Order ko read mark karo.
+     * Current CRM member ke liye exact order read mark karo.
      */
     public function markRead(int $id): JsonResponse
     {
         try {
             $response = $this->prosixRequest()
-                ->post("/api/crm/place-orders/{$id}/mark-read");
+                ->post(
+                    "/api/crm/place-orders/{$id}/mark-read"
+                );
 
             if ($response->failed()) {
+                Log::error('Place Order mark-read failed', [
+                    'order_id' => $id,
+                    'status'   => $response->status(),
+                    'body'     => $response->body(),
+                ]);
+
                 return response()->json([
                     'success' => false,
                     'message' => 'Place Order read mark nahi hua.',
@@ -124,13 +141,34 @@ class PlaceOrderController extends Controller
 
     /**
      * Prosix API request client.
+     *
+     * Har request ke sath current CRM member ki identity jati hai.
      */
     private function prosixRequest()
     {
+        $user = auth()->user();
+
         return Http::baseUrl(
-            rtrim(config('services.prosix.url'), '/')
+            rtrim(
+                (string) config('services.prosix.url'),
+                '/'
+            )
         )
-            ->withToken(config('services.prosix.crm_token'))
+            ->withToken(
+                (string) config(
+                    'services.prosix.crm_token'
+                )
+            )
+            ->withHeaders([
+                'X-CRM-User-ID' =>
+                    (string) $user->id,
+
+                'X-CRM-User-Name' =>
+                    (string) $user->name,
+
+                'X-CRM-User-Email' =>
+                    (string) $user->email,
+            ])
             ->acceptJson()
             ->timeout(30)
             ->retry(2, 500);
