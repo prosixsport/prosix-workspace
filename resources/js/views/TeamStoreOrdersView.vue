@@ -130,6 +130,31 @@
               {{ filteredOrders.length === 1 ? 'order' : 'orders' }}
             </p>
           </div>
+
+          <div class="bulk-actions">
+            <span v-if="selectedIds.length">
+              {{ selectedIds.length }} selected
+            </span>
+
+            <button
+              type="button"
+              class="select-visible-button"
+              @click="toggleVisibleSelection"
+            >
+              <i class="fa-regular fa-square-check"></i>
+              {{ allVisibleSelected ? 'Clear Visible' : 'Select Visible' }}
+            </button>
+
+            <button
+              type="button"
+              class="print-selected-button"
+              :disabled="selectedIds.length === 0"
+              @click="printSelectedOrders"
+            >
+              <i class="fa-solid fa-print"></i>
+              Print Selected
+            </button>
+          </div>
         </div>
 
         <div
@@ -156,6 +181,13 @@
           <table class="orders-table">
             <thead>
               <tr>
+                <th class="check-column">
+                  <input
+                    type="checkbox"
+                    :checked="allVisibleSelected"
+                    @change="toggleVisibleSelection"
+                  />
+                </th>
                 <th>Order</th>
                 <th>Category</th>
                 <th>Items</th>
@@ -175,6 +207,14 @@
                 :key="order.id"
                 :class="{ unread: !order.is_read }"
               >
+                <td class="check-column">
+                  <input
+                    type="checkbox"
+                    :checked="isSelected(order.id)"
+                    @change="toggleOrder(order.id)"
+                  />
+                </td>
+
                 <td>
                   <div class="order-number-cell">
                     <span
@@ -576,6 +616,7 @@ export default {
       loading: false,
       orders: [],
       selectedOrder: null,
+      selectedIds: [],
       search: '',
       activeCategory: 'all',
       activeStatus: 'all',
@@ -602,19 +643,23 @@ export default {
 
       this.orders.forEach(order => {
         this.normalizedItems(order).forEach(item => {
-          const name = this.itemCategory(item)
+          const category = this.itemCategoryData(item)
+          const key = category.id
+            ? `category-${category.id}`
+            : this.slug(category.name)
 
-          if (!map.has(name)) {
-            map.set(name, {
-              key: this.slug(name),
-              label: name,
-              image: this.itemImage(item),
-              icon: this.categoryIcon(name),
+          if (!map.has(key)) {
+            map.set(key, {
+              key,
+              id: category.id,
+              label: category.name,
+              image: category.image || this.itemImage(item),
+              icon: this.categoryIcon(category.name),
               orderIds: new Set()
             })
           }
 
-          map.get(name).orderIds.add(order.id)
+          map.get(key).orderIds.add(order.id)
         })
       })
 
@@ -623,6 +668,7 @@ export default {
           ...category,
           count: category.orderIds.size
         }))
+        .filter(category => category.label !== 'Other' || category.count > 0)
         .sort((a, b) => a.label.localeCompare(b.label))
     },
 
@@ -647,6 +693,21 @@ export default {
       )
     },
 
+    selectedOrders() {
+      return this.orders.filter(order =>
+        this.selectedIds.includes(Number(order.id))
+      )
+    },
+
+    allVisibleSelected() {
+      return (
+        this.filteredOrders.length > 0 &&
+        this.filteredOrders.every(order =>
+          this.selectedIds.includes(Number(order.id))
+        )
+      )
+    },
+
     filteredOrders() {
       const query = String(this.search || '').trim().toLowerCase()
 
@@ -661,9 +722,14 @@ export default {
 
         const categoryMatch =
           this.activeCategory === 'all' ||
-          categories.some(
-            category => this.slug(category) === this.activeCategory
-          )
+          this.normalizedItems(order).some(item => {
+            const category = this.itemCategoryData(item)
+            const key = category.id
+              ? `category-${category.id}`
+              : this.slug(category.name)
+
+            return key === this.activeCategory
+          })
 
         const searchMatch =
           !query ||
@@ -724,6 +790,232 @@ export default {
       } finally {
         this.loading = false
       }
+    },
+
+    isSelected(orderId) {
+      return this.selectedIds.includes(Number(orderId))
+    },
+
+    toggleOrder(orderId) {
+      const id = Number(orderId)
+
+      if (this.selectedIds.includes(id)) {
+        this.selectedIds = this.selectedIds.filter(
+          selectedId => selectedId !== id
+        )
+      } else {
+        this.selectedIds = [...this.selectedIds, id]
+      }
+    },
+
+    toggleVisibleSelection() {
+      const visibleIds = this.filteredOrders.map(
+        order => Number(order.id)
+      )
+
+      if (this.allVisibleSelected) {
+        this.selectedIds = this.selectedIds.filter(
+          id => !visibleIds.includes(id)
+        )
+      } else {
+        this.selectedIds = [
+          ...new Set([
+            ...this.selectedIds,
+            ...visibleIds
+          ])
+        ]
+      }
+    },
+
+    escapeHtml(value) {
+      return String(value ?? '')
+        .replaceAll('&', '&amp;')
+        .replaceAll('<', '&lt;')
+        .replaceAll('>', '&gt;')
+        .replaceAll('"', '&quot;')
+        .replaceAll("'", '&#039;')
+    },
+
+    printSelectedOrders() {
+      const orders = this.selectedOrders
+
+      if (!orders.length) {
+        return
+      }
+
+      const rows = orders.map(order => {
+        const items = this.normalizedItems(order)
+          .map(item => {
+            const image = this.itemImage(item)
+
+            return `
+              <div class="print-item">
+                ${
+                  image
+                    ? `<img src="${this.escapeHtml(image)}" alt="">`
+                    : '<div class="print-placeholder">No Image</div>'
+                }
+                <div>
+                  <strong>${this.escapeHtml(this.itemName(item))}</strong>
+                  <span>Category: ${this.escapeHtml(this.itemCategory(item))}</span>
+                  <span>Size: ${this.escapeHtml(item.size || item.selected_size || '—')}</span>
+                  <span>Qty: ${this.escapeHtml(item.quantity || item.qty || 1)}</span>
+                  ${
+                    item.color || item.selected_color
+                      ? `<span>Color: ${this.escapeHtml(item.color || item.selected_color)}</span>`
+                      : ''
+                  }
+                </div>
+              </div>
+            `
+          })
+          .join('')
+
+        return `
+          <section class="print-order">
+            <div class="print-order-head">
+              <div>
+                <small>ORDER</small>
+                <h2>${this.escapeHtml(order.order_number || `Order #${order.id}`)}</h2>
+              </div>
+              <span>${this.escapeHtml(this.formatLabel(order.status || 'new'))}</span>
+            </div>
+
+            <div class="print-details">
+              <p><b>Customer:</b> ${this.escapeHtml(order.customer_name || '—')}</p>
+              <p><b>Phone:</b> ${this.escapeHtml(order.phone || '—')}</p>
+              <p><b>Email:</b> ${this.escapeHtml(order.email || '—')}</p>
+              <p><b>City:</b> ${this.escapeHtml(order.shipping_city || '—')}</p>
+              <p><b>Address:</b> ${this.escapeHtml(order.shipping_address || '—')}</p>
+              <p><b>Courier:</b> ${this.escapeHtml(order.courier_name || '—')}</p>
+              <p><b>Tracking:</b> ${this.escapeHtml(order.tracking_number || '—')}</p>
+              <p><b>Date:</b> ${this.escapeHtml(this.formatDate(order.created_at))}</p>
+            </div>
+
+            <h3>Items</h3>
+            <div class="print-items">
+              ${items || '<p>No item details found.</p>'}
+            </div>
+          </section>
+        `
+      }).join('')
+
+      const printWindow = window.open('', '_blank', 'width=1100,height=800')
+
+      if (!printWindow) {
+        alert('Please allow popups to print selected orders.')
+        return
+      }
+
+      printWindow.document.write(`
+        <!doctype html>
+        <html>
+          <head>
+            <title>TeamStore Orders</title>
+            <style>
+              * { box-sizing: border-box; }
+              body {
+                margin: 0;
+                padding: 28px;
+                color: #111;
+                font-family: Arial, sans-serif;
+                background: #fff;
+              }
+              .print-logo {
+                margin-bottom: 22px;
+                text-align: center;
+                border-bottom: 2px solid #111;
+                padding-bottom: 14px;
+              }
+              .print-logo h1 { margin: 0; font-size: 26px; }
+              .print-logo p { margin: 4px 0 0; color: #666; }
+              .print-order {
+                margin-bottom: 24px;
+                border: 1px solid #ddd;
+                border-radius: 12px;
+                overflow: hidden;
+                page-break-inside: avoid;
+              }
+              .print-order-head {
+                padding: 14px 16px;
+                background: #111827;
+                color: #fff;
+                display: flex;
+                align-items: center;
+                justify-content: space-between;
+              }
+              .print-order-head small { color: #aaa; }
+              .print-order-head h2 { margin: 3px 0 0; font-size: 18px; }
+              .print-order-head > span {
+                padding: 6px 10px;
+                border-radius: 999px;
+                background: #fff;
+                color: #111;
+                font-size: 11px;
+                font-weight: 700;
+              }
+              .print-details {
+                padding: 14px 16px;
+                display: grid;
+                grid-template-columns: repeat(2, 1fr);
+                gap: 8px 18px;
+              }
+              .print-details p { margin: 0; font-size: 12px; }
+              .print-order > h3 { margin: 4px 16px 10px; font-size: 14px; }
+              .print-items {
+                padding: 0 16px 16px;
+                display: grid;
+                grid-template-columns: repeat(2, 1fr);
+                gap: 10px;
+              }
+              .print-item {
+                padding: 9px;
+                border: 1px solid #ddd;
+                border-radius: 9px;
+                display: flex;
+                gap: 10px;
+              }
+              .print-item img,
+              .print-placeholder {
+                width: 62px;
+                height: 62px;
+                flex-shrink: 0;
+                border-radius: 7px;
+                object-fit: contain;
+                background: #f3f4f6;
+              }
+              .print-placeholder {
+                color: #777;
+                font-size: 9px;
+                display: grid;
+                place-items: center;
+              }
+              .print-item strong,
+              .print-item span { display: block; }
+              .print-item strong { margin-bottom: 5px; font-size: 12px; }
+              .print-item span { margin-top: 2px; color: #555; font-size: 10px; }
+              @media print {
+                body { padding: 0; }
+                .print-order { break-inside: avoid; }
+              }
+            </style>
+          </head>
+          <body>
+            <header class="print-logo">
+              <h1>PROSIX SPORTS</h1>
+              <p>TeamStore Orders Production Sheet</p>
+            </header>
+            ${rows}
+          </body>
+        </html>
+      `)
+
+      printWindow.document.close()
+      printWindow.focus()
+
+      setTimeout(() => {
+        printWindow.print()
+      }, 450)
     },
 
     async openOrder(order) {
@@ -787,16 +1079,42 @@ export default {
       )
     },
 
-    itemCategory(item) {
-      return (
+    itemCategoryData(item) {
+      const nestedCategory =
+        item?.category && typeof item.category === 'object'
+          ? item.category
+          : null
+
+      const id =
+        item?.category_id ||
+        nestedCategory?.id ||
+        item?.product_category_id ||
+        null
+
+      const name =
         item?.category_name ||
-        item?.category ||
+        nestedCategory?.name ||
         item?.product_category ||
         item?.store_name ||
         item?.team_name ||
         item?.collection_name ||
         'Other'
-      )
+
+      const image =
+        item?.category_icon_image ||
+        nestedCategory?.icon_image ||
+        item?.category_image ||
+        ''
+
+      return {
+        id: id ? Number(id) : null,
+        name: String(name || 'Other'),
+        image
+      }
+    },
+
+    itemCategory(item) {
+      return this.itemCategoryData(item).name
     },
 
     orderCategories(order) {
@@ -1230,6 +1548,58 @@ export default {
 .panel-header {
   padding: 17px 20px;
   border-bottom: 1px solid #e5e7eb;
+}
+
+.bulk-actions {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  flex-wrap: wrap;
+}
+
+.bulk-actions > span {
+  color: #4b5563;
+  font-size: 10px;
+  font-weight: 800;
+}
+
+.select-visible-button,
+.print-selected-button {
+  height: 36px;
+  padding: 0 12px;
+  border-radius: 9px;
+  font-size: 10px;
+  font-weight: 800;
+  cursor: pointer;
+}
+
+.select-visible-button {
+  border: 1px solid #d9dde5;
+  background: #ffffff;
+  color: #111827;
+}
+
+.print-selected-button {
+  border: 1px solid #111827;
+  background: #111827;
+  color: #ffffff;
+}
+
+.print-selected-button:disabled {
+  cursor: not-allowed;
+  opacity: .45;
+}
+
+.check-column {
+  width: 42px;
+  text-align: center !important;
+}
+
+.check-column input {
+  width: 16px;
+  height: 16px;
+  cursor: pointer;
+  accent-color: #111827;
 }
 
 .table-wrap {
