@@ -1,5 +1,9 @@
 <template>
-  <div class="factory-board-page" @click="closeAllMenus">
+  <div
+    class="factory-board-page"
+    :class="`theme-${boardTheme}`"
+    @click="closeAllMenus"
+  >
     <!-- TOP BRAND / PROFILE -->
     <header class="board-brand-header">
       <div class="board-brand-mark">
@@ -40,15 +44,18 @@
         type="button"
         class="summary-home-card"
         :class="{ active: activeGroup === 'all' }"
-        @click="activeGroup = 'all'"
+        @click="
+          activeGroup = 'all';
+          activeSectionCollapsed = false
+        "
       >
         <span class="summary-home-icon">
           <i class="fa-solid fa-house"></i>
         </span>
 
         <span>
-          <small>Total Orders</small>
-          <strong>{{ orders.length }}</strong>
+          <small>To Open</small>
+          <strong>{{ unreadOrdersCount }}</strong>
         </span>
       </button>
 
@@ -63,7 +70,10 @@
             class="workflow-tab"
             :class="{ active: activeGroup === group.key }"
             :style="{ '--group-color': group.color }"
-            @click="activeGroup = group.key"
+            @click="
+              activeGroup = group.key;
+              activeSectionCollapsed = false
+            "
           >
             <span class="workflow-tab-label">{{ group.label }}</span>
             <strong>{{ countForGroup(group.key) }}</strong>
@@ -121,29 +131,82 @@
         </button>
       </div>
 
-      <div class="board-search">
-        <i class="fa-solid fa-magnifying-glass"></i>
+      <div class="board-toolbar-actions">
+        <button
+          type="button"
+          class="theme-toggle-button"
+          :title="boardTheme === 'light' ? 'Switch to dark mode' : 'Switch to light mode'"
+          @click.stop="toggleBoardTheme"
+        >
+          <i
+            :class="boardTheme === 'light'
+              ? 'fa-solid fa-moon'
+              : 'fa-solid fa-sun'"
+          ></i>
+
+          <span>
+            {{ boardTheme === 'light' ? 'Dark' : 'Light' }}
+          </span>
+        </button>
+
+        <div class="board-search">
+          <i class="fa-solid fa-magnifying-glass"></i>
         <input
           v-model="searchOrder"
           type="text"
           placeholder="Search orders..."
           @click.stop
         />
+        </div>
       </div>
     </section>
 
     <!-- BOARD -->
     <main class="factory-board">
-      <section class="board-section-heading">
+      <section
+        class="board-section-heading collapsible-active-heading"
+        :class="{ collapsed: activeSectionCollapsed }"
+        @click="activeSectionCollapsed = !activeSectionCollapsed"
+      >
         <div>
+          <i
+            class="fa-solid section-collapse-icon"
+            :class="
+              activeSectionCollapsed
+                ? 'fa-chevron-right'
+                : 'fa-chevron-down'
+            "
+          ></i>
+
           <h1>{{ activeBoardGroup.label }}</h1>
-          <span>TOTAL {{ filteredOrders.length }} ORDER</span>
+
+          <span>
+            {{ unreadOrdersCount }} TO OPEN
+            · {{ filteredOrders.length }} TOTAL
+          </span>
         </div>
 
-        <button type="button" class="board-print-button" title="Print" @click="printVisibleOrders">
-          <i class="fa-solid fa-print"></i>
-          <small>PRINT</small>
-        </button>
+        <div class="board-heading-actions" @click.stop>
+          <button
+            v-if="canCreateOrder"
+            type="button"
+            class="board-top-add-button"
+            @click="startInlineOrder"
+          >
+            <i class="fa-solid fa-plus"></i>
+            Add Order
+          </button>
+
+          <button
+            type="button"
+            class="board-print-button"
+            title="Print"
+            @click="printVisibleOrders"
+          >
+            <i class="fa-solid fa-print"></i>
+            <small>PRINT</small>
+          </button>
+        </div>
       </section>
 
 
@@ -169,7 +232,7 @@
         <button
           v-if="hasFullOrderAccess || currentUser?.can_create_orders === true"
           type="button"
-          @click="openBulkClientsPrompt"
+          @click="openBulkClientsModal"
         >
           <i class="fa-solid fa-user-tie"></i>
           Add Client
@@ -182,14 +245,6 @@
         >
           <i class="fa-solid fa-copy"></i>
           Duplicate
-        </button>
-
-        <button
-          type="button"
-          @click="printSelectedOrders"
-        >
-          <i class="fa-solid fa-print"></i>
-          Print
         </button>
 
         <button
@@ -212,7 +267,10 @@
         </button>
       </section>
 
-      <section class="board-table-shell">
+      <section
+        v-show="!activeSectionCollapsed"
+        class="board-table-shell"
+      >
         <div class="board-table-head">
           <div class="board-col board-col-check">
             <input
@@ -237,6 +295,46 @@
           </div>
         </div>
 
+        <!-- INLINE ADD ORDER -->
+        <div v-if="canCreateOrder && inlineAddOpen" class="board-inline-add-row board-inline-add-top">
+          <div class="board-col board-col-check"></div>
+
+          <div class="board-col board-inline-add-main">
+            <template v-if="inlineAddOpen">
+              <input
+                ref="inlineOrderInput"
+                v-model="inlineOrderName"
+                type="text"
+                placeholder="WRITE ORDER NAME AND PRESS ENTER"
+                @keyup.enter="createInlineOrder"
+                @keyup.esc="cancelInlineOrder"
+              />
+
+              <button
+                type="button"
+                class="inline-save-button"
+                :disabled="inlineOrderSaving || !inlineOrderName.trim()"
+                @click="createInlineOrder"
+              >
+                <i
+                  :class="inlineOrderSaving
+                    ? 'fa-solid fa-spinner fa-spin'
+                    : 'fa-solid fa-check'"
+                ></i>
+              </button>
+
+              <button
+                type="button"
+                class="inline-cancel-button"
+                @click="cancelInlineOrder"
+              >
+                <i class="fa-solid fa-xmark"></i>
+              </button>
+            </template>
+          </div>
+        </div>
+
+
         <div v-if="loadingOrders" class="board-empty-state">
           <i class="fa-solid fa-spinner fa-spin"></i>
           Loading orders...
@@ -252,6 +350,7 @@
           class="board-table-row"
           :class="{
             unread: !order.user_has_seen,
+            opened: order.user_has_seen,
             selected: selectedOrders.includes(order.id)
           }"
           @click="openBoardOrder(order)"
@@ -310,21 +409,61 @@
                   <small>working</small>
                 </span>
               </button>
+
+              <div class="order-working-actions">
+                <button
+                  v-if="!workingDesigner(order)"
+                  type="button"
+                  class="start-working-btn"
+                  @click.stop="startWorking(order)"
+                >
+                  <i class="fa-solid fa-play"></i>
+                  Start Working
+                </button>
+
+                <button
+                  v-else-if="Number(workingDesigner(order)?.id) === Number(currentUser?.id)"
+                  type="button"
+                  class="stop-working-btn"
+                  @click.stop="stopWorking(order)"
+                >
+                  <i class="fa-solid fa-stop"></i>
+                  Stop Working
+                </button>
+
+                <span
+                  v-else
+                  class="busy-working-label"
+                >
+                  <i class="fa-solid fa-user-lock"></i>
+                  Busy
+                </span>
+              </div>
             </div>
           </div>
 
           <div class="board-col board-col-status">
             <select
               class="board-inline-select board-status-pill"
-              :style="{ background: order.statusColor }"
+              :style="{
+                background: order.statusColor,
+                color: readableTextColor(order.statusColor)
+              }"
               :value="order.status"
               @click.stop
-              @change="inlineChangeStatus(order, $event.target.value)"
+              @change="
+                inlineChangeStatus(order, $event.target.value);
+                $event.target.blur()
+              "
             >
               <option
                 v-for="status in statusOptions"
                 :key="status.label"
                 :value="status.label"
+                :style="{
+                  backgroundColor: status.color,
+                  color: readableTextColor(status.color)
+                }"
               >
                 {{ status.label }}
               </option>
@@ -487,61 +626,13 @@
             <button
               type="button"
               title="Order details"
-              @click.stop="openBoardOrder(order)"
+              @click.stop="openOrderInfo(order)"
             >
               <i class="fa-regular fa-circle-question"></i>
             </button>
           </div>
         </div>
 
-        <!-- INLINE ADD ORDER -->
-        <div v-if="canCreateOrder" class="board-inline-add-row">
-          <div class="board-col board-col-check"></div>
-
-          <div class="board-col board-inline-add-main">
-            <template v-if="inlineAddOpen">
-              <input
-                ref="inlineOrderInput"
-                v-model="inlineOrderName"
-                type="text"
-                placeholder="WRITE ORDER NAME AND PRESS ENTER"
-                @keyup.enter="createInlineOrder"
-                @keyup.esc="cancelInlineOrder"
-              />
-
-              <button
-                type="button"
-                class="inline-save-button"
-                :disabled="inlineOrderSaving || !inlineOrderName.trim()"
-                @click="createInlineOrder"
-              >
-                <i
-                  :class="inlineOrderSaving
-                    ? 'fa-solid fa-spinner fa-spin'
-                    : 'fa-solid fa-check'"
-                ></i>
-              </button>
-
-              <button
-                type="button"
-                class="inline-cancel-button"
-                @click="cancelInlineOrder"
-              >
-                <i class="fa-solid fa-xmark"></i>
-              </button>
-            </template>
-
-            <button
-              v-else
-              type="button"
-              class="board-add-order-button"
-              @click="startInlineOrder"
-            >
-              <i class="fa-solid fa-plus"></i>
-              ADD NEW ORDER
-            </button>
-          </div>
-        </div>
       </section>
 
       <!-- COLLAPSED STATUS BARS -->
@@ -552,7 +643,10 @@
           type="button"
           class="collapsed-status-bar"
           :style="{ '--group-color': group.color }"
-          @click="activeGroup = group.key"
+          @click="
+            activeGroup = group.key;
+            activeSectionCollapsed = false
+          "
         >
           <strong>{{ group.label }}</strong>
           <span>TOTAL {{ countForGroup(group.key) }} ORDER</span>
@@ -562,10 +656,10 @@
 
     <!-- RIGHT PANEL -->
     <div v-if="selectedOrder && detailOpen" class="board-detail-overlay" @click.self="closeBoardDetail">
-      <div class="orders-right board-detail-panel view-only-detail">
+      <div class="orders-right board-detail-panel clean-detail-panel">
 
       <!-- HEADER -->
-      <div class="detail-header">
+      <div class="detail-header clean-detail-header">
         <button
           type="button"
           class="board-detail-back"
@@ -576,69 +670,80 @@
           <span>Back to Orders</span>
         </button>
 
-        <button
-          type="button"
-          class="board-detail-close"
-          title="Close order details"
-          @click.stop="closeBoardDetail"
+        <div
+          v-if="selectedOrder"
+          class="clean-detail-order-name"
         >
-          <i class="fa-solid fa-xmark"></i>
+          <i class="fa-solid fa-folder-open"></i>
+
+          <div>
+            <small>Order</small>
+            <strong>{{ selectedOrder.name }}</strong>
+          </div>
+        </div>
+
+        <button
+          v-if="!isClient"
+          type="button"
+          class="clean-detail-chat-button"
+          :class="{ active: showChat }"
+          @click.stop="toggleChat"
+        >
+          <i class="fa-solid fa-comments"></i>
+          <span>Chat</span>
+
+          <strong v-if="unreadChatCount > 0">
+            {{ unreadChatCount }}
+          </strong>
         </button>
-        <div class="header-left-p">
-          <img src="/public/assets/images/P LOGO WHITE.png" alt="Prosix P" class="left-p-logo" />
-        </div>
-        <div class="header-center-logo">
-          <img src="/public/assets/images/PROSIX SPORTS LOGO PNG WHITE.png" alt="Prosix" class="prosix-main-logo" />
-        </div>
-        <div class="header-right-icons">
-<button
-    v-if="!isClient"
-    class="header-icon-btn"
-    @click.stop="toggleChat"
-    :class="{ active: showChat }">
-                <i class="fa-solid fa-comments"></i>
-            <span v-if="unreadChatCount > 0" class="chat-badge">{{ unreadChatCount }}</span>
+
+        <div
+          v-if="selectedOrder"
+          class="detail-pipeline-strip"
+        >
+          <span class="detail-pipeline-label">
+            Pipeline
+          </span>
+
+          <button
+            v-for="group in boardGroups"
+            :key="group.key"
+            type="button"
+            class="detail-pipeline-step"
+            :class="{
+              active:
+                selectedOrder.group === group.key ||
+                (
+                  group.key === 'delivered' &&
+                  String(
+                    selectedOrder.status || ''
+                  ).toLowerCase() === 'delivered'
+                )
+            }"
+            :style="{
+              '--pipeline-color': group.color,
+              background:
+                (
+                  selectedOrder.group === group.key ||
+                  (
+                    group.key === 'delivered' &&
+                    String(
+                      selectedOrder.status || ''
+                    ).toLowerCase() === 'delivered'
+                  )
+                )
+                  ? group.color
+                  : 'rgba(255,255,255,.08)'
+            }"
+            @click.stop="moveSelectedOrderToPipeline(group)"
+          >
+            <span
+              :style="{ background: group.color }"
+            ></span>
+
+            {{ group.label }}
           </button>
-          <button class="user-avatar-top" type="button" title="Open profile" @click.stop="openProfile(currentUser)">
-            <img v-if="userPhoto" :src="userPhoto" class="avatar-img" />
-            <span v-else>{{ userInitial }}</span>
-          </button>
         </div>
- <div v-if="selectedOrder" class="current-order-title">
-  <i class="fa-solid fa-folder-open"></i>
-  <span>{{ selectedOrder.name }}</span>
-</div>
-
-<div
-  v-if="selectedOrder"
-  class="detail-pipeline-strip"
->
-  <span class="detail-pipeline-label">Pipeline</span>
-
-  <button
-    v-for="group in boardGroups"
-    :key="group.key"
-    type="button"
-    class="detail-pipeline-step"
-    :class="{
-      active:
-        selectedOrder.group === group.key ||
-        (
-          group.key === 'delivered' &&
-          String(selectedOrder.status || '').toLowerCase() === 'delivered'
-        )
-    }"
-    :style="{ '--pipeline-color': group.color }"
-    @click.stop="moveSelectedOrderToPipeline(group)"
-  >
-    <span></span>
-    {{ group.label }}
-  </button>
-</div>
-
-
-
-
       </div>
 
  <!-- INFO BAR -->
@@ -833,7 +938,7 @@
               <div class="payment-read-row balance-row">
                 <span>Balance</span><strong>${{ selectedOrder.paymentBalance || 0 }}</strong>
               </div>
-<div v-if="hasFullOrderAccess || currentUser?.can_create_orders === true" class="payment-admin-editor">
+<div v-if="canEditWorkflowFields" class="payment-admin-editor">
                     <div class="payment-field">
                   <label class="payment-label">Paid %</label>
                   <div class="payment-percent-row">
@@ -968,6 +1073,464 @@
       </div>
 
 
+
+
+    <!-- PROFILE SETTINGS MODAL -->
+    <div
+      v-if="profileModal"
+      class="profile-settings-overlay"
+      @click.self="closeProfile"
+    >
+      <div class="profile-settings-modal">
+        <button
+          type="button"
+          class="profile-settings-close"
+          @click="closeProfile"
+        >
+          <i class="fa-solid fa-xmark"></i>
+        </button>
+
+        <div class="profile-settings-heading">
+          <h3>Profile Settings</h3>
+          <p>Update your photo and personal details.</p>
+        </div>
+
+        <div class="profile-settings-photo-section">
+          <label class="profile-photo-circle">
+            <img
+              v-if="profileForm.preview"
+              :src="profileForm.preview"
+              alt="Profile"
+            />
+
+            <span v-else>
+              {{ initial(profileForm.name || profileUser?.name || 'U') }}
+            </span>
+
+            <input
+              v-if="isOwnProfile(profileUser)"
+              type="file"
+              accept="image/*"
+              @change="onProfilePhotoChange"
+            />
+
+            <i
+              v-if="isOwnProfile(profileUser)"
+              class="fa-solid fa-camera"
+            ></i>
+          </label>
+
+          <small v-if="isOwnProfile(profileUser)">
+            Click photo to change
+          </small>
+        </div>
+
+        <div class="profile-settings-field">
+          <label>Name</label>
+
+          <input
+            v-model="profileForm.name"
+            type="text"
+            :readonly="!isOwnProfile(profileUser)"
+          />
+        </div>
+
+        <div class="profile-settings-field">
+          <label>About</label>
+
+          <textarea
+            v-model="profileForm.about"
+            rows="4"
+            :readonly="!isOwnProfile(profileUser)"
+            placeholder="Write something about yourself..."
+          ></textarea>
+        </div>
+
+        <div class="profile-settings-actions">
+          <button
+            type="button"
+            class="profile-settings-cancel"
+            @click="closeProfile"
+          >
+            Cancel
+          </button>
+
+          <button
+            v-if="isOwnProfile(profileUser)"
+            type="button"
+            class="profile-settings-save"
+            @click="saveProfile"
+          >
+            <i class="fa-solid fa-floppy-disk"></i>
+            Save Changes
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- MEMBER SELECTION MODAL -->
+    <div
+      v-if="bulkMembersModal"
+      class="member-select-overlay"
+      @click.self="closeBulkMembersModal"
+    >
+      <div class="member-select-modal">
+        <div class="member-select-header">
+          <div>
+            <h3>Add Members</h3>
+            <p>
+              Apply members to
+              {{ selectedOrders.length }}
+              selected order(s)
+            </p>
+          </div>
+
+          <button
+            type="button"
+            @click="closeBulkMembersModal"
+          >
+            <i class="fa-solid fa-xmark"></i>
+          </button>
+        </div>
+
+        <div class="member-select-toolbar">
+          <button
+            type="button"
+            @click="selectAllAvailableMembers"
+          >
+            <i class="fa-solid fa-users"></i>
+            {{
+              bulkSelectedMembers.length === availableMembers.length &&
+              availableMembers.length
+                ? 'Clear All'
+                : 'Select All Members'
+            }}
+          </button>
+
+          <span>
+            {{ bulkSelectedMembers.length }}
+            selected
+          </span>
+        </div>
+
+        <Multiselect
+          v-model="bulkSelectedMembers"
+          :options="availableMembers"
+          :multiple="true"
+          :close-on-select="false"
+          :clear-on-select="false"
+          :preserve-search="true"
+          label="name"
+          track-by="id"
+          placeholder="Search and select members"
+          class="member-multiselect"
+        >
+          <template #option="{ option }">
+            <div class="member-option-row">
+              <div class="member-option-avatar">
+                <img
+                  v-if="option.profile_photo_url"
+                  :src="option.profile_photo_url"
+                  alt=""
+                />
+
+                <span v-else>
+                  {{ initial(option.name) }}
+                </span>
+              </div>
+
+              <div>
+                <strong>{{ option.name }}</strong>
+                <small>{{ option.email || option.role }}</small>
+              </div>
+            </div>
+          </template>
+
+          <template #tag="{ option, remove }">
+            <span class="member-selected-tag">
+              {{ option.name }}
+
+              <button
+                type="button"
+                @click.stop="remove(option)"
+              >
+                ×
+              </button>
+            </span>
+          </template>
+        </Multiselect>
+
+        <div class="member-selected-preview">
+          <div
+            v-for="member in bulkSelectedMembers"
+            :key="member.id"
+            class="member-preview-chip"
+          >
+            <img
+              v-if="member.profile_photo_url"
+              :src="member.profile_photo_url"
+              alt=""
+            />
+
+            <span v-else>
+              {{ initial(member.name) }}
+            </span>
+
+            <strong>{{ member.name }}</strong>
+          </div>
+        </div>
+
+        <div class="member-select-footer">
+          <button
+            type="button"
+            class="member-cancel-button"
+            @click="closeBulkMembersModal"
+          >
+            Cancel
+          </button>
+
+          <button
+            type="button"
+            class="member-save-button"
+            :disabled="bulkSaving"
+            @click="bulkUpdateMembers"
+          >
+            <i
+              :class="
+                bulkSaving
+                  ? 'fa-solid fa-spinner fa-spin'
+                  : 'fa-solid fa-check'
+              "
+            ></i>
+
+            {{
+              bulkSaving
+                ? 'Saving...'
+                : 'Apply Members'
+            }}
+          </button>
+        </div>
+      </div>
+    </div>
+
+
+    <!-- CLIENT SELECTION MODAL -->
+    <div
+      v-if="bulkClientsModal"
+      class="member-select-overlay"
+      @click.self="closeBulkClientsModal"
+    >
+      <div class="member-select-modal">
+        <div class="member-select-header">
+          <div>
+            <h3>Add Clients</h3>
+            <p>
+              Apply clients to
+              {{ selectedOrders.length }}
+              selected order(s)
+            </p>
+          </div>
+
+          <button
+            type="button"
+            @click="closeBulkClientsModal"
+          >
+            <i class="fa-solid fa-xmark"></i>
+          </button>
+        </div>
+
+        <div class="member-select-toolbar">
+          <button
+            type="button"
+            @click="selectAllAvailableClients"
+          >
+            <i class="fa-solid fa-user-tie"></i>
+            {{
+              bulkSelectedClients.length === availableClients.length &&
+              availableClients.length
+                ? 'Clear All'
+                : 'Select All Clients'
+            }}
+          </button>
+
+          <span>
+            {{ bulkSelectedClients.length }}
+            selected
+          </span>
+        </div>
+
+        <Multiselect
+          v-model="bulkSelectedClients"
+          :options="availableClients"
+          :multiple="true"
+          :close-on-select="false"
+          :clear-on-select="false"
+          :preserve-search="true"
+          label="name"
+          track-by="id"
+          placeholder="Search and select clients"
+          class="member-multiselect"
+        >
+          <template #option="{ option }">
+            <div class="member-option-row">
+              <div class="member-option-avatar client-avatar">
+                <i class="fa-solid fa-user-tie"></i>
+              </div>
+
+              <div>
+                <strong>{{ option.name }}</strong>
+                <small>
+                  {{ option.company || option.email || 'Client' }}
+                </small>
+              </div>
+            </div>
+          </template>
+
+          <template #tag="{ option, remove }">
+            <span class="member-selected-tag">
+              {{ option.name }}
+
+              <button
+                type="button"
+                @click.stop="remove(option)"
+              >
+                ×
+              </button>
+            </span>
+          </template>
+        </Multiselect>
+
+        <div class="member-selected-preview">
+          <div
+            v-for="client in bulkSelectedClients"
+            :key="client.id"
+            class="member-preview-chip"
+          >
+            <span class="client-preview-icon">
+              <i class="fa-solid fa-user-tie"></i>
+            </span>
+
+            <strong>{{ client.name }}</strong>
+          </div>
+        </div>
+
+        <div class="member-select-footer">
+          <button
+            type="button"
+            class="member-cancel-button"
+            @click="closeBulkClientsModal"
+          >
+            Cancel
+          </button>
+
+          <button
+            type="button"
+            class="member-save-button"
+            :disabled="bulkClientSaving"
+            @click="bulkUpdateClients"
+          >
+            <i
+              :class="
+                bulkClientSaving
+                  ? 'fa-solid fa-spinner fa-spin'
+                  : 'fa-solid fa-check'
+              "
+            ></i>
+
+            {{
+              bulkClientSaving
+                ? 'Saving...'
+                : 'Apply Clients'
+            }}
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- VIEWED BY MODAL -->
+    <div
+      v-if="orderInfoModal"
+      class="viewed-modal-overlay"
+      @click.self="closeOrderInfo"
+    >
+      <div class="viewed-modal">
+        <div class="viewed-modal-header">
+          <div>
+            <h3>Order View History</h3>
+            <p>{{ infoOrder?.name || 'Order' }}</p>
+          </div>
+
+          <button
+            type="button"
+            @click="closeOrderInfo"
+          >
+            <i class="fa-solid fa-xmark"></i>
+          </button>
+        </div>
+
+        <div
+          v-if="orderReadInfo.length === 0"
+          class="viewed-empty"
+        >
+          No member has opened this order yet.
+        </div>
+
+        <div
+          v-for="read in orderReadInfo"
+          :key="read.id || read.user_id"
+          class="viewed-person-row"
+        >
+          <div class="viewed-avatar">
+            <img
+              v-if="read.user?.profile_photo_url || read.profile_photo_url"
+              :src="read.user?.profile_photo_url || read.profile_photo_url"
+              alt=""
+            />
+
+            <span v-else>
+              {{ initial(read.user?.name || read.name || 'U') }}
+            </span>
+          </div>
+
+          <div class="viewed-person-info">
+            <strong>
+              {{ read.user?.name || read.name || 'Member' }}
+            </strong>
+
+            <small>
+              Opened: {{
+                formatReadDate(
+                  read.last_viewed_at ||
+                  read.read_at ||
+                  read.created_at
+                )
+              }}
+            </small>
+
+            <small v-if="read.views_count">
+              Views: {{ read.views_count }}
+            </small>
+          </div>
+
+          <span
+            v-if="
+              infoOrder &&
+              workingDesigner(infoOrder) &&
+              Number(
+                workingDesigner(infoOrder)?.id
+              ) === Number(
+                read.user_id ||
+                read.user?.id
+              )
+            "
+            class="currently-working-badge"
+          >
+            Working now
+          </span>
+        </div>
+      </div>
+    </div>
+
   </div>
 </template>
 
@@ -996,6 +1559,15 @@ export default {
       rowFileDragDepth: 0,
       claimedOrderIds: [],
       customBoardGroups: [],
+      newlyCreatedOrderIds: [],
+      activeSectionCollapsed: false,
+      boardTheme: localStorage.getItem('artwork_board_theme') || 'light',
+      persistentSeenOrderIds: JSON.parse(
+        localStorage.getItem('artwork_seen_order_ids') || '[]'
+      ).map(Number),
+      bulkClientsModal: false,
+      bulkSelectedClients: [],
+      bulkClientSaving: false,
       shippingAddressEdit: '',
       sidebarLightMode: false,
       leftWidth: 370,
@@ -1141,16 +1713,23 @@ activeTracking() {
   return this.currentUser?.role === 'client'
 },
  canEditNotes() {
-  if (!this.selectedOrder || !this.currentUser) return false
+  if (!this.selectedOrder || !this.currentUser) {
+    return false
+  }
 
-  if (this.hasFullOrderAccess) return true
-
-  return this.currentUser.can_create_orders === true
+  return this.hasFullOrderAccess
+    || this.currentUser?.can_create_orders === true
 },
 canUploadFiles() {
   return this.hasFullOrderAccess
     || this.currentUser?.can_create_orders === true
-    || this.isClient
+},
+canEditWorkflowFields() {
+  const role = this.currentUser?.role
+
+  return role === 'super_admin'
+    || role === 'admin'
+    || role === 'member'
 },
     currentUser() {
       try { return JSON.parse(localStorage.getItem('user')) || null } catch { return null }
@@ -1159,13 +1738,8 @@ canUploadFiles() {
     isAdmin() { return this.currentUser?.role === 'admin' },
     hasFullOrderAccess() { return this.isSuperAdmin || this.isAdmin },
    canCreateOrder() {
-  const role = this.currentUser?.role
-
-  return role === 'super_admin'
-    || role === 'admin'
-    || role === 'member'
+  return this.hasFullOrderAccess
     || this.currentUser?.can_create_orders === true
-    || this.isClient
 },
 
     userInitial() {
@@ -1212,6 +1786,25 @@ filteredOrders() {
       return groupMatch && searchMatch && clientMatch
     })
     .sort((a, b) => {
+      const aNewIndex = this.newlyCreatedOrderIds.indexOf(
+        Number(a.id)
+      )
+
+      const bNewIndex = this.newlyCreatedOrderIds.indexOf(
+        Number(b.id)
+      )
+
+      const aIsNew = aNewIndex !== -1
+      const bIsNew = bNewIndex !== -1
+
+      if (aIsNew !== bIsNew) {
+        return aIsNew ? -1 : 1
+      }
+
+      if (aIsNew && bIsNew && aNewIndex !== bNewIndex) {
+        return aNewIndex - bNewIndex
+      }
+
       const aUnread = Number(a.unread_chat_count || 0) > 0
       const bUnread = Number(b.unread_chat_count || 0) > 0
 
@@ -1248,6 +1841,39 @@ filteredOrders() {
       return {}
     }
   },
+
+
+watch: {
+  detailOpen(value) {
+    document.body.style.overflow = value
+      ? 'hidden'
+      : ''
+  },
+
+  orderInfoModal(value) {
+    if (value) {
+      document.body.style.overflow = 'hidden'
+    } else if (!this.detailOpen && !this.bulkMembersModal && !this.bulkClientsModal) {
+      document.body.style.overflow = ''
+    }
+  },
+
+  bulkMembersModal(value) {
+    if (value) {
+      document.body.style.overflow = 'hidden'
+    } else if (!this.detailOpen && !this.orderInfoModal && !this.bulkClientsModal) {
+      document.body.style.overflow = ''
+    }
+  },
+
+  bulkClientsModal(value) {
+    if (value) {
+      document.body.style.overflow = 'hidden'
+    } else if (!this.detailOpen && !this.orderInfoModal && !this.bulkMembersModal) {
+      document.body.style.overflow = ''
+    }
+  }
+},
 
 async mounted() {
   this.loadCustomStatuses()
@@ -1303,7 +1929,174 @@ beforeUnmount()  {
 
 
 
+
+
+
+  beforeUnmount() {
+    document.body.style.overflow = ''
+  },
+
+
  methods: {
+    toggleBoardTheme() {
+      this.boardTheme =
+        this.boardTheme === 'light'
+          ? 'dark'
+          : 'light'
+
+      localStorage.setItem(
+        'artwork_board_theme',
+        this.boardTheme
+      )
+    },
+
+    readableTextColor(color) {
+      const value = String(color || '')
+        .replace('#', '')
+        .trim()
+
+      if (!/^[0-9a-f]{6}$/i.test(value)) {
+        return '#111827'
+      }
+
+      const red = parseInt(value.slice(0, 2), 16)
+      const green = parseInt(value.slice(2, 4), 16)
+      const blue = parseInt(value.slice(4, 6), 16)
+
+      const luminance =
+        (0.299 * red) +
+        (0.587 * green) +
+        (0.114 * blue)
+
+      return luminance > 150
+        ? '#111827'
+        : '#ffffff'
+    },
+
+    openBulkClientsModal() {
+      if (!this.selectedOrders.length) {
+        return
+      }
+
+      this.bulkSelectedClients = []
+      this.bulkClientsModal = true
+    },
+
+    closeBulkClientsModal() {
+      this.bulkClientsModal = false
+      this.bulkSelectedClients = []
+      this.bulkClientSaving = false
+    },
+
+    selectAllAvailableClients() {
+      if (
+        this.bulkSelectedClients.length ===
+          this.availableClients.length &&
+        this.availableClients.length
+      ) {
+        this.bulkSelectedClients = []
+        return
+      }
+
+      this.bulkSelectedClients = [
+        ...this.availableClients
+      ]
+    },
+
+    async bulkUpdateClients() {
+      if (!this.selectedOrders.length) return
+
+      this.bulkClientSaving = true
+
+      try {
+        const clientIds =
+          this.bulkSelectedClients.map(
+            client => Number(client.id)
+          )
+
+        await Promise.all(
+          this.selectedOrders.map(orderId =>
+            axios.put(
+              `/api/orders/${orderId}`,
+              {
+                client_ids: clientIds
+              },
+              {
+                headers: this.headers()
+              }
+            )
+          )
+        )
+
+        await this.fetchOrders()
+        this.closeBulkClientsModal()
+      } catch (error) {
+        console.error(
+          'Bulk clients update error:',
+          error
+        )
+
+        alert(
+          error.response?.data?.message ||
+          'Clients could not be added.'
+        )
+      } finally {
+        this.bulkClientSaving = false
+      }
+    },
+
+    async startWorking(order) {
+      if (!order?.id) return
+
+      try {
+        const response = await axios.post(
+          `/api/orders/${order.id}/claim`,
+          {},
+          {
+            headers: this.headers()
+          }
+        )
+
+        order.working_by =
+          response.data?.working_by ||
+          response.data?.user ||
+          this.currentUser
+
+        await this.fetchOrders()
+      } catch (error) {
+        console.error('Start working error:', error)
+
+        alert(
+          error.response?.data?.message ||
+          'Working status could not be started.'
+        )
+      }
+    },
+
+    async stopWorking(order) {
+      if (!order?.id) return
+
+      try {
+        await axios.post(
+          `/api/orders/${order.id}/release`,
+          {},
+          {
+            headers: this.headers()
+          }
+        )
+
+        order.working_by = null
+        await this.fetchOrders()
+      } catch (error) {
+        console.error('Stop working error:', error)
+
+        alert(
+          error.response?.data?.message ||
+          'Working status could not be stopped.'
+        )
+      }
+    },
+
     workingDesigner(order) {
       const apiViewer =
         order?.working_by ||
@@ -1738,7 +2531,7 @@ beforeUnmount()  {
     },
 
     async saveDirectInlineField(order, field, value) {
-      if (!this.canCreateOrder) return
+      if (!this.canEditWorkflowFields) return
 
       try {
         await axios.put(
@@ -1778,6 +2571,8 @@ beforeUnmount()  {
     },
 
     async inlineChangeStatus(order, label) {
+      if (!this.canEditWorkflowFields) return
+
       const status = this.statusOptions.find(
         item => item.label === label
       )
@@ -1820,7 +2615,18 @@ beforeUnmount()  {
 
     openSingleOrderMembers(order) {
       this.selectedOrders = [order.id]
-      this.openBulkMembersModal()
+
+      const ownerIds = (order.owners || []).map(
+        owner => Number(owner.id)
+      )
+
+      this.bulkSelectedMembers =
+        this.availableMembers.filter(
+          member =>
+            ownerIds.includes(Number(member.id))
+        )
+
+      this.bulkMembersModal = true
     },
 
     openBulkClientsPrompt() {
@@ -1911,7 +2717,7 @@ beforeUnmount()  {
 
     printOrders(orders) {
       if (!orders.length) {
-        alert('No orders selected for print.')
+        alert('No orders available for print.')
         return
       }
 
@@ -1922,88 +2728,435 @@ beforeUnmount()  {
         return
       }
 
-      const rows = orders.map(order => `
-        <tr>
-          <td>${this.escapePrint(order.name || '')}</td>
-          <td>${this.escapePrint(order.po || 'N/A')}</td>
-          <td>${this.escapePrint(order.status || '')}</td>
-          <td>${this.escapePrint(
-            (order.owners || []).map(owner => owner.name).join(', ')
-          )}</td>
-          <td>${this.escapePrint(order.payment || '0 % Paid')}</td>
-          <td>${this.escapePrint(order.shippingAddress || '')}</td>
-          <td>${this.escapePrint(this.trackingSummary(order.trk))}</td>
-        </tr>
-      `).join('')
+      const generatedAt =
+        new Date().toLocaleString()
+
+      const isDarkPrint =
+        this.boardTheme === 'dark'
+
+      const printColors = isDarkPrint
+        ? {
+            page: '#111827',
+            surface: '#1f2937',
+            text: '#f9fafb',
+            muted: '#cbd5e1',
+            border: '#475569',
+            header: '#020617'
+          }
+        : {
+            page: '#ffffff',
+            surface: '#ffffff',
+            text: '#111827',
+            muted: '#6b7280',
+            border: '#cfd5dd',
+            header: '#111827'
+          }
+
+      const logoUrl =
+        `${window.location.origin}/public/assets/images/P LOGO BLACK.png`
+
+      const summaryCards = this.boardGroups
+        .map(group => {
+          const count = orders.filter(order => {
+            return (
+              order.group === group.key ||
+              (
+                group.key === 'delivered' &&
+                String(order.status || '')
+                  .toLowerCase() === 'delivered'
+              )
+            )
+          }).length
+
+          return `
+            <div class="summary-card">
+              <span
+                class="summary-line"
+                style="background:${group.color}"
+              ></span>
+
+              <div>
+                <small>${this.escapePrint(group.label)}</small>
+                <strong>${count}</strong>
+              </div>
+            </div>
+          `
+        })
+        .join('')
+
+      const rows = orders
+        .map((order, index) => {
+          const owners = (order.owners || [])
+            .map(owner => {
+              const photo = owner.profile_photo_url
+                ? `
+                    <img
+                      src="${this.escapePrint(owner.profile_photo_url)}"
+                      alt=""
+                    />
+                  `
+                : `
+                    <span class="owner-fallback">
+                      ${this.escapePrint(
+                        this.initial(owner.name || 'U')
+                      )}
+                    </span>
+                  `
+
+              return `
+                <div class="owner-item">
+                  ${photo}
+
+                  <span>
+                    ${this.escapePrint(owner.name || 'Member')}
+                  </span>
+                </div>
+              `
+            })
+            .join('')
+
+          return `
+            <tr>
+              <td class="number">
+                ${index + 1}
+              </td>
+
+              <td class="order-cell">
+                <strong>
+                  ${this.escapePrint(order.name || '')}
+                </strong>
+
+                <small>
+                  ${this.escapePrint(order.po || 'N/A')}
+                </small>
+              </td>
+
+              <td>
+                <span
+                  class="status"
+                  style="
+                    background:${order.statusColor || '#e5e7eb'};
+                    color:${this.readableTextColor(
+                      order.statusColor || '#e5e7eb'
+                    )};
+                  "
+                >
+                  ${this.escapePrint(order.status || '')}
+                </span>
+              </td>
+
+              <td class="owners-cell">
+                ${
+                  owners ||
+                  '<span class="unassigned">Unassigned</span>'
+                }
+              </td>
+            </tr>
+          `
+        })
+        .join('')
 
       printWindow.document.write(`
         <!DOCTYPE html>
         <html>
           <head>
+            <meta charset="UTF-8" />
+
             <title>Prosix Factory Orders</title>
+
             <style>
-              * { box-sizing: border-box; }
+              @page {
+                size: landscape;
+                margin: 10mm;
+              }
+
+              * {
+                box-sizing: border-box;
+              }
+
               body {
                 margin: 0;
-                padding: 24px;
-                color: #111;
-                font-family: Arial, sans-serif;
+                background: ${printColors.page};
+                color: ${printColors.text};
+                font-family: Arial, Helvetica, sans-serif;
               }
-              h1 {
-                margin: 0 0 4px;
-                font-size: 24px;
+
+              .report-header {
+                padding-bottom: 12px;
+                border-bottom: 3px solid ${printColors.text};
+                display: flex;
+                align-items: center;
+                justify-content: space-between;
+                gap: 20px;
               }
-              p {
-                margin: 0 0 20px;
-                color: #555;
+
+              .brand {
+                display: flex;
+                align-items: center;
+                gap: 12px;
+              }
+
+              .brand img {
+                width: 62px;
+                height: 62px;
+                object-fit: contain;
+              }
+
+              .brand-text h1 {
+                margin: 0;
+                font-size: 22px;
+                letter-spacing: .03em;
+              }
+
+              .brand-text p {
+                margin: 4px 0 0;
+                color: ${printColors.muted};
+                font-size: 9px;
+              }
+
+              .report-meta {
+                text-align: right;
+              }
+
+              .report-meta strong,
+              .report-meta small {
+                display: block;
+              }
+
+              .report-meta strong {
                 font-size: 12px;
               }
+
+              .report-meta small {
+                margin-top: 4px;
+                color: ${printColors.muted};
+                font-size: 8px;
+              }
+
+              .summary-grid {
+                margin: 12px 0;
+                display: grid;
+                grid-template-columns:
+                  repeat(auto-fit, minmax(115px, 1fr));
+                gap: 7px;
+              }
+
+              .summary-card {
+                min-height: 48px;
+                padding: 8px 10px;
+                border: 1px solid ${printColors.border};
+                border-radius: 7px;
+                background: ${printColors.surface};
+                display: flex;
+                align-items: center;
+                gap: 9px;
+              }
+
+              .summary-line {
+                width: 6px;
+                height: 31px;
+                border-radius: 999px;
+                flex-shrink: 0;
+              }
+
+              .summary-card small,
+              .summary-card strong {
+                display: block;
+              }
+
+              .summary-card small {
+                color: ${printColors.muted};
+                font-size: 7px;
+                font-weight: 800;
+                text-transform: uppercase;
+              }
+
+              .summary-card strong {
+                margin-top: 3px;
+                font-size: 16px;
+              }
+
               table {
                 width: 100%;
                 border-collapse: collapse;
+                table-layout: fixed;
               }
-              th, td {
-                padding: 9px;
-                border: 1px solid #bbb;
+
+              thead {
+                display: table-header-group;
+              }
+
+              tr {
+                page-break-inside: avoid;
+              }
+
+              th,
+              td {
+                padding: 7px 8px;
+                border: 1px solid ${printColors.border};
                 text-align: left;
-                font-size: 11px;
-                vertical-align: top;
+                vertical-align: middle;
+                font-size: 8px;
               }
+
               th {
-                background: #4a90e2;
-                color: #111;
+                background: ${printColors.header};
+                color: #ffffff;
+                font-size: 8px;
+                text-transform: uppercase;
+                letter-spacing: .04em;
               }
-              @media print {
-                body { padding: 0; }
+
+              .number {
+                width: 32px;
+                text-align: center;
+              }
+
+              .order-cell strong,
+              .order-cell small {
+                display: block;
+              }
+
+              .order-cell strong {
+                font-size: 9px;
+              }
+
+              .order-cell small {
+                margin-top: 3px;
+                color: ${printColors.muted};
+                font-size: 7px;
+              }
+
+              .status {
+                display: inline-block;
+                min-width: 78px;
+                padding: 5px 8px;
+                border-radius: 5px;
+                font-size: 7px;
+                font-weight: 900;
+                text-align: center;
+              }
+
+              .owners-cell {
+                display: flex;
+                flex-wrap: wrap;
+                align-items: center;
+                gap: 6px;
+              }
+
+              .owner-item {
+                min-width: 0;
+                padding: 3px 7px 3px 3px;
+                border: 1px solid ${printColors.border};
+                border-radius: 999px;
+                background: ${isDarkPrint ? '#111827' : '#f8fafc'};
+                display: inline-flex;
+                align-items: center;
+                gap: 5px;
+              }
+
+              .owner-item img,
+              .owner-fallback {
+                width: 23px;
+                height: 23px;
+                border-radius: 50%;
+                object-fit: cover;
+                flex-shrink: 0;
+              }
+
+              .owner-fallback {
+                background: ${printColors.header};
+                color: #ffffff;
+                display: grid;
+                place-items: center;
+                font-size: 7px;
+                font-weight: 900;
+              }
+
+              .owner-item > span:last-child {
+                overflow: hidden;
+                max-width: 105px;
+                font-size: 7px;
+                font-weight: 800;
+                text-overflow: ellipsis;
+                white-space: nowrap;
+              }
+
+              .unassigned {
+                color: #9ca3af;
+                font-size: 8px;
+              }
+
+              .report-footer {
+                margin-top: 10px;
+                padding-top: 7px;
+                border-top: 1px solid ${printColors.border};
+                color: ${printColors.muted};
+                font-size: 7px;
+                display: flex;
+                justify-content: space-between;
               }
             </style>
           </head>
+
           <body>
-            <h1>Prosix Factory Orders</h1>
-            <p>
-              ${this.escapePrint(this.activeBoardGroup.label)}
-              · Total ${orders.length} Orders
-            </p>
+            <header class="report-header">
+              <div class="brand">
+                <img
+                  src="${logoUrl}"
+                  alt="Prosix"
+                  onerror="this.style.display='none'"
+                />
+
+                <div class="brand-text">
+                  <h1>PROSIX SPORTS</h1>
+                  <p>Factory Order Management Overview</p>
+                </div>
+              </div>
+
+              <div class="report-meta">
+                <strong>
+                  ${this.escapePrint(this.activeBoardGroup.label)}
+                </strong>
+
+                <small>
+                  Generated: ${this.escapePrint(generatedAt)}
+                </small>
+
+                <small>
+                  Total Orders: ${orders.length}
+                </small>
+              </div>
+            </header>
+
+            <section class="summary-grid">
+              ${summaryCards}
+            </section>
 
             <table>
               <thead>
                 <tr>
-                  <th>Order Name</th>
-                  <th>PO #</th>
-                  <th>Status</th>
+                  <th style="width:32px">#</th>
+                  <th style="width:220px">Order Name</th>
+                  <th style="width:110px">Status</th>
                   <th>Owners</th>
-                  <th>Payment</th>
-                  <th>Address</th>
-                  <th>Tracking</th>
                 </tr>
               </thead>
-              <tbody>${rows}</tbody>
+
+              <tbody>
+                ${rows}
+              </tbody>
             </table>
+
+            <footer class="report-footer">
+              <span>Prosix Sports — Internal Order Report</span>
+              <span>${orders.length} order(s)</span>
+            </footer>
 
             <script>
               window.onload = function () {
-                window.print();
-              };
+                window.print()
+              }
             <\/script>
           </body>
         </html>
@@ -2111,39 +3264,29 @@ beforeUnmount()  {
         JSON.stringify(this.customBoardGroups)
       )
 
-      this.statusOptions.push({
+      const statusOption = {
         label: cleanLabel,
         color: group.color,
         group: key,
         groupLabel: cleanLabel,
         custom: true
-      })
+      }
 
-      this.saveCustomStatusOption(
-        this.statusOptions[
-          this.statusOptions.length - 1
-        ]
-      )
+      this.statusOptions.push(statusOption)
+      this.saveCustomStatusOption(statusOption)
 
       this.activeGroup = key
     },
 
     async openBoardOrder(order) {
-      await this.claimOrder(order)
       await this.selectOrder(order)
       this.detailOpen = true
     },
 
-    async closeBoardDetail() {
-      const openedOrder = this.selectedOrder
-
+    closeBoardDetail() {
       this.detailOpen = false
       this.showChat = false
       this.closeAllMenus()
-
-      if (openedOrder) {
-        await this.releaseOrder(openedOrder)
-      }
     },
 
     async openBoardChat(order) {
@@ -2188,7 +3331,16 @@ beforeUnmount()  {
       this.inlineOrderName = ''
 
       this.$nextTick(() => {
-        this.$refs.inlineOrderInput?.focus()
+        const input = this.$refs.inlineOrderInput
+
+        if (input) {
+          input.scrollIntoView({
+            behavior: 'smooth',
+            block: 'center'
+          })
+
+          input.focus()
+        }
       })
     },
 
@@ -2243,6 +3395,21 @@ beforeUnmount()  {
             headers: this.headers()
           }
         )
+
+        const createdId =
+          response.data?.order?.id ||
+          response.data?.id
+
+        if (
+          createdId &&
+          !this.newlyCreatedOrderIds.includes(
+            Number(createdId)
+          )
+        ) {
+          this.newlyCreatedOrderIds.unshift(
+            Number(createdId)
+          )
+        }
 
         this.cancelInlineOrder()
         await this.fetchOrders()
@@ -2357,6 +3524,21 @@ deleteCustomStatus(status) {
 clearBulkSelection() {
   this.selectedOrders = []
   this.selectAll = false
+},
+
+selectAllAvailableMembers() {
+  if (
+    this.bulkSelectedMembers.length ===
+      this.availableMembers.length &&
+    this.availableMembers.length
+  ) {
+    this.bulkSelectedMembers = []
+    return
+  }
+
+  this.bulkSelectedMembers = [
+    ...this.availableMembers
+  ]
 },
 
 openBulkMembersModal() {
@@ -2730,7 +3912,14 @@ openPreviewFile(file) {
       try {
         const res = await axios.post('/api/me/profile', form, { headers: { ...this.headers(), 'Content-Type': 'multipart/form-data' } })
         const user = res.data?.user
-        if (user) localStorage.setItem('user', JSON.stringify(user))
+
+        if (user) {
+          localStorage.setItem(
+            'user',
+            JSON.stringify(user)
+          )
+        }
+
         this.closeProfile()
         await this.fetchMembers()
         await this.fetchOrders()
@@ -2829,7 +4018,9 @@ async fetchClients() {
       const status = order.status || 'Pending'
       return {
         id: order.id,
-        user_has_seen: Boolean(order.user_has_seen),
+        user_has_seen:
+          Boolean(order.user_has_seen) ||
+          this.persistentSeenOrderIds.includes(Number(order.id)),
         read_at: order.read_at || null,
         read_info: order.read_info || [],
         group: this.statusToGroup(status),
@@ -2936,6 +4127,22 @@ this.activeTrackingIndex = 0
         const res = await axios.post(`/api/orders/${order.id}/mark-read`, {}, { headers: this.headers() })
         order.user_has_seen = true
         order.read_at = res.data?.read_at || new Date().toISOString()
+
+        if (
+          !this.persistentSeenOrderIds.includes(
+            Number(order.id)
+          )
+        ) {
+          this.persistentSeenOrderIds.push(
+            Number(order.id)
+          )
+
+          localStorage.setItem(
+            'artwork_seen_order_ids',
+            JSON.stringify(this.persistentSeenOrderIds)
+          )
+        }
+
         const idx = this.orders.findIndex(o => Number(o.id) === Number(order.id))
         if (idx !== -1) { this.orders[idx].user_has_seen = true; this.orders[idx].read_at = order.read_at }
       } catch (e) { console.error('markOrderRead error:', e) }
@@ -6664,6 +7871,1630 @@ grid-template-columns: 32px 1fr 118px 38px;
 .detail-pipeline-step.active {
   background: var(--pipeline-color);
   color: #111827;
+}
+
+
+/* TOP ACTIONS */
+.board-heading-actions {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.board-top-add-button {
+  min-height: 38px;
+  padding: 0 16px;
+  border: 0;
+  border-radius: 6px;
+  background: #111827;
+  color: #ffffff;
+  cursor: pointer;
+  font-size: 11px;
+  font-weight: 900;
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+}
+
+/* CLEAR COLUMN BOXES */
+.board-table-head .board-col,
+.board-table-row .board-col {
+  min-height: 100%;
+  border-right: 1px solid #d9dee7;
+  display: flex;
+  align-items: center;
+}
+
+.board-table-head .board-col:last-child,
+.board-table-row .board-col:last-child {
+  border-right: 0;
+}
+
+.board-col-status,
+.board-col-owner,
+.board-col-files,
+.board-col-packing,
+.board-col-chat,
+.board-col-payment,
+.board-col-address,
+.board-col-track,
+.board-col-info {
+  justify-content: center;
+}
+
+.board-col-name {
+  align-items: flex-start !important;
+}
+
+/* WORKING ACTIONS */
+.order-working-actions {
+  margin-top: 7px;
+}
+
+.start-working-btn,
+.stop-working-btn {
+  min-height: 25px;
+  padding: 0 8px;
+  border: 0;
+  border-radius: 999px;
+  cursor: pointer;
+  font-size: 8px;
+  font-weight: 900;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+}
+
+.start-working-btn {
+  background: #dcfce7;
+  color: #166534;
+}
+
+.stop-working-btn {
+  background: #fee2e2;
+  color: #991b1b;
+}
+
+.busy-working-label {
+  min-height: 25px;
+  padding: 0 8px;
+  border-radius: 999px;
+  background: #fff7ed;
+  color: #9a3412;
+  font-size: 8px;
+  font-weight: 900;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+}
+
+/* VIEW HISTORY MODAL */
+.viewed-modal-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 99999;
+  padding: 20px;
+  background: rgba(15, 23, 42, .68);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.viewed-modal {
+  width: min(520px, 100%);
+  max-height: 80vh;
+  overflow-y: auto;
+  border-radius: 14px;
+  background: #ffffff;
+  box-shadow: 0 30px 80px rgba(0,0,0,.3);
+}
+
+.viewed-modal-header {
+  position: sticky;
+  top: 0;
+  z-index: 3;
+  padding: 18px;
+  border-bottom: 1px solid #e5e7eb;
+  background: #ffffff;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.viewed-modal-header h3 {
+  margin: 0;
+  font-size: 18px;
+}
+
+.viewed-modal-header p {
+  margin: 4px 0 0;
+  color: #6b7280;
+  font-size: 11px;
+}
+
+.viewed-modal-header button {
+  width: 34px;
+  height: 34px;
+  border: 0;
+  border-radius: 8px;
+  background: #f3f4f6;
+  cursor: pointer;
+}
+
+.viewed-person-row {
+  padding: 13px 18px;
+  border-bottom: 1px solid #eef0f3;
+  display: flex;
+  align-items: center;
+  gap: 11px;
+}
+
+.viewed-avatar {
+  flex: 0 0 38px;
+  width: 38px;
+  height: 38px;
+  border-radius: 50%;
+  background: #111827;
+  color: #ffffff;
+  overflow: hidden;
+  display: grid;
+  place-items: center;
+  font-size: 12px;
+  font-weight: 900;
+}
+
+.viewed-avatar img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.viewed-person-info {
+  flex: 1;
+}
+
+.viewed-person-info strong,
+.viewed-person-info small {
+  display: block;
+}
+
+.viewed-person-info strong {
+  font-size: 12px;
+}
+
+.viewed-person-info small {
+  margin-top: 3px;
+  color: #6b7280;
+  font-size: 9px;
+}
+
+.currently-working-badge {
+  padding: 5px 8px;
+  border-radius: 999px;
+  background: #dcfce7;
+  color: #166534;
+  font-size: 8px;
+  font-weight: 900;
+}
+
+.viewed-empty {
+  padding: 40px 20px;
+  color: #6b7280;
+  text-align: center;
+  font-size: 12px;
+}
+
+/* CLEAN DETAIL HEADER */
+.board-detail-back {
+  top: 10px;
+  left: 10px;
+}
+
+.board-detail-close {
+  top: 10px;
+  right: 10px;
+}
+
+.detail-header {
+  padding-top: 48px;
+}
+
+.detail-pipeline-strip {
+  margin-top: 8px;
+}
+
+
+/* TOP INLINE ADD ROW */
+.board-inline-add-top {
+  min-height: 64px;
+  border-bottom: 1px solid #e5e7eb;
+  background: #f8fbff;
+}
+
+.board-inline-add-top .board-inline-add-main {
+  padding-left: 10px;
+}
+
+.board-inline-add-top input {
+  width: min(520px, 72vw);
+  height: 40px;
+  background: #ffffff;
+}
+
+/* SHORT GRAY PIPELINE SEPARATORS */
+.board-table-row .board-col {
+  position: relative;
+  border-right: 0 !important;
+}
+
+.board-table-row .board-col:not(:last-child)::after {
+  content: "";
+  position: absolute;
+  top: 50%;
+  right: 0;
+  width: 1px;
+  height: 42px;
+  background: #c9ced6;
+  transform: translateY(-50%);
+}
+
+.board-table-head .board-col {
+  border-right: 0 !important;
+}
+
+.board-table-row .board-col::before,
+.board-table-head .board-col::before {
+  display: none !important;
+  content: none !important;
+}
+
+.board-table-row .board-col-status::after,
+.board-table-row .board-col-owner::after,
+.board-table-row .board-col-files::after,
+.board-table-row .board-col-packing::after,
+.board-table-row .board-col-chat::after,
+.board-table-row .board-col-payment::after,
+.board-table-row .board-col-address::after,
+.board-table-row .board-col-track::after {
+  background: #bfc5ce;
+}
+
+/* MEMBER SELECT MODAL */
+.member-select-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 100000;
+  padding: 20px;
+  background: rgba(15, 23, 42, .7);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.member-select-modal {
+  width: min(620px, 100%);
+  max-height: 86vh;
+  overflow-y: auto;
+  border-radius: 16px;
+  background: #ffffff;
+  box-shadow: 0 30px 90px rgba(0, 0, 0, .35);
+}
+
+.member-select-header {
+  position: sticky;
+  top: 0;
+  z-index: 5;
+  padding: 18px 20px;
+  border-bottom: 1px solid #e5e7eb;
+  background: #ffffff;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.member-select-header h3 {
+  margin: 0;
+  color: #111827;
+  font-size: 19px;
+}
+
+.member-select-header p {
+  margin: 4px 0 0;
+  color: #6b7280;
+  font-size: 11px;
+}
+
+.member-select-header > button {
+  width: 35px;
+  height: 35px;
+  border: 0;
+  border-radius: 8px;
+  background: #f3f4f6;
+  cursor: pointer;
+}
+
+.member-select-toolbar {
+  padding: 14px 20px 10px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.member-select-toolbar button {
+  min-height: 34px;
+  padding: 0 12px;
+  border: 1px solid #d1d5db;
+  border-radius: 7px;
+  background: #ffffff;
+  color: #111827;
+  cursor: pointer;
+  font-size: 10px;
+  font-weight: 800;
+}
+
+.member-select-toolbar span {
+  color: #6b7280;
+  font-size: 10px;
+  font-weight: 800;
+}
+
+.member-multiselect {
+  margin: 0 20px;
+}
+
+.member-option-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.member-option-avatar,
+.member-preview-chip > img,
+.member-preview-chip > span {
+  width: 31px;
+  height: 31px;
+  border-radius: 50%;
+  background: #111827;
+  color: #ffffff;
+  object-fit: cover;
+  display: grid;
+  place-items: center;
+  font-size: 9px;
+  font-weight: 900;
+}
+
+.member-option-row strong,
+.member-option-row small {
+  display: block;
+}
+
+.member-option-row strong {
+  color: #111827;
+  font-size: 11px;
+}
+
+.member-option-row small {
+  margin-top: 2px;
+  color: #6b7280;
+  font-size: 9px;
+}
+
+.member-selected-tag {
+  margin: 2px;
+  padding: 4px 7px;
+  border-radius: 999px;
+  background: #111827;
+  color: #ffffff;
+  font-size: 9px;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+}
+
+.member-selected-tag button {
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: #ffffff;
+  cursor: pointer;
+}
+
+.member-selected-preview {
+  max-height: 190px;
+  margin: 14px 20px;
+  overflow-y: auto;
+  display: grid;
+  grid-template-columns: repeat(
+    auto-fill,
+    minmax(150px, 1fr)
+  );
+  gap: 8px;
+}
+
+.member-preview-chip {
+  min-width: 0;
+  padding: 7px;
+  border: 1px solid #e5e7eb;
+  border-radius: 9px;
+  display: flex;
+  align-items: center;
+  gap: 7px;
+}
+
+.member-preview-chip strong {
+  overflow: hidden;
+  color: #111827;
+  font-size: 9px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.member-select-footer {
+  position: sticky;
+  bottom: 0;
+  padding: 14px 20px;
+  border-top: 1px solid #e5e7eb;
+  background: #ffffff;
+  display: flex;
+  justify-content: flex-end;
+  gap: 9px;
+}
+
+.member-cancel-button,
+.member-save-button {
+  min-height: 38px;
+  padding: 0 15px;
+  border-radius: 7px;
+  cursor: pointer;
+  font-size: 10px;
+  font-weight: 900;
+}
+
+.member-cancel-button {
+  border: 1px solid #d1d5db;
+  background: #ffffff;
+  color: #111827;
+}
+
+.member-save-button {
+  border: 0;
+  background: #111827;
+  color: #ffffff;
+}
+
+
+/* PIPELINE HOVER CONTROLS FIX */
+.workflow-tabs {
+  overflow: visible !important;
+  padding-top: 34px !important;
+  margin-top: -34px;
+}
+
+.workflow-tab-wrap {
+  overflow: visible;
+}
+
+.workflow-custom-actions {
+  top: -32px !important;
+  left: 2px !important;
+  z-index: 200 !important;
+}
+
+.workflow-tab-wrap:hover {
+  z-index: 210;
+}
+
+/* CLIENT MODAL */
+.client-avatar,
+.client-preview-icon {
+  background: #eef2ff !important;
+  color: #3730a3 !important;
+}
+
+.client-preview-icon {
+  flex: 0 0 31px;
+  width: 31px;
+  height: 31px;
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+}
+
+/* CLEAN MODERN DETAIL VIEW */
+.board-detail-overlay {
+  padding: 18px !important;
+  background: rgba(15, 23, 42, .74) !important;
+  backdrop-filter: blur(6px);
+}
+
+.board-detail-panel {
+  width: min(1460px, calc(100vw - 36px)) !important;
+  height: calc(100vh - 36px) !important;
+  border: 1px solid rgba(255,255,255,.12);
+  border-radius: 18px !important;
+  background: #f5f7fb !important;
+  overflow: auto;
+}
+
+.view-only-detail .detail-header {
+  position: sticky;
+  top: 0;
+  z-index: 100;
+  min-height: 112px;
+  padding: 48px 20px 12px !important;
+  border-radius: 18px 18px 0 0 !important;
+  background:
+    linear-gradient(135deg, #191b34 0%, #302f5d 100%) !important;
+  box-shadow: 0 8px 28px rgba(20, 22, 45, .22);
+}
+
+.board-detail-back {
+  top: 12px !important;
+  left: 14px !important;
+  min-height: 34px;
+  background: rgba(255,255,255,.10) !important;
+  border-color: rgba(255,255,255,.22) !important;
+}
+
+.board-detail-close {
+  top: 12px !important;
+  right: 14px !important;
+}
+
+.current-order-title {
+  min-width: 0;
+  max-width: 360px;
+  height: 38px;
+  padding: 0 12px;
+  border: 1px solid rgba(255,255,255,.16);
+  border-radius: 9px;
+  background: rgba(255,255,255,.09);
+  display: inline-flex !important;
+  align-items: center;
+  gap: 8px;
+}
+
+.current-order-title span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.detail-pipeline-strip {
+  margin: 12px 0 0 !important;
+  padding: 9px 10px !important;
+  border: 1px solid rgba(255,255,255,.14) !important;
+  border-radius: 10px;
+  background: rgba(0,0,0,.16) !important;
+}
+
+.detail-pipeline-step {
+  min-height: 30px !important;
+  padding: 0 11px !important;
+  border-radius: 8px !important;
+}
+
+.detail-topbar-wrapper {
+  position: sticky;
+  top: 112px;
+  z-index: 80;
+  padding: 10px 14px 0;
+  background: #f5f7fb;
+}
+
+.detail-topbar {
+  border: 1px solid #e0e5ed !important;
+  border-radius: 11px;
+  background: #ffffff;
+  box-shadow: 0 5px 18px rgba(15, 23, 42, .05);
+}
+
+.detail-info-item {
+  min-height: 48px;
+  padding: 8px 12px !important;
+  border-right: 1px solid #e9edf2 !important;
+}
+
+.detail-body {
+  padding: 14px !important;
+  background: #f5f7fb;
+}
+
+.cards-grid {
+  grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+  gap: 14px !important;
+}
+
+.order-card {
+  overflow: hidden;
+  border: 1px solid #e2e7ee !important;
+  border-radius: 14px !important;
+  background: #ffffff !important;
+  box-shadow: 0 8px 24px rgba(15, 23, 42, .06) !important;
+}
+
+.card-preview-area {
+  min-height: 190px !important;
+  background:
+    linear-gradient(180deg, #fafbfc 0%, #f2f5f8 100%) !important;
+}
+
+.card-files-preview {
+  padding: 14px;
+  display: grid !important;
+  grid-template-columns: repeat(
+    auto-fill,
+    minmax(110px, 1fr)
+  );
+  gap: 10px;
+}
+
+.file-thumb {
+  min-height: 100px;
+  border: 1px solid #e2e7ee;
+  border-radius: 10px;
+  background: #ffffff;
+  overflow: hidden;
+}
+
+.file-img {
+  width: 100% !important;
+  height: 100px !important;
+  object-fit: cover !important;
+  cursor: zoom-in !important;
+}
+
+.card-footer-inner {
+  min-height: 48px;
+  padding: 8px 11px !important;
+  border-top: 1px solid #e7ebf0;
+  background: #ffffff;
+}
+
+.card-title {
+  font-size: 11px !important;
+  font-weight: 900 !important;
+}
+
+.card-view-btn {
+  min-height: 30px;
+  padding: 0 9px;
+  border: 1px solid #d8dee8 !important;
+  border-radius: 7px !important;
+  background: #ffffff !important;
+}
+
+.card-view-btn:hover {
+  border-color: #111827 !important;
+  background: #111827 !important;
+  color: #ffffff !important;
+}
+
+.card-notes-area {
+  min-height: 260px;
+  background: #ffffff;
+}
+
+.notes-header {
+  min-height: 44px;
+  padding: 0 13px !important;
+  background: #111827 !important;
+  color: #ffffff !important;
+}
+
+.notes-header .text-dark {
+  color: #ffffff !important;
+}
+
+.notes-textarea {
+  min-height: 165px !important;
+  padding: 14px !important;
+  border: 0 !important;
+  resize: vertical;
+}
+
+.notes-footer {
+  min-height: 46px;
+  padding: 8px 12px !important;
+  border-top: 1px solid #e7ebf0;
+  background: #f8fafc !important;
+}
+
+@media (max-width: 900px) {
+  .cards-grid {
+    grid-template-columns: 1fr !important;
+  }
+
+  .board-detail-overlay {
+    padding: 0 !important;
+  }
+
+  .board-detail-panel {
+    width: 100vw !important;
+    height: 100vh !important;
+    border-radius: 0 !important;
+  }
+}
+
+
+/* OPENED / UNOPENED ORDERS */
+.board-table-row.unread {
+  background: #fffdf5 !important;
+  box-shadow:
+    inset 5px 0 #f59e0b,
+    inset 0 0 0 1px rgba(245, 158, 11, .10);
+}
+
+.board-table-row.opened {
+  background: #f4fbf7 !important;
+  box-shadow:
+    inset 5px 0 #22c55e,
+    inset 0 0 0 1px rgba(34, 197, 94, .08);
+}
+
+.board-table-row.unread:hover {
+  background: #fff8e6 !important;
+}
+
+.board-table-row.opened:hover {
+  background: #eaf8ef !important;
+}
+
+.board-new-dot {
+  background: #f59e0b !important;
+}
+
+.board-table-row.opened .board-new-dot {
+  display: none;
+}
+
+/* CORRECT STATUS COLORS */
+.board-inline-select.board-status-pill {
+  border: 1px solid rgba(17, 24, 39, .18);
+  font-weight: 900;
+}
+
+.detail-pipeline-step.active {
+  border-color: var(--pipeline-color) !important;
+  background: var(--pipeline-color) !important;
+  color: #111827 !important;
+  box-shadow:
+    0 0 0 3px color-mix(
+      in srgb,
+      var(--pipeline-color),
+      transparent 72%
+    );
+}
+
+/* CLEAN DETAIL HEADER */
+.clean-detail-panel {
+  background: #f4f6fa !important;
+}
+
+.clean-detail-header {
+  position: sticky;
+  top: 0;
+  z-index: 110;
+  min-height: 118px;
+  padding: 16px 18px 14px 170px !important;
+  border-radius: 18px 18px 0 0 !important;
+  background:
+    linear-gradient(
+      135deg,
+      #171a31 0%,
+      #292852 100%
+    ) !important;
+  display: grid;
+  grid-template-columns:
+    minmax(220px, 1fr)
+    auto;
+  align-items: center;
+  gap: 12px;
+}
+
+.clean-detail-header .board-detail-back {
+  top: 17px !important;
+  left: 17px !important;
+}
+
+.clean-detail-order-name {
+  min-width: 0;
+  height: 48px;
+  padding: 0 14px;
+  border: 1px solid rgba(255,255,255,.16);
+  border-radius: 11px;
+  background: rgba(255,255,255,.08);
+  color: #ffffff;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.clean-detail-order-name > i {
+  font-size: 17px;
+}
+
+.clean-detail-order-name > div {
+  min-width: 0;
+}
+
+.clean-detail-order-name small,
+.clean-detail-order-name strong {
+  display: block;
+}
+
+.clean-detail-order-name small {
+  color: #b9bdd0;
+  font-size: 8px;
+  font-weight: 800;
+  text-transform: uppercase;
+}
+
+.clean-detail-order-name strong {
+  overflow: hidden;
+  margin-top: 2px;
+  font-size: 13px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.clean-detail-chat-button {
+  position: relative;
+  min-height: 42px;
+  padding: 0 14px;
+  border: 1px solid rgba(255,255,255,.18);
+  border-radius: 10px;
+  background: rgba(255,255,255,.09);
+  color: #ffffff;
+  cursor: pointer;
+  font-size: 10px;
+  font-weight: 900;
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+}
+
+.clean-detail-chat-button.active,
+.clean-detail-chat-button:hover {
+  background: #ffffff;
+  color: #171a31;
+}
+
+.clean-detail-chat-button strong {
+  min-width: 18px;
+  height: 18px;
+  padding: 0 4px;
+  border-radius: 999px;
+  background: #ef4444;
+  color: #ffffff;
+  font-size: 8px;
+  display: grid;
+  place-items: center;
+}
+
+.clean-detail-header .detail-pipeline-strip {
+  grid-column: 1 / -1;
+  margin: 0 !important;
+  padding: 8px !important;
+  border: 1px solid rgba(255,255,255,.13);
+  border-radius: 10px;
+  background: rgba(0,0,0,.14) !important;
+}
+
+/* REMOVE OLD DETAIL HEADER ELEMENTS */
+.clean-detail-panel .header-left-p,
+.clean-detail-panel .header-center-logo,
+.clean-detail-panel .header-right-icons,
+.clean-detail-panel .board-detail-close,
+.clean-detail-panel .user-avatar-top,
+.clean-detail-panel .current-order-title {
+  display: none !important;
+}
+
+/* NOTES / FILES PERMISSION LOOK */
+.clean-detail-panel .notes-textarea[readonly] {
+  background: #f8fafc !important;
+  color: #6b7280;
+  cursor: not-allowed;
+}
+
+.clean-detail-panel .card-add-btn {
+  display: inline-flex;
+}
+
+.clean-detail-panel .notes-save-btn {
+  display: inline-flex;
+}
+
+/* DETAIL BODY */
+.clean-detail-panel .detail-topbar-wrapper {
+  top: 118px !important;
+}
+
+.clean-detail-panel .detail-body {
+  padding: 16px !important;
+}
+
+.clean-detail-panel .order-card {
+  border-radius: 14px !important;
+  box-shadow:
+    0 8px 22px rgba(15, 23, 42, .06) !important;
+}
+
+/* SMALL PERMISSION NOTE */
+.permission-readonly-note {
+  color: #9ca3af;
+  font-size: 9px;
+}
+
+@media (max-width: 800px) {
+  .clean-detail-header {
+    padding: 58px 12px 12px !important;
+    grid-template-columns: 1fr auto;
+  }
+
+  .clean-detail-order-name {
+    min-width: 0;
+  }
+}
+
+
+/* FINAL OPENED / UNOPENED COLORS */
+.board-table-row.unread {
+  background: #f3f4f6 !important;
+  box-shadow: inset 4px 0 #9ca3af !important;
+}
+
+.board-table-row.unread:hover {
+  background: #e9edf2 !important;
+}
+
+.board-table-row.opened {
+  background: #ffffff !important;
+  box-shadow: inset 4px 0 #22c55e !important;
+}
+
+.board-table-row.opened:hover {
+  background: #f8fafc !important;
+}
+
+.board-table-row.unread .board-new-dot {
+  background: #9ca3af !important;
+}
+
+.board-table-row.opened .board-new-dot {
+  display: none !important;
+}
+
+/* DETAIL SCROLL: ONLY PANEL MOVES, PAGE BEHIND STAYS FIXED */
+.board-detail-overlay {
+  overflow: hidden !important;
+}
+
+.board-detail-panel {
+  overflow-y: auto !important;
+  overscroll-behavior: contain;
+}
+
+/* REMOVE DETAIL PIPELINE AREA */
+.clean-detail-header .detail-pipeline-strip,
+.detail-pipeline-strip {
+  display: none !important;
+}
+
+/* CLEAN HEADER AFTER PIPELINE REMOVAL */
+.clean-detail-header {
+  min-height: 78px !important;
+  grid-template-columns: minmax(220px, 1fr) auto !important;
+  padding-bottom: 14px !important;
+}
+
+.clean-detail-panel .detail-topbar-wrapper {
+  top: 78px !important;
+}
+
+/* NATIVE STATUS OPTIONS */
+.board-inline-select option {
+  font-weight: 800;
+  padding: 8px;
+}
+
+
+/* COLLAPSIBLE ACTIVE SECTION */
+.collapsible-active-heading {
+  min-height: 52px;
+  padding: 8px 10px;
+  cursor: pointer;
+  user-select: none;
+  transition: background .18s ease;
+}
+
+.collapsible-active-heading:hover {
+  background: #f8fafc;
+}
+
+.collapsible-active-heading > div:first-child {
+  align-items: center;
+}
+
+.section-collapse-icon {
+  width: 18px;
+  color: #64748b;
+  font-size: 12px;
+}
+
+.collapsible-active-heading.collapsed {
+  margin-bottom: 10px;
+  border: 1px solid #d9dee7;
+  border-radius: 7px;
+  background: #f8fafc;
+}
+
+.collapsible-active-heading.collapsed h1 {
+  font-size: 17px;
+}
+
+/* COMPACT TABLE TO REDUCE SCROLLING */
+.board-table-row {
+  min-height: 72px !important;
+}
+
+.board-table-head {
+  min-height: 38px !important;
+}
+
+.board-col {
+  padding-top: 5px !important;
+  padding-bottom: 5px !important;
+}
+
+.board-col-name strong {
+  font-size: 11px !important;
+}
+
+.board-col-name small {
+  margin-top: 2px !important;
+}
+
+.order-working-actions {
+  margin-top: 4px !important;
+}
+
+.start-working-btn,
+.stop-working-btn,
+.busy-working-label {
+  min-height: 21px !important;
+  font-size: 7px !important;
+}
+
+.collapsed-status-bars {
+  gap: 7px !important;
+}
+
+.collapsed-status-bar {
+  min-height: 34px !important;
+}
+
+/* ACTIVE SECTION STAYS VISIBLE */
+.board-section-heading {
+  position: sticky;
+  top: 0;
+  z-index: 90;
+  background: #ffffff;
+}
+
+
+/* EXTRA COMPACT DETAIL VIEW */
+.clean-detail-panel .detail-header,
+.clean-detail-header {
+  min-height: 66px !important;
+  padding-top: 10px !important;
+  padding-bottom: 10px !important;
+}
+
+.clean-detail-panel .detail-topbar-wrapper {
+  top: 66px !important;
+  padding-top: 7px !important;
+}
+
+.clean-detail-panel .detail-topbar {
+  min-height: 42px !important;
+}
+
+.clean-detail-panel .detail-info-item {
+  min-height: 42px !important;
+  padding: 6px 9px !important;
+}
+
+.clean-detail-panel .detail-body {
+  padding: 10px !important;
+}
+
+.clean-detail-panel .cards-grid {
+  gap: 9px !important;
+}
+
+.clean-detail-panel .order-card {
+  min-height: 0 !important;
+  border-radius: 10px !important;
+}
+
+.clean-detail-panel .card-preview-area {
+  min-height: 135px !important;
+  height: 135px !important;
+}
+
+.clean-detail-panel .card-footer-inner {
+  min-height: 38px !important;
+  padding: 5px 8px !important;
+}
+
+.clean-detail-panel .card-title {
+  font-size: 9px !important;
+}
+
+.clean-detail-panel .card-view-btn {
+  min-height: 25px !important;
+  padding: 0 7px !important;
+  font-size: 8px !important;
+}
+
+.clean-detail-panel .card-notes-area {
+  min-height: 180px !important;
+}
+
+.clean-detail-panel .notes-header {
+  min-height: 36px !important;
+  padding: 0 10px !important;
+}
+
+.clean-detail-panel .notes-textarea {
+  min-height: 108px !important;
+  padding: 10px !important;
+}
+
+.clean-detail-panel .notes-footer {
+  min-height: 36px !important;
+  padding: 5px 9px !important;
+}
+
+.clean-detail-panel .file-img {
+  height: 78px !important;
+}
+
+.clean-detail-panel .file-thumb {
+  min-height: 78px !important;
+}
+
+.clean-detail-panel .card-files-preview {
+  padding: 9px !important;
+  grid-template-columns:
+    repeat(auto-fill, minmax(85px, 1fr)) !important;
+  gap: 7px !important;
+}
+
+@media (min-width: 1100px) {
+  .clean-detail-panel .cards-grid {
+    grid-template-columns:
+      repeat(2, minmax(0, 1fr)) !important;
+  }
+}
+
+
+/* THEME TOOLBAR */
+.board-toolbar-actions {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 10px;
+}
+
+.theme-toggle-button {
+  height: 36px;
+  padding: 0 12px;
+  border: 1px solid #111827;
+  border-radius: 999px;
+  background: #ffffff;
+  color: #111827;
+  cursor: pointer;
+  font-size: 10px;
+  font-weight: 800;
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+}
+
+/* REMOVE LONG LEFT STATUS LINE */
+.board-table-row,
+.board-table-row.unread,
+.board-table-row.opened,
+.board-table-row.selected {
+  box-shadow: none !important;
+}
+
+.board-table-row::before,
+.board-table-row::after {
+  display: none !important;
+  content: none !important;
+}
+
+/* LIGHT THEME */
+.theme-light {
+  background: #ffffff;
+  color: #111827;
+}
+
+/* DARK THEME */
+.theme-dark {
+  background: #0f172a;
+  color: #f8fafc;
+}
+
+.theme-dark .board-brand-header,
+.theme-dark .board-toolbar,
+.theme-dark .factory-board,
+.theme-dark .board-section-heading,
+.theme-dark .board-table-shell,
+.theme-dark .board-inline-add-top {
+  background: #0f172a !important;
+  color: #f8fafc !important;
+}
+
+.theme-dark .board-section-heading:hover,
+.theme-dark .collapsible-active-heading.collapsed {
+  background: #111827 !important;
+}
+
+.theme-dark .board-table-head {
+  background: #1d4ed8 !important;
+  color: #ffffff !important;
+}
+
+.theme-dark .board-table-row,
+.theme-dark .board-table-row.opened,
+.theme-dark .board-table-row.unread {
+  background: #111827 !important;
+  color: #f8fafc !important;
+  border-bottom-color: #334155 !important;
+}
+
+.theme-dark .board-table-row:hover,
+.theme-dark .board-table-row.opened:hover,
+.theme-dark .board-table-row.unread:hover {
+  background: #1e293b !important;
+}
+
+.theme-dark .board-inline-cell-input,
+.theme-dark .board-inline-select,
+.theme-dark .board-search input {
+  color: #f8fafc !important;
+}
+
+.theme-dark .board-inline-cell-input:hover,
+.theme-dark .board-inline-cell-input:focus,
+.theme-dark .board-inline-select:hover,
+.theme-dark .board-inline-select:focus {
+  background: #1e293b !important;
+  border-color: #60a5fa !important;
+}
+
+.theme-dark .board-search {
+  border-color: #e2e8f0;
+  color: #f8fafc;
+}
+
+.theme-dark .theme-toggle-button {
+  border-color: #e2e8f0;
+  background: #111827;
+  color: #f8fafc;
+}
+
+.theme-dark .collapsed-status-bars {
+  border-top-color: #334155 !important;
+}
+
+.theme-dark .board-col-address,
+.theme-dark .board-col-track,
+.theme-dark .design-meta,
+.theme-dark .board-col-name small,
+.theme-dark .subtitle {
+  color: #cbd5e1 !important;
+}
+
+.theme-dark .board-row-file-thumb,
+.theme-dark .board-row-file-add,
+.theme-dark .board-avatar-add {
+  border-color: #475569;
+  background: #1e293b !important;
+  color: #f8fafc;
+}
+
+.theme-dark .board-table-row .board-col:not(:last-child)::after {
+  background: #475569 !important;
+}
+
+
+/* DARK MODE HEADER FIXES */
+.theme-dark .board-brand-mark img {
+  filter: brightness(0) invert(1);
+}
+
+.theme-dark .board-print-button {
+  color: #ffffff !important;
+}
+
+.theme-dark .board-print-button i,
+.theme-dark .board-print-button small {
+  color: #ffffff !important;
+}
+
+.theme-dark .board-top-add-button {
+  border: 1px solid #ffffff !important;
+  background: transparent !important;
+  color: #ffffff !important;
+}
+
+.theme-dark .board-top-add-button:hover {
+  background: #ffffff !important;
+  color: #111827 !important;
+}
+
+/* PROFILE BUTTON: TRUE FIXED CIRCLE */
+.board-profile-button {
+  overflow: visible !important;
+}
+
+.board-profile-button > img.board-profile-photo {
+  position: absolute;
+  inset: 0;
+  width: 100% !important;
+  height: 100% !important;
+  border-radius: 50% !important;
+  object-fit: cover !important;
+  object-position: center !important;
+  display: block;
+}
+
+.board-profile-button > span:not(.board-profile-photo) {
+  width: 100%;
+  height: 100%;
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+}
+
+.board-profile-button > i {
+  z-index: 4;
+}
+
+/* PROFILE SETTINGS */
+.profile-settings-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 120000;
+  padding: 20px;
+  background: rgba(15, 23, 42, .72);
+  backdrop-filter: blur(5px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.profile-settings-modal {
+  position: relative;
+  width: min(430px, 100%);
+  padding: 24px;
+  border-radius: 18px;
+  background: #ffffff;
+  color: #111827;
+  box-shadow: 0 35px 100px rgba(0, 0, 0, .35);
+}
+
+.profile-settings-close {
+  position: absolute;
+  top: 14px;
+  right: 14px;
+  width: 34px;
+  height: 34px;
+  border: 0;
+  border-radius: 9px;
+  background: #f3f4f6;
+  color: #111827;
+  cursor: pointer;
+}
+
+.profile-settings-heading h3 {
+  margin: 0;
+  font-size: 20px;
+}
+
+.profile-settings-heading p {
+  margin: 5px 0 0;
+  color: #6b7280;
+  font-size: 11px;
+}
+
+.profile-settings-photo-section {
+  margin: 22px 0;
+  text-align: center;
+}
+
+.profile-photo-circle {
+  position: relative;
+  width: 116px;
+  height: 116px;
+  margin: 0 auto;
+  border: 4px solid #ffffff;
+  border-radius: 50%;
+  background: #111827;
+  box-shadow:
+    0 0 0 2px #d1d5db,
+    0 12px 30px rgba(15, 23, 42, .18);
+  overflow: hidden;
+  cursor: pointer;
+  display: grid;
+  place-items: center;
+}
+
+.profile-photo-circle img {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  border-radius: 50%;
+  object-fit: cover;
+  object-position: center;
+}
+
+.profile-photo-circle > span {
+  color: #ffffff;
+  font-size: 32px;
+  font-weight: 900;
+}
+
+.profile-photo-circle input {
+  position: absolute;
+  inset: 0;
+  opacity: 0;
+  cursor: pointer;
+  z-index: 3;
+}
+
+.profile-photo-circle > i {
+  position: absolute;
+  right: 5px;
+  bottom: 5px;
+  z-index: 4;
+  width: 30px;
+  height: 30px;
+  border: 3px solid #ffffff;
+  border-radius: 50%;
+  background: #111827;
+  color: #ffffff;
+  display: grid;
+  place-items: center;
+  font-size: 11px;
+  pointer-events: none;
+}
+
+.profile-settings-photo-section small {
+  display: block;
+  margin-top: 10px;
+  color: #6b7280;
+  font-size: 10px;
+}
+
+.profile-settings-field {
+  margin-top: 14px;
+}
+
+.profile-settings-field label {
+  display: block;
+  margin-bottom: 6px;
+  color: #374151;
+  font-size: 11px;
+  font-weight: 800;
+}
+
+.profile-settings-field input,
+.profile-settings-field textarea {
+  width: 100%;
+  padding: 10px 12px;
+  border: 1px solid #d1d5db;
+  border-radius: 9px;
+  background: #ffffff;
+  color: #111827;
+  outline: 0;
+  font-family: inherit;
+  font-size: 12px;
+}
+
+.profile-settings-field input:focus,
+.profile-settings-field textarea:focus {
+  border-color: #2563eb;
+  box-shadow: 0 0 0 3px rgba(37, 99, 235, .12);
+}
+
+.profile-settings-field input[readonly],
+.profile-settings-field textarea[readonly] {
+  background: #f8fafc;
+  color: #64748b;
+}
+
+.profile-settings-actions {
+  margin-top: 20px;
+  display: flex;
+  justify-content: flex-end;
+  gap: 9px;
+}
+
+.profile-settings-cancel,
+.profile-settings-save {
+  min-height: 39px;
+  padding: 0 15px;
+  border-radius: 8px;
+  cursor: pointer;
+  font-size: 10px;
+  font-weight: 900;
+}
+
+.profile-settings-cancel {
+  border: 1px solid #d1d5db;
+  background: #ffffff;
+  color: #111827;
+}
+
+.profile-settings-save {
+  border: 0;
+  background: #111827;
+  color: #ffffff;
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+}
+
+/* PROFILE MODAL DARK MODE */
+.theme-dark .profile-settings-modal {
+  background: #111827;
+  color: #f8fafc;
+}
+
+.theme-dark .profile-settings-heading p,
+.theme-dark .profile-settings-photo-section small,
+.theme-dark .profile-settings-field label {
+  color: #cbd5e1;
+}
+
+.theme-dark .profile-settings-field input,
+.theme-dark .profile-settings-field textarea {
+  border-color: #475569;
+  background: #1e293b;
+  color: #f8fafc;
+}
+
+.theme-dark .profile-settings-close {
+  background: #1e293b;
+  color: #ffffff;
+}
+
+.theme-dark .profile-settings-cancel {
+  border-color: #475569;
+  background: #1e293b;
+  color: #ffffff;
+}
+
+.theme-dark .profile-settings-save {
+  background: #ffffff;
+  color: #111827;
+}
+
+/* PERMANENT VIEWED STATE */
+.board-table-row.opened {
+  background: #ffffff !important;
+}
+
+.theme-dark .board-table-row.opened {
+  background: #111827 !important;
 }
 
 </style>
