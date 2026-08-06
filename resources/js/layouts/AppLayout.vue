@@ -87,20 +87,27 @@
                 </router-link>
 
                 <!-- TEAMSTORE ORDERS -->
-               <router-link
-    to="/teamstore-orders"
-    class="nav-link-custom"
-    :class="{
-        active: $route.path === '/teamstore-orders'
-    }"
-    @click="sidebarOpen = false"
->
-    <span class="nav-icon">
-        <i class="fa-solid fa-store"></i>
-    </span>
+                <router-link
+                    to="/teamstore-orders"
+                    class="nav-link-custom"
+                    :class="{
+                        active: $route.path === '/teamstore-orders'
+                    }"
+                    @click="sidebarOpen = false"
+                >
+                    <span class="nav-icon">
+                        <i class="fa-solid fa-store"></i>
+                    </span>
 
-    <span>TeamStore Orders</span>
-</router-link>
+                    <span>TeamStore Orders</span>
+
+                    <span
+                        v-if="teamStoreNotificationCount > 0"
+                        class="order-badge"
+                    >
+                        {{ teamStoreNotificationCount }}
+                    </span>
+                </router-link>
 
                 <!-- PLACE ORDERS -->
                 <router-link
@@ -284,6 +291,7 @@ export default {
             savingProfile: false,
             orderNotificationCount: 0,
             placeOrderNotificationCount: 0,
+            teamStoreNotificationCount: 0,
             profileForm: {
                 name: '',
                 about: '',
@@ -319,10 +327,16 @@ export default {
     mounted() {
         this.loadOrderNotificationCount()
         this.loadPlaceOrderNotificationCount()
+        this.loadTeamStoreNotificationCount()
 
         window.addEventListener(
             'place-orders-read-updated',
             this.loadPlaceOrderNotificationCount
+        )
+
+        window.addEventListener(
+            'teamstore-orders-read-updated',
+            this.loadTeamStoreNotificationCount
         )
     },
 
@@ -337,6 +351,7 @@ export default {
             }
 
             this.loadPlaceOrderNotificationCount()
+            this.loadTeamStoreNotificationCount()
         }
     },
 
@@ -344,6 +359,11 @@ export default {
         window.removeEventListener(
             'place-orders-read-updated',
             this.loadPlaceOrderNotificationCount
+        )
+
+        window.removeEventListener(
+            'teamstore-orders-read-updated',
+            this.loadTeamStoreNotificationCount
         )
     },
 
@@ -380,6 +400,26 @@ export default {
             } catch (error) {
                 console.error('Place order notification error:', error)
                 this.placeOrderNotificationCount = 0
+            }
+        },
+
+        async loadTeamStoreNotificationCount() {
+            try {
+                const response = await axios.get(
+                    '/api/teamstore-orders/unread-count',
+                    { headers: this.headers() }
+                )
+
+                this.teamStoreNotificationCount = Number(
+                    response.data?.count || 0
+                )
+            } catch (error) {
+                console.error(
+                    'TeamStore notification error:',
+                    error
+                )
+
+                this.teamStoreNotificationCount = 0
             }
         },
 
