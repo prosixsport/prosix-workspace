@@ -87,22 +87,20 @@
                 </router-link>
 
                 <!-- TEAMSTORE ORDERS -->
-                <router-link
-                    :to="{ path: '/orders', query: { type: 'teamstore' } }"
-                    class="nav-link-custom"
-                    :class="{
-                        active:
-                            $route.path === '/orders' &&
-                            $route.query.type === 'teamstore'
-                    }"
-                    @click="clearOrderBadge(); sidebarOpen = false"
-                >
-                    <span class="nav-icon">
-                        <i class="fa-solid fa-store"></i>
-                    </span>
+               <router-link
+    to="/teamstore-orders"
+    class="nav-link-custom"
+    :class="{
+        active: $route.path === '/teamstore-orders'
+    }"
+    @click="sidebarOpen = false"
+>
+    <span class="nav-icon">
+        <i class="fa-solid fa-store"></i>
+    </span>
 
-                    <span>TeamStore Orders</span>
-                </router-link>
+    <span>TeamStore Orders</span>
+</router-link>
 
                 <!-- PLACE ORDERS -->
                 <router-link
