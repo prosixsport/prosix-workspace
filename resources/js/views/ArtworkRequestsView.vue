@@ -1571,7 +1571,6 @@ export default {
       inlineEditValue: '',
       rowFileDragOrderId: null,
       rowFileDragDepth: 0,
-      claimedOrderIds: [],
       customBoardGroups: [],
       newlyCreatedOrderIds: [],
       activeSectionCollapsed: false,
@@ -2269,25 +2268,7 @@ beforeUnmount()  {
     },
 
     workingDesigner(order) {
-      const apiViewer =
-        order?.working_by ||
-        order?.active_designer ||
-        order?.claimed_by ||
-        null
-
-      if (apiViewer) {
-        return apiViewer
-      }
-
-      if (
-        this.claimedOrderIds.includes(
-          Number(order?.id)
-        )
-      ) {
-        return this.currentUser
-      }
-
-      return null
+      return order?.working_by || null
     },
 
     async claimOrder(order) {
@@ -2307,20 +2288,12 @@ beforeUnmount()  {
           response.data?.user ||
           this.currentUser
       } catch (error) {
-        /*
-         * Backend claim endpoint abhi na ho to current browser
-         * mein indicator show hoga. Real multi-user sync ke liye
-         * backend endpoint required hai.
-         */
-        if (
-          !this.claimedOrderIds.includes(
-            Number(order.id)
-          )
-        ) {
-          this.claimedOrderIds.push(
-            Number(order.id)
-          )
-        }
+        console.error('Claim order error:', error)
+
+        alert(
+          error.response?.data?.message ||
+          'Working status could not be started.'
+        )
       }
     },
 
@@ -2338,10 +2311,12 @@ beforeUnmount()  {
 
         order.working_by = null
       } catch (error) {
-        this.claimedOrderIds =
-          this.claimedOrderIds.filter(
-            id => id !== Number(order.id)
-          )
+        console.error('Release order error:', error)
+
+        alert(
+          error.response?.data?.message ||
+          'Working status could not be stopped.'
+        )
       }
     },
 
@@ -4214,6 +4189,12 @@ async fetchClients() {
         last_message_text: order.last_message_text || '',
         last_message_sender: order.last_message_sender || '',
         last_message_time: order.last_message_time || '',
+
+        /*
+         * Current working designer backend ki
+         * order_work_sessions table se aata hai.
+         */
+        working_by: order.working_by || null,
 
         invoiceFiles: [],
         owners: members.map(m => ({
@@ -9699,6 +9680,52 @@ grid-template-columns: 32px 1fr 118px 38px;
   background: #111827 !important;
 }
 
+.board-avatar-add {
+  margin-left: 3px !important;
+}
+
+
+/* WORK SESSION FINAL CLEANUP */
+.working-designer-pill {
+  max-width: 190px;
+  min-height: 27px;
+  padding: 3px 8px 3px 4px;
+  border: 1px solid #bbf7d0;
+  border-radius: 999px;
+  background: #f0fdf4;
+  color: #166534;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.working-designer-pill img {
+  width: 21px !important;
+  height: 21px !important;
+  border-radius: 50% !important;
+  object-fit: cover !important;
+}
+
+.working-designer-pill strong {
+  overflow: hidden;
+  max-width: 90px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.working-live-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: #22c55e;
+  box-shadow: 0 0 0 4px rgba(34, 197, 94, .13);
+}
+
+.board-avatar-stack {
+  gap: 2px !important;
+}
+
+.board-avatar-more,
 .board-avatar-add {
   margin-left: 3px !important;
 }

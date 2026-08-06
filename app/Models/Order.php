@@ -32,7 +32,10 @@ class Order extends Model
 
     public function members()
     {
-        return $this->belongsToMany(User::class, 'order_members')
+        return $this->belongsToMany(
+            User::class,
+            'order_members'
+        )
             ->withPivot('role')
             ->withTimestamps();
     }
@@ -54,7 +57,10 @@ class Order extends Model
 
     public function creator()
     {
-        return $this->belongsTo(User::class, 'created_by');
+        return $this->belongsTo(
+            User::class,
+            'created_by'
+        );
     }
 
     public function reads()
@@ -64,11 +70,31 @@ class Order extends Model
 
     public function clients()
     {
-        return $this->belongsToMany(Client::class, 'client_order');
+        return $this->belongsToMany(
+            Client::class,
+            'client_order'
+        );
     }
 
     public function activities()
     {
-        return $this->hasMany(OrderActivity::class)->latest();
+        return $this->hasMany(OrderActivity::class)
+            ->latest();
+    }
+
+    public function workSessions()
+    {
+        return $this->hasMany(
+            OrderWorkSession::class
+        );
+    }
+
+    public function activeWorkSession()
+    {
+        return $this->hasOne(
+            OrderWorkSession::class
+        )
+            ->whereNull('ended_at')
+            ->latestOfMany('started_at');
     }
 }

@@ -205,6 +205,22 @@ Route::middleware('auth:sanctum')->group(function () {
 
     /*
     |--------------------------------------------------------------------------
+    | Factory Order Working Status
+    |--------------------------------------------------------------------------
+    */
+
+    Route::post('/orders/{order}/claim', [
+        OrderController::class,
+        'claim'
+    ]);
+
+    Route::post('/orders/{order}/release', [
+        OrderController::class,
+        'release'
+    ]);
+
+    /*
+    |--------------------------------------------------------------------------
     | Main Factory Order Routes
     |--------------------------------------------------------------------------
     */

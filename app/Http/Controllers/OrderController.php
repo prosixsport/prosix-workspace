@@ -5,6 +5,7 @@ use App\Models\OrderActivity;
 use App\Models\OrderNotification;
 use App\Models\Order;
 use App\Models\OrderRead;
+use App\Models\OrderWorkSession;
 use App\Models\User;
 use App\Mail\NewOrderAssignedMail;
 use App\Services\FcmService;
@@ -21,6 +22,7 @@ public function index()
     $orders = Order::with([
             'members',
             'clients',
+            'activeWorkSession.user:id,name,email,role,profile_photo',
             'reads.user:id,name,email,profile_photo',
             'messages' => function ($q) {
                 $q->with('user:id,name')
@@ -61,6 +63,19 @@ public function index()
             $order->last_message_text = $lastMessage?->message;
             $order->last_message_sender = $lastMessage?->user?->name;
             $order->last_message_time = $lastMessage?->created_at?->diffForHumans();
+
+            $activeWork = $order->activeWorkSession;
+
+            $order->working_by = $activeWork?->user
+                ? [
+                    'id' => $activeWork->user->id,
+                    'name' => $activeWork->user->name,
+                    'email' => $activeWork->user->email,
+                    'role' => $activeWork->user->role,
+                    'profile_photo_url' => $activeWork->user->profile_photo_url,
+                    'started_at' => $activeWork->started_at,
+                ]
+                : null;
 
             return $order;
         });
@@ -170,7 +185,7 @@ if ($user->role === 'client') {
         $this->checkAccess($order);
 
         return response()->json(
-            $order->load(['members', 'messages.user'])
+            $order->load(['members', 'messages.user', 'activeWorkSession.user'])
         );
     }
 
@@ -443,6 +458,131 @@ $this->logActivity(
 
         return response()->json(['reads' => $reads]);
     }
+
+
+public function claim(Order $order)
+{
+    $this->checkAccess($order);
+
+    $user = auth()->user();
+
+    if (!$user) {
+        return response()->json([
+            'success' => false,
+            'message' => 'Unauthenticated.'
+        ], 401);
+    }
+
+    return DB::transaction(function () use ($order, $user) {
+        $activeWork = OrderWorkSession::query()
+            ->with('user:id,name,email,role,profile_photo')
+            ->where('order_id', $order->id)
+            ->whereNull('ended_at')
+            ->lockForUpdate()
+            ->first();
+
+        if (
+            $activeWork &&
+            (int) $activeWork->user_id !== (int) $user->id
+        ) {
+            return response()->json([
+                'success' => false,
+                'message' => ($activeWork->user?->name ?? 'Another member')
+                    . ' is already working on this order.',
+                'working_by' => $activeWork->user
+                    ? [
+                        'id' => $activeWork->user->id,
+                        'name' => $activeWork->user->name,
+                        'email' => $activeWork->user->email,
+                        'role' => $activeWork->user->role,
+                        'profile_photo_url' =>
+                            $activeWork->user->profile_photo_url,
+                        'started_at' => $activeWork->started_at,
+                    ]
+                    : null,
+            ], 409);
+        }
+
+        if (!$activeWork) {
+            $activeWork = OrderWorkSession::create([
+                'order_id' => $order->id,
+                'user_id' => $user->id,
+                'started_at' => now(),
+                'last_seen_at' => now(),
+            ]);
+        } else {
+            $activeWork->update([
+                'last_seen_at' => now(),
+            ]);
+        }
+
+        $activeWork->load(
+            'user:id,name,email,role,profile_photo'
+        );
+
+        return response()->json([
+            'success' => true,
+            'message' => 'You are now working on this order.',
+            'working_by' => [
+                'id' => $activeWork->user->id,
+                'name' => $activeWork->user->name,
+                'email' => $activeWork->user->email,
+                'role' => $activeWork->user->role,
+                'profile_photo_url' =>
+                    $activeWork->user->profile_photo_url,
+                'started_at' => $activeWork->started_at,
+            ],
+        ]);
+    });
+}
+
+public function release(Order $order)
+{
+    $this->checkAccess($order);
+
+    $user = auth()->user();
+
+    if (!$user) {
+        return response()->json([
+            'success' => false,
+            'message' => 'Unauthenticated.'
+        ], 401);
+    }
+
+    $activeWork = OrderWorkSession::query()
+        ->where('order_id', $order->id)
+        ->whereNull('ended_at')
+        ->first();
+
+    if (!$activeWork) {
+        return response()->json([
+            'success' => true,
+            'message' => 'This order is already free.'
+        ]);
+    }
+
+    $canRelease =
+        (int) $activeWork->user_id === (int) $user->id ||
+        in_array($user->role, ['super_admin', 'admin'], true);
+
+    if (!$canRelease) {
+        return response()->json([
+            'success' => false,
+            'message' => 'You cannot stop another member’s work.'
+        ], 403);
+    }
+
+    $activeWork->update([
+        'ended_at' => now(),
+        'last_seen_at' => now(),
+    ]);
+
+    return response()->json([
+        'success' => true,
+        'message' => 'Working status stopped.',
+        'working_by' => null,
+    ]);
+}
 
   private function checkAccess($order)
 {
