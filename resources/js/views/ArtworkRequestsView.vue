@@ -2847,8 +2847,16 @@ beforeUnmount()  {
     },
 
     printVisibleOrders() {
-      const orders = this.filteredOrders
-      this.printOrders(orders)
+      /*
+       * Checkbox selection ho to sirf selected orders.
+       * Selection na ho to current visible/filter orders.
+       */
+      if (this.selectedOrders.length > 0) {
+        this.printSelectedOrders()
+        return
+      }
+
+      this.printOrders(this.filteredOrders)
     },
 
     printSelectedOrders() {
@@ -2861,147 +2869,344 @@ beforeUnmount()  {
       this.printOrders(orders)
     },
 
-    printOrders(orders) {
+    printOrderCreator(order) {
+      /*
+       * Preferred: actual order creator.
+       * Purane API response mein creator na ho to:
+       * created_by member ya pehla assigned owner fallback hoga.
+       */
+      const directCreator =
+        order?.creator ||
+        order?.created_by_user ||
+        order?.createdBy ||
+        null
+
+      if (directCreator) {
+        return {
+          id: directCreator.id || directCreator.user_id || null,
+          name:
+            directCreator.name ||
+            directCreator.full_name ||
+            'Order Creator',
+          profile_photo_url:
+            directCreator.profile_photo_url ||
+            directCreator.photo_url ||
+            directCreator.avatar ||
+            null
+        }
+      }
+
+      const members = order?.owners || order?.members || []
+
+      const creatorMember = members.find(member => {
+        return (
+          member?.pivot?.role === 'creator' ||
+          member?.role === 'creator' ||
+          Number(member?.id) === Number(order?.created_by)
+        )
+      })
+
+      const fallback = creatorMember || members[0] || null
+
+      return {
+        id: fallback?.id || null,
+        name: fallback?.name || 'Unassigned',
+        profile_photo_url:
+          fallback?.profile_photo_url ||
+          fallback?.photo_url ||
+          null
+      }
+    },
+
+    absolutePrintImageUrl(url) {
+      const value = String(url || '').trim()
+
+      if (!value) {
+        return ''
+      }
+
+      if (
+        value.startsWith('http://') ||
+        value.startsWith('https://') ||
+        value.startsWith('data:')
+      ) {
+        return value
+      }
+
+      if (value.startsWith('/')) {
+        return `${window.location.origin}${value}`
+      }
+
+      return `${window.location.origin}/${value}`
+    },
+
+    splitPrintOrders(orders, pageSize = 30) {
+      const pages = []
+
+      for (let index = 0; index < orders.length; index += pageSize) {
+        pages.push(orders.slice(index, index + pageSize))
+      }
+
+      return pages
+    },
+
+    waitForPrintImages(printWindow, timeout = 2500) {
+      return new Promise(resolve => {
+        const images = Array.from(
+          printWindow.document.images || []
+        )
+
+        if (!images.length) {
+          resolve()
+          return
+        }
+
+        let finished = 0
+        let resolved = false
+
+        const done = () => {
+          finished += 1
+
+          if (!resolved && finished >= images.length) {
+            resolved = true
+            resolve()
+          }
+        }
+
+        images.forEach(image => {
+          if (image.complete) {
+            done()
+            return
+          }
+
+          image.addEventListener('load', done, { once: true })
+          image.addEventListener('error', done, { once: true })
+        })
+
+        setTimeout(() => {
+          if (!resolved) {
+            resolved = true
+            resolve()
+          }
+        }, timeout)
+      })
+    },
+
+    async printOrders(orders) {
       if (!orders.length) {
         alert('No orders available for print.')
         return
       }
 
-      const printWindow = window.open('', '_blank')
+      /*
+       * Window foran open hoti hai taake browser popup block na kare.
+       * Heavy report/summary/images remove kiye gaye hain for fast load.
+       */
+      const printWindow = window.open(
+        '',
+        '_blank',
+        'width=1200,height=850'
+      )
 
       if (!printWindow) {
         alert('Please allow popups for printing.')
         return
       }
 
-      const generatedAt =
-        new Date().toLocaleString()
+      printWindow.document.write(`
+        <!DOCTYPE html>
+        <html>
+          <head>
+            <meta charset="UTF-8" />
+            <title>Preparing Prosix Orders...</title>
+            <style>
+              body {
+                margin: 0;
+                min-height: 100vh;
+                font-family: Arial, Helvetica, sans-serif;
+                display: grid;
+                place-items: center;
+                background: #ffffff;
+                color: #111827;
+              }
 
-      const isDarkPrint =
-        this.boardTheme === 'dark'
+              .loading-print {
+                text-align: center;
+              }
 
-      const printColors = isDarkPrint
-        ? {
-            page: '#111827',
-            surface: '#1f2937',
-            text: '#f9fafb',
-            muted: '#cbd5e1',
-            border: '#475569',
-            header: '#020617'
+              .loading-print strong,
+              .loading-print span {
+                display: block;
+              }
+
+              .loading-print span {
+                margin-top: 8px;
+                color: #6b7280;
+                font-size: 12px;
+              }
+            </style>
+          </head>
+          <body>
+            <div class="loading-print">
+              <strong>Preparing order sheet...</strong>
+              <span>Please wait</span>
+            </div>
+          </body>
+        </html>
+      `)
+
+      printWindow.document.close()
+
+      const generatedAt = new Date().toLocaleString()
+      const pages = this.splitPrintOrders(orders, 30)
+
+      const pageMarkup = pages
+        .map((pageOrders, pageIndex) => {
+          const leftOrders = pageOrders.slice(0, 15)
+          const rightOrders = pageOrders.slice(15, 30)
+
+          const makeColumn = (columnOrders, startIndex) => {
+            const orderRows = columnOrders
+              .map((order, localIndex) => {
+                const creator = this.printOrderCreator(order)
+                const photoUrl = this.absolutePrintImageUrl(
+                  creator.profile_photo_url
+                )
+
+                const creatorPhoto = photoUrl
+                  ? `
+                      <img
+                        src="${this.escapePrint(photoUrl)}"
+                        alt=""
+                        loading="eager"
+                        decoding="sync"
+                        onerror="
+                          this.style.display='none';
+                          this.nextElementSibling.style.display='grid';
+                        "
+                      />
+                      <span
+                        class="creator-fallback"
+                        style="display:none"
+                      >
+                        ${this.escapePrint(
+                          this.initial(creator.name || 'U')
+                        )}
+                      </span>
+                    `
+                  : `
+                      <span class="creator-fallback">
+                        ${this.escapePrint(
+                          this.initial(creator.name || 'U')
+                        )}
+                      </span>
+                    `
+
+                return `
+                  <article class="print-order-card">
+                    <span class="order-number">
+                      ${startIndex + localIndex + 1}
+                    </span>
+
+                    <div class="order-main">
+                      <strong class="order-name">
+                        ${this.escapePrint(order.name || 'Unnamed Order')}
+                      </strong>
+
+                      <span
+                        class="order-status"
+                        style="
+                          --status-color:${this.escapePrint(
+                            order.statusColor || '#e5e7eb'
+                          )};
+                          --status-text:${this.escapePrint(
+                            this.readableTextColor(
+                              order.statusColor || '#e5e7eb'
+                            )
+                          )};
+                        "
+                      >
+                        ${this.escapePrint(order.status || 'Pending')}
+                      </span>
+                    </div>
+
+                    <div class="creator">
+                      <span class="creator-photo">
+                        ${creatorPhoto}
+                      </span>
+
+                      <span class="creator-name">
+                        <small>Created By</small>
+                        <strong>
+                          ${this.escapePrint(creator.name || 'Unassigned')}
+                        </strong>
+                      </span>
+                    </div>
+                  </article>
+                `
+              })
+              .join('')
+
+            const emptyRows = Math.max(0, 15 - columnOrders.length)
+
+            const placeholders = Array.from(
+              { length: emptyRows },
+              () => '<div class="empty-print-row"></div>'
+            ).join('')
+
+            return `
+              <div class="print-column">
+                ${orderRows}
+                ${placeholders}
+              </div>
+            `
           }
-        : {
-            page: '#ffffff',
-            surface: '#ffffff',
-            text: '#111827',
-            muted: '#6b7280',
-            border: '#cfd5dd',
-            header: '#111827'
-          }
-
-      const logoUrl =
-        `${window.location.origin}/public/assets/images/P LOGO BLACK.png`
-
-      const summaryCards = this.boardGroups
-        .map(group => {
-          const count = orders.filter(order => {
-            return (
-              order.group === group.key ||
-              (
-                group.key === 'delivered' &&
-                String(order.status || '')
-                  .toLowerCase() === 'delivered'
-              )
-            )
-          }).length
 
           return `
-            <div class="summary-card">
-              <span
-                class="summary-line"
-                style="background:${group.color}"
-              ></span>
+            <section class="print-page">
+              <header class="print-header">
+                <div class="print-brand">
+                  <strong>PROSIX SPORTS</strong>
+                  <span>Factory Order Production Sheet</span>
+                </div>
 
-              <div>
-                <small>${this.escapePrint(group.label)}</small>
-                <strong>${count}</strong>
-              </div>
-            </div>
-          `
-        })
-        .join('')
-
-      const rows = orders
-        .map((order, index) => {
-          const owners = (order.owners || [])
-            .map(owner => {
-              const photo = owner.profile_photo_url
-                ? `
-                    <img
-                      src="${this.escapePrint(owner.profile_photo_url)}"
-                      alt=""
-                    />
-                  `
-                : `
-                    <span class="owner-fallback">
-                      ${this.escapePrint(
-                        this.initial(owner.name || 'U')
-                      )}
-                    </span>
-                  `
-
-              return `
-                <div class="owner-item">
-                  ${photo}
-
+                <div class="print-meta">
+                  <strong>
+                    ${this.escapePrint(this.activeBoardGroup.label)}
+                  </strong>
                   <span>
-                    ${this.escapePrint(owner.name || 'Member')}
+                    Page ${pageIndex + 1} of ${pages.length}
+                  </span>
+                  <span>
+                    Generated: ${this.escapePrint(generatedAt)}
                   </span>
                 </div>
-              `
-            })
-            .join('')
+              </header>
 
-          return `
-            <tr>
-              <td class="number">
-                ${index + 1}
-              </td>
+              <div class="print-columns">
+                ${makeColumn(
+                  leftOrders,
+                  pageIndex * 30
+                )}
 
-              <td class="order-cell">
+                ${makeColumn(
+                  rightOrders,
+                  pageIndex * 30 + 15
+                )}
+              </div>
+
+              <footer class="print-footer">
+                <span>Prosix Sports — Internal Use</span>
                 <strong>
-                  ${this.escapePrint(order.name || '')}
+                  ${pageOrders.length} orders on this page
                 </strong>
-
-                <small>
-                  ${this.escapePrint(order.po || 'N/A')}
-                </small>
-              </td>
-
-              <td>
-                <span
-                  class="status"
-                  style="
-                    background:${order.statusColor || '#e5e7eb'};
-                    color:${this.readableTextColor(
-                      order.statusColor || '#e5e7eb'
-                    )};
-                  "
-                >
-                  ${this.escapePrint(order.status || '')}
-                </span>
-              </td>
-
-              <td class="owners-cell">
-                ${
-                  owners ||
-                  '<span class="unassigned">Unassigned</span>'
-                }
-              </td>
-            </tr>
+              </footer>
+            </section>
           `
         })
         .join('')
 
+      printWindow.document.open()
       printWindow.document.write(`
         <!DOCTYPE html>
         <html>
@@ -3012,303 +3217,290 @@ beforeUnmount()  {
 
             <style>
               @page {
-                size: landscape;
-                margin: 10mm;
+                size: A4 landscape;
+                margin: 6mm;
               }
 
               * {
                 box-sizing: border-box;
               }
 
+              html,
               body {
                 margin: 0;
-                background: ${printColors.page};
-                color: ${printColors.text};
+                padding: 0;
+                background: #ffffff;
+                color: #111827;
                 font-family: Arial, Helvetica, sans-serif;
+                -webkit-print-color-adjust: exact;
+                print-color-adjust: exact;
               }
 
-              .report-header {
-                padding-bottom: 12px;
-                border-bottom: 3px solid ${printColors.text};
+              .print-page {
+                width: 100%;
+                min-height: 190mm;
+                padding: 0;
+                display: flex;
+                flex-direction: column;
+                page-break-after: always;
+                break-after: page;
+              }
+
+              .print-page:last-child {
+                page-break-after: auto;
+                break-after: auto;
+              }
+
+              .print-header {
+                height: 14mm;
+                padding: 0 1mm 2mm;
+                border-bottom: 1.5px solid #111827;
                 display: flex;
                 align-items: center;
                 justify-content: space-between;
-                gap: 20px;
+                gap: 10px;
               }
 
-              .brand {
-                display: flex;
-                align-items: center;
-                gap: 12px;
+              .print-brand strong,
+              .print-brand span,
+              .print-meta strong,
+              .print-meta span {
+                display: block;
               }
 
-              .brand img {
-                width: 62px;
-                height: 62px;
-                object-fit: contain;
+              .print-brand strong {
+                font-size: 15px;
+                letter-spacing: .06em;
               }
 
-              .brand-text h1 {
-                margin: 0;
-                font-size: 22px;
-                letter-spacing: .03em;
+              .print-brand span {
+                margin-top: 2px;
+                color: #6b7280;
+                font-size: 7px;
               }
 
-              .brand-text p {
-                margin: 4px 0 0;
-                color: ${printColors.muted};
-                font-size: 9px;
-              }
-
-              .report-meta {
+              .print-meta {
                 text-align: right;
               }
 
-              .report-meta strong,
-              .report-meta small {
-                display: block;
-              }
-
-              .report-meta strong {
-                font-size: 12px;
-              }
-
-              .report-meta small {
-                margin-top: 4px;
-                color: ${printColors.muted};
+              .print-meta strong {
                 font-size: 8px;
-              }
-
-              .summary-grid {
-                margin: 12px 0;
-                display: grid;
-                grid-template-columns:
-                  repeat(auto-fit, minmax(115px, 1fr));
-                gap: 7px;
-              }
-
-              .summary-card {
-                min-height: 48px;
-                padding: 8px 10px;
-                border: 1px solid ${printColors.border};
-                border-radius: 7px;
-                background: ${printColors.surface};
-                display: flex;
-                align-items: center;
-                gap: 9px;
-              }
-
-              .summary-line {
-                width: 6px;
-                height: 31px;
-                border-radius: 999px;
-                flex-shrink: 0;
-              }
-
-              .summary-card small,
-              .summary-card strong {
-                display: block;
-              }
-
-              .summary-card small {
-                color: ${printColors.muted};
-                font-size: 7px;
-                font-weight: 800;
                 text-transform: uppercase;
               }
 
-              .summary-card strong {
-                margin-top: 3px;
-                font-size: 16px;
+              .print-meta span {
+                margin-top: 1px;
+                color: #6b7280;
+                font-size: 6px;
               }
 
-              table {
-                width: 100%;
-                border-collapse: collapse;
-                table-layout: fixed;
+              .print-columns {
+                flex: 1;
+                padding-top: 3mm;
+                display: grid;
+                grid-template-columns: repeat(2, minmax(0, 1fr));
+                gap: 4mm;
               }
 
-              thead {
-                display: table-header-group;
+              .print-column {
+                min-width: 0;
+                display: grid;
+                grid-template-rows: repeat(15, minmax(0, 1fr));
+                gap: 1.1mm;
               }
 
-              tr {
+              .print-order-card,
+              .empty-print-row {
+                min-height: 9.2mm;
+                border: 1px solid #d4d8df;
+                border-radius: 2mm;
+              }
+
+              .print-order-card {
+                padding: 1.2mm 1.8mm;
+                background: #ffffff;
+                display: grid;
+                grid-template-columns: 6mm minmax(0, 1fr) 39mm;
+                align-items: center;
+                gap: 2mm;
+                break-inside: avoid;
                 page-break-inside: avoid;
               }
 
-              th,
-              td {
-                padding: 7px 8px;
-                border: 1px solid ${printColors.border};
-                text-align: left;
-                vertical-align: middle;
-                font-size: 8px;
+              .empty-print-row {
+                border-color: transparent;
               }
 
-              th {
-                background: ${printColors.header};
-                color: #ffffff;
-                font-size: 8px;
-                text-transform: uppercase;
-                letter-spacing: .04em;
-              }
-
-              .number {
-                width: 32px;
-                text-align: center;
-              }
-
-              .order-cell strong,
-              .order-cell small {
-                display: block;
-              }
-
-              .order-cell strong {
-                font-size: 9px;
-              }
-
-              .order-cell small {
-                margin-top: 3px;
-                color: ${printColors.muted};
-                font-size: 7px;
-              }
-
-              .status {
-                display: inline-block;
-                min-width: 78px;
-                padding: 5px 8px;
-                border-radius: 5px;
-                font-size: 7px;
-                font-weight: 900;
-                text-align: center;
-              }
-
-              .owners-cell {
-                display: flex;
-                flex-wrap: wrap;
-                align-items: center;
-                gap: 6px;
-              }
-
-              .owner-item {
-                min-width: 0;
-                padding: 3px 7px 3px 3px;
-                border: 1px solid ${printColors.border};
-                border-radius: 999px;
-                background: ${isDarkPrint ? '#111827' : '#f8fafc'};
-                display: inline-flex;
-                align-items: center;
-                gap: 5px;
-              }
-
-              .owner-item img,
-              .owner-fallback {
-                width: 23px;
-                height: 23px;
+              .order-number {
+                width: 5mm;
+                height: 5mm;
                 border-radius: 50%;
-                object-fit: cover;
-                flex-shrink: 0;
-              }
-
-              .owner-fallback {
-                background: ${printColors.header};
+                background: #111827;
                 color: #ffffff;
+                font-size: 6px;
+                font-weight: 800;
                 display: grid;
                 place-items: center;
-                font-size: 7px;
-                font-weight: 900;
               }
 
-              .owner-item > span:last-child {
+              .order-main {
+                min-width: 0;
+                display: flex;
+                align-items: center;
+                gap: 2mm;
+              }
+
+              .order-name {
+                min-width: 0;
+                flex: 1;
                 overflow: hidden;
-                max-width: 105px;
-                font-size: 7px;
-                font-weight: 800;
+                font-size: 7.4px;
+                line-height: 1.1;
                 text-overflow: ellipsis;
                 white-space: nowrap;
               }
 
-              .unassigned {
-                color: #9ca3af;
-                font-size: 8px;
+              .order-status {
+                flex-shrink: 0;
+                max-width: 25mm;
+                padding: 1.2mm 2mm;
+                border-radius: 999px;
+                background: var(--status-color);
+                color: var(--status-text);
+                overflow: hidden;
+                font-size: 5.8px;
+                font-weight: 900;
+                line-height: 1;
+                text-overflow: ellipsis;
+                white-space: nowrap;
               }
 
-              .report-footer {
-                margin-top: 10px;
-                padding-top: 7px;
-                border-top: 1px solid ${printColors.border};
-                color: ${printColors.muted};
-                font-size: 7px;
+              .creator {
+                min-width: 0;
+                padding-left: 2mm;
+                border-left: 1px solid #e5e7eb;
                 display: flex;
+                align-items: center;
+                gap: 1.5mm;
+              }
+
+              .creator-photo,
+              .creator-photo img,
+              .creator-fallback {
+                width: 6.5mm;
+                height: 6.5mm;
+                flex-shrink: 0;
+                border-radius: 50%;
+              }
+
+              .creator-photo {
+                overflow: hidden;
+                background: #eef0f3;
+              }
+
+              .creator-photo img {
+                display: block;
+                object-fit: cover;
+              }
+
+              .creator-fallback {
+                background: #111827;
+                color: #ffffff;
+                font-size: 6px;
+                font-weight: 900;
+                place-items: center;
+              }
+
+              .creator-name {
+                min-width: 0;
+              }
+
+              .creator-name small,
+              .creator-name strong {
+                display: block;
+                overflow: hidden;
+                text-overflow: ellipsis;
+                white-space: nowrap;
+              }
+
+              .creator-name small {
+                color: #9ca3af;
+                font-size: 4.8px;
+                font-weight: 800;
+                text-transform: uppercase;
+              }
+
+              .creator-name strong {
+                margin-top: .7mm;
+                font-size: 6.3px;
+              }
+
+              .print-footer {
+                height: 8mm;
+                padding: 2mm 1mm 0;
+                border-top: 1px solid #d4d8df;
+                color: #6b7280;
+                font-size: 6px;
+                display: flex;
+                align-items: flex-start;
                 justify-content: space-between;
+              }
+
+              .print-footer strong {
+                color: #111827;
+              }
+
+              @media screen {
+                body {
+                  padding: 12px;
+                  background: #e5e7eb;
+                }
+
+                .print-page {
+                  max-width: 297mm;
+                  min-height: 210mm;
+                  margin: 0 auto 14px;
+                  padding: 6mm;
+                  background: #ffffff;
+                  box-shadow: 0 8px 25px rgba(0, 0, 0, .12);
+                }
+              }
+
+              @media print {
+                body {
+                  background: #ffffff;
+                }
+
+                .print-page {
+                  height: 198mm;
+                  min-height: 198mm;
+                  overflow: hidden;
+                }
               }
             </style>
           </head>
 
           <body>
-            <header class="report-header">
-              <div class="brand">
-                <img
-                  src="${logoUrl}"
-                  alt="Prosix"
-                  onerror="this.style.display='none'"
-                />
-
-                <div class="brand-text">
-                  <h1>PROSIX SPORTS</h1>
-                  <p>Factory Order Management Overview</p>
-                </div>
-              </div>
-
-              <div class="report-meta">
-                <strong>
-                  ${this.escapePrint(this.activeBoardGroup.label)}
-                </strong>
-
-                <small>
-                  Generated: ${this.escapePrint(generatedAt)}
-                </small>
-
-                <small>
-                  Total Orders: ${orders.length}
-                </small>
-              </div>
-            </header>
-
-            <section class="summary-grid">
-              ${summaryCards}
-            </section>
-
-            <table>
-              <thead>
-                <tr>
-                  <th style="width:32px">#</th>
-                  <th style="width:220px">Order Name</th>
-                  <th style="width:110px">Status</th>
-                  <th>Owners</th>
-                </tr>
-              </thead>
-
-              <tbody>
-                ${rows}
-              </tbody>
-            </table>
-
-            <footer class="report-footer">
-              <span>Prosix Sports — Internal Order Report</span>
-              <span>${orders.length} order(s)</span>
-            </footer>
-
-            <script>
-              window.onload = function () {
-                window.print()
-              }
-            <\/script>
+            ${pageMarkup}
           </body>
         </html>
       `)
 
       printWindow.document.close()
+
+      /*
+       * Browser ko document render aur creator photos load karne do.
+       * Hard delay ki jagah actual image load events ka wait hota hai.
+       */
+      await this.waitForPrintImages(printWindow, 2500)
+
+      printWindow.focus()
+
+      requestAnimationFrame(() => {
+        setTimeout(() => {
+          printWindow.print()
+        }, 120)
+      })
     },
 
     escapePrint(value) {
@@ -4195,6 +4387,16 @@ async fetchClients() {
          * order_work_sessions table se aata hai.
          */
         working_by: order.working_by || null,
+
+        /*
+         * Order creator backend se creator relation ke naam se aaye.
+         * Alternate field names bhi support kiye gaye hain.
+         */
+        creator:
+          order.creator ||
+          order.created_by_user ||
+          order.createdBy ||
+          null,
 
         invoiceFiles: [],
         owners: members.map(m => ({
