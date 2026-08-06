@@ -5,23 +5,33 @@
             <!-- HERO -->
             <div class="hero">
                 <div>
-                    <h2>{{ user?.name || 'User' }}! </h2>
-                    <p>Here is your Prosix orders overview.</p>
+                    <span class="hero-label">PROSIX WORKSPACE</span>
+                    <h2>{{ user?.name || 'User' }}!</h2>
+                    <p>
+                        Here is your orders and designer performance overview.
+                    </p>
                 </div>
-                <router-link to="/orders" class="hero-btn">
+
+                <router-link
+                    to="/orders?type=factory"
+                    class="hero-btn"
+                >
                     <i class="fa-solid fa-clipboard-list"></i>
-                    View Orders
+                    View Factory Orders
                 </router-link>
             </div>
 
-            <!-- STATS 2x2 -->
+            <!-- STATS -->
             <div class="stats">
                 <div class="stat-card">
                     <div class="stat-left">
                         <span>Total Orders</span>
                         <strong>{{ stats.totalOrders }}</strong>
                     </div>
-                    <div class="stat-ico"><i class="fa-solid fa-box"></i></div>
+
+                    <div class="stat-ico">
+                        <i class="fa-solid fa-box"></i>
+                    </div>
                 </div>
 
                 <div class="stat-card">
@@ -29,7 +39,10 @@
                         <span>In Production</span>
                         <strong>{{ stats.inProduction }}</strong>
                     </div>
-                    <div class="stat-ico"><i class="fa-solid fa-gears"></i></div>
+
+                    <div class="stat-ico">
+                        <i class="fa-solid fa-gears"></i>
+                    </div>
                 </div>
 
                 <div class="stat-card">
@@ -37,7 +50,10 @@
                         <span>Completed</span>
                         <strong>{{ stats.completed }}</strong>
                     </div>
-                    <div class="stat-ico"><i class="fa-solid fa-circle-check"></i></div>
+
+                    <div class="stat-ico">
+                        <i class="fa-solid fa-circle-check"></i>
+                    </div>
                 </div>
 
                 <div class="stat-card">
@@ -45,46 +61,310 @@
                         <span>Shipped</span>
                         <strong>{{ stats.shipped }}</strong>
                     </div>
-                    <div class="stat-ico"><i class="fa-solid fa-truck-fast"></i></div>
+
+                    <div class="stat-ico">
+                        <i class="fa-solid fa-truck-fast"></i>
+                    </div>
                 </div>
             </div>
 
-            <!-- RECENT ORDERS -->
-            <div class="orders-card">
+            <!-- DESIGNER PERFORMANCE -->
+            <section class="performance-card">
+                <div class="section-head">
+                    <div>
+                        <span class="section-eyebrow">
+                            TEAM PERFORMANCE
+                        </span>
 
-                <div class="orders-head">
-                    <p>Latest orders in Prosix</p>
-                    <router-link to="/orders" class="view-all-btn">View All</router-link>
+                        <h3>Designer Record</h3>
+
+                        <p>
+                            Working, completed and total time record for every designer.
+                        </p>
+                    </div>
+
+                    <div class="performance-search">
+                        <i class="fa-solid fa-magnifying-glass"></i>
+
+                        <input
+                            v-model.trim="designerSearch"
+                            type="search"
+                            placeholder="Search designer..."
+                        />
+                    </div>
                 </div>
 
-                <div v-if="loading" class="empty-state">
+                <div
+                    v-if="loading"
+                    class="empty-state"
+                >
+                    <i class="fa-solid fa-spinner fa-spin"></i>
+                    <p>Loading designer record...</p>
+                </div>
+
+                <div
+                    v-else-if="filteredDesigners.length === 0"
+                    class="empty-state"
+                >
+                    <i class="fa-solid fa-users"></i>
+                    <p>No designer record found.</p>
+                </div>
+
+                <div
+                    v-else
+                    class="designer-grid"
+                >
+                    <article
+                        v-for="designer in filteredDesigners"
+                        :key="designer.id"
+                        class="designer-card"
+                        :class="{
+                            working:
+                                designer.currently_working > 0
+                        }"
+                    >
+                        <div class="designer-top">
+                            <div class="designer-photo">
+                                <img
+                                    v-if="designer.profile_photo_url"
+                                    :src="designer.profile_photo_url"
+                                    :alt="designer.name"
+                                />
+
+                                <span v-else>
+                                    {{ initial(designer.name) }}
+                                </span>
+
+                                <i
+                                    v-if="designer.currently_working > 0"
+                                    class="working-dot"
+                                ></i>
+                            </div>
+
+                            <div class="designer-identity">
+                                <strong>{{ designer.name }}</strong>
+
+                                <small>
+                                    {{ formatRole(designer.role) }}
+                                </small>
+                            </div>
+
+                            <button
+                                type="button"
+                                class="record-toggle"
+                                :class="{
+                                    active:
+                                        expandedDesignerId ===
+                                        designer.id
+                                }"
+                                @click="toggleDesigner(designer.id)"
+                            >
+                                <i
+                                    class="fa-solid"
+                                    :class="
+                                        expandedDesignerId ===
+                                        designer.id
+                                            ? 'fa-chevron-up'
+                                            : 'fa-chevron-down'
+                                    "
+                                ></i>
+                            </button>
+                        </div>
+
+                        <div class="designer-metrics">
+                            <div>
+                                <span>Working Now</span>
+                                <strong>
+                                    {{ designer.currently_working }}
+                                </strong>
+                            </div>
+
+                            <div>
+                                <span>Worked Orders</span>
+                                <strong>
+                                    {{ designer.total_worked_orders }}
+                                </strong>
+                            </div>
+
+                            <div>
+                                <span>Completed</span>
+                                <strong>
+                                    {{ designer.completed_orders }}
+                                </strong>
+                            </div>
+
+                            <div>
+                                <span>Forwarded</span>
+                                <strong>
+                                    {{ designer.forwarded_orders }}
+                                </strong>
+                            </div>
+                        </div>
+
+                        <div class="designer-time">
+                            <div>
+                                <span>Total Time</span>
+                                <strong>
+                                    {{ formatMinutes(designer.total_minutes) }}
+                                </strong>
+                            </div>
+
+                            <div>
+                                <span>Average / Session</span>
+                                <strong>
+                                    {{ formatMinutes(designer.average_minutes) }}
+                                </strong>
+                            </div>
+                        </div>
+
+                        <div
+                            v-if="
+                                designer.currently_working_orders?.length
+                            "
+                            class="working-orders"
+                        >
+                            <span class="working-label">
+                                <i class="fa-solid fa-circle"></i>
+                                Working now
+                            </span>
+
+                            <button
+                                v-for="order in designer.currently_working_orders"
+                                :key="order.order_id"
+                                type="button"
+                                @click="openOrder(order.order_id)"
+                            >
+                                {{ order.order_name }}
+                            </button>
+                        </div>
+
+                        <div
+                            v-if="
+                                expandedDesignerId === designer.id
+                            "
+                            class="designer-history"
+                        >
+                            <div class="history-head">
+                                <strong>Recent Work Record</strong>
+                                <span>
+                                    {{ designer.recent_record?.length || 0 }}
+                                    sessions
+                                </span>
+                            </div>
+
+                            <div
+                                v-if="!designer.recent_record?.length"
+                                class="history-empty"
+                            >
+                                No working sessions yet.
+                            </div>
+
+                            <button
+                                v-for="record in designer.recent_record"
+                                v-else
+                                :key="record.id"
+                                type="button"
+                                class="history-row"
+                                @click="openOrder(record.order_id)"
+                            >
+                                <div>
+                                    <strong>
+                                        {{ record.order_name }}
+                                    </strong>
+
+                                    <small>
+                                        {{ formatDateTime(record.started_at) }}
+                                    </small>
+                                </div>
+
+                                <span
+                                    v-if="record.is_working"
+                                    class="history-status live"
+                                >
+                                    Working
+                                </span>
+
+                                <span
+                                    v-else
+                                    class="history-status"
+                                >
+                                    {{ formatMinutes(record.minutes) }}
+                                </span>
+                            </button>
+                        </div>
+                    </article>
+                </div>
+            </section>
+
+            <!-- RECENT ORDERS -->
+            <div class="orders-card">
+                <div class="orders-head">
+                    <div>
+                        <h3>Recent Orders</h3>
+                        <p>Latest factory orders in Prosix.</p>
+                    </div>
+
+                    <router-link
+                        to="/orders?type=factory"
+                        class="view-all-btn"
+                    >
+                        View All
+                    </router-link>
+                </div>
+
+                <div
+                    v-if="loading"
+                    class="empty-state"
+                >
                     <i class="fa-solid fa-spinner fa-spin"></i>
                     <p>Loading...</p>
                 </div>
 
-                <div v-else-if="recentOrders.length === 0" class="empty-state">
+                <div
+                    v-else-if="recentOrders.length === 0"
+                    class="empty-state"
+                >
                     <i class="fa-solid fa-inbox"></i>
                     <p>No orders yet.</p>
                 </div>
 
-                <div v-else class="order-list">
+                <div
+                    v-else
+                    class="order-list"
+                >
                     <div
                         v-for="order in recentOrders"
                         :key="order.id"
                         class="order-row"
-                        @click="$router.push(`/orders?order_id=${order.id}`)"
+                        @click="openOrder(order.id)"
                     >
-                        <div class="order-av">{{ initial(order.name) }}</div>
+                        <div class="order-av">
+                            {{ initial(order.name) }}
+                        </div>
+
                         <div class="order-info">
                             <strong>{{ order.name }}</strong>
-                            <small>{{ formatDate(order.created_at) }}</small>
+
+                            <small>
+                                {{ order.po || formatDate(order.created_at) }}
+                            </small>
                         </div>
-                        <span class="badge" :class="statusClass(order.status)">
+
+                        <span
+                            class="badge"
+                            :style="{
+                                background:
+                                    order.status_color || '#111827',
+                                color:
+                                    readableTextColor(
+                                        order.status_color || '#111827'
+                                    )
+                            }"
+                        >
                             {{ order.status || 'Pending' }}
                         </span>
                     </div>
                 </div>
-
             </div>
 
         </div>
@@ -97,303 +377,812 @@ import axios from 'axios'
 
 export default {
     name: 'Dashboard',
-    components: { AppLayout },
+
+    components: {
+        AppLayout
+    },
 
     data() {
         return {
             loading: false,
-            orders: [],
-            stats: { totalOrders: 0, pending: 0, inProduction: 0, completed: 0, shipped: 0 }
+            designerSearch: '',
+            expandedDesignerId: null,
+            recentOrders: [],
+            designers: [],
+
+            stats: {
+                totalOrders: 0,
+                pending: 0,
+                inProduction: 0,
+                completed: 0,
+                shipped: 0,
+                delivered: 0
+            }
         }
     },
 
     computed: {
         user() {
-            try { return JSON.parse(localStorage.getItem('user')) } catch { return null }
+            try {
+                return JSON.parse(
+                    localStorage.getItem('user')
+                )
+            } catch {
+                return null
+            }
         },
-        recentOrders() { return this.orders.slice(0, 8) }
+
+        filteredDesigners() {
+            const search = this.designerSearch
+                .toLowerCase()
+                .trim()
+
+            if (!search) {
+                return this.designers
+            }
+
+            return this.designers.filter(designer => {
+                return [
+                    designer.name,
+                    designer.email,
+                    this.formatRole(designer.role)
+                ]
+                    .join(' ')
+                    .toLowerCase()
+                    .includes(search)
+            })
+        }
     },
 
-    mounted() { this.fetchDashboard() },
+    mounted() {
+        this.fetchDashboard()
+    },
 
     methods: {
         headers() {
             return {
-                Authorization: `Bearer ${localStorage.getItem('token')}`,
+                Authorization:
+                    `Bearer ${localStorage.getItem('token')}`,
                 Accept: 'application/json'
             }
         },
 
         async fetchDashboard() {
             this.loading = true
+
             try {
-                const res = await axios.get('/api/orders', { headers: this.headers() })
-                const orders = Array.isArray(res.data) ? res.data : (res.data?.data || [])
-                this.orders = orders
-                this.makeStats(orders)
-            } catch (e) {
-                console.error(e)
+                const response = await axios.get(
+                    '/api/dashboard',
+                    {
+                        headers: this.headers()
+                    }
+                )
+
+                this.stats = {
+                    ...this.stats,
+                    ...(response.data?.stats || {})
+                }
+
+                this.recentOrders =
+                    response.data?.recent_orders || []
+
+                this.designers =
+                    response.data?.designer_performance || []
+
+            } catch (error) {
+                console.error(
+                    'Dashboard load error:',
+                    error
+                )
             } finally {
                 this.loading = false
             }
         },
 
-        makeStats(orders) {
-            this.stats.totalOrders = orders.length
-            this.stats.pending = orders.filter(o => {
-                const s = this.cs(o.status)
-                return s.includes('pending') || s.includes('design')
-            }).length
-            this.stats.inProduction = orders.filter(o => {
-                const s = this.cs(o.status)
-                return s.includes('production') || s.includes('progress')
-            }).length
-            this.stats.completed = orders.filter(o => this.cs(o.status).includes('completed')).length
-            this.stats.shipped = orders.filter(o => {
-                const s = this.cs(o.status)
-                return s.includes('shipped') || s.includes('delivered')
-            }).length
+        toggleDesigner(id) {
+            this.expandedDesignerId =
+                this.expandedDesignerId === id
+                    ? null
+                    : id
         },
 
-        cs(status) { return String(status || '').toLowerCase() },
+        openOrder(orderId) {
+            if (!orderId) return
 
-        statusClass(status) {
-            const s = this.cs(status)
-            if (s.includes('completed')) return 'b-completed'
-            if (s.includes('shipped') || s.includes('delivered')) return 'b-shipped'
-            if (s.includes('production') || s.includes('progress') || s.includes('packing')) return 'b-production'
-            if (s.includes('design')) return 'b-designing'
-            return 'b-pending'
+            this.$router.push({
+                path: '/orders',
+                query: {
+                    type: 'factory',
+                    order_id: orderId
+                }
+            })
         },
 
-        initial(name) { return name ? name.charAt(0).toUpperCase() : 'O' },
+        initial(name) {
+            return String(name || 'U')
+                .charAt(0)
+                .toUpperCase()
+        },
+
+        formatRole(role) {
+            return String(role || 'member')
+                .replaceAll('_', ' ')
+                .replace(
+                    /\b\w/g,
+                    letter => letter.toUpperCase()
+                )
+        },
+
+        formatMinutes(minutes) {
+            const total = Number(minutes || 0)
+
+            if (total <= 0) {
+                return '0m'
+            }
+
+            const hours = Math.floor(total / 60)
+            const remaining = total % 60
+
+            if (!hours) {
+                return `${remaining}m`
+            }
+
+            if (!remaining) {
+                return `${hours}h`
+            }
+
+            return `${hours}h ${remaining}m`
+        },
 
         formatDate(date) {
-            if (!date) return ''
-            const d = new Date(date)
-            if (isNaN(d)) return date
-            return d.toLocaleDateString()
+            if (!date) return '—'
+
+            const parsed = new Date(date)
+
+            if (Number.isNaN(parsed.getTime())) {
+                return String(date)
+            }
+
+            return parsed.toLocaleDateString(
+                'en-US',
+                {
+                    day: '2-digit',
+                    month: 'short',
+                    year: 'numeric'
+                }
+            )
+        },
+
+        formatDateTime(date) {
+            if (!date) return '—'
+
+            const parsed = new Date(date)
+
+            if (Number.isNaN(parsed.getTime())) {
+                return String(date)
+            }
+
+            return parsed.toLocaleString(
+                'en-US',
+                {
+                    day: '2-digit',
+                    month: 'short',
+                    year: 'numeric',
+                    hour: '2-digit',
+                    minute: '2-digit'
+                }
+            )
+        },
+
+        readableTextColor(color) {
+            const value = String(color || '')
+                .replace('#', '')
+
+            if (!/^[0-9a-f]{6}$/i.test(value)) {
+                return '#ffffff'
+            }
+
+            const red = parseInt(
+                value.slice(0, 2),
+                16
+            )
+
+            const green = parseInt(
+                value.slice(2, 4),
+                16
+            )
+
+            const blue = parseInt(
+                value.slice(4, 6),
+                16
+            )
+
+            const luminance =
+                (0.299 * red) +
+                (0.587 * green) +
+                (0.114 * blue)
+
+            return luminance > 155
+                ? '#111827'
+                : '#ffffff'
         }
     }
 }
 </script>
 
 <style scoped>
-*, *::before, *::after { box-sizing: border-box; }
+*,
+*::before,
+*::after {
+    box-sizing: border-box;
+}
 
 .dash {
-    padding: 20px;
-    background: #f4f5f8;
     min-height: 100vh;
+    padding: 22px;
+    background: #f4f5f8;
 }
 
-/* ─── HERO ─── */
 .hero {
-    background: #111;
-    color: #fff;
+    margin-bottom: 16px;
+    padding: 26px;
     border-radius: 20px;
-    padding: 24px 20px;
-    margin-bottom: 16px;
-    display: flex;
-    flex-direction: column;
-    gap: 16px;
-}
-
-.hero h2 { margin: 0; font-size: 22px; font-weight: 900; line-height: 1.3; }
-.hero p  { margin: 6px 0 0; color: #9ca3af; font-size: 13px; }
-
-.hero-btn {
-    display: inline-flex;
-    align-items: center;
-    gap: 8px;
-    background: #fff;
-    color: #000;
-    border: none;
-    border-radius: 10px;
-    padding: 10px 18px;
-    font-size: 13px;
-    font-weight: 800;
-    text-decoration: none;
-    align-self: flex-start;
-}
-.hero-btn:hover { background: #f0f0f0; color: #000; }
-
-/* ─── STATS ─── */
-.stats {
-    display: grid;
-    grid-template-columns: 1fr 1fr;
-    gap: 12px;
-    margin-bottom: 16px;
-}
-
-.stat-card {
-    background: #fff;
-    border-radius: 16px;
-    padding: 18px 16px;
+    background:
+        linear-gradient(
+            135deg,
+            #10121a 0%,
+            #202534 100%
+        );
+    color: #ffffff;
     display: flex;
     align-items: center;
     justify-content: space-between;
-    border: 1px solid #e8eaed;
+    gap: 18px;
 }
 
-.stat-left {
+.hero-label,
+.section-eyebrow {
+    display: block;
+    margin-bottom: 7px;
+    color: #9ca3af;
+    font-size: 9px;
+    font-weight: 900;
+    letter-spacing: 0.14em;
+}
+
+.hero h2 {
+    margin: 0;
+    font-size: 24px;
+    font-weight: 900;
+}
+
+.hero p {
+    margin: 6px 0 0;
+    color: #b6bdcc;
+    font-size: 12px;
+}
+
+.hero-btn {
+    min-height: 41px;
+    padding: 0 16px;
+    border-radius: 10px;
+    background: #ffffff;
+    color: #111827;
+    text-decoration: none;
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 11px;
+    font-weight: 900;
+}
+
+.stats {
+    margin-bottom: 16px;
+    display: grid;
+    grid-template-columns:
+        repeat(4, minmax(0, 1fr));
+    gap: 12px;
+}
+
+.stat-card {
+    min-height: 108px;
+    padding: 17px;
+    border: 1px solid #e4e7ec;
+    border-radius: 15px;
+    background: #ffffff;
     display: flex;
-    flex-direction: column;
-    gap: 6px;
+    align-items: center;
+    justify-content: space-between;
 }
 
 .stat-left span {
-    font-size: 12px;
+    display: block;
     color: #6b7280;
-    font-weight: 700;
+    font-size: 10px;
+    font-weight: 800;
 }
 
 .stat-left strong {
-    font-size: 30px;
+    display: block;
+    margin-top: 8px;
+    color: #111827;
+    font-size: 31px;
     font-weight: 900;
-    color: #000;
     line-height: 1;
 }
 
 .stat-ico {
-    width: 44px;
-    height: 44px;
+    width: 42px;
+    height: 42px;
     border-radius: 12px;
-    background: #111;
-    color: #fff;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    font-size: 18px;
-    flex-shrink: 0;
+    background: #111827;
+    color: #ffffff;
+    display: grid;
+    place-items: center;
 }
 
-/* ─── ORDERS CARD ─── */
+.performance-card,
 .orders-card {
-    background: #fff;
+    margin-bottom: 16px;
+    border: 1px solid #e4e7ec;
     border-radius: 16px;
-    border: 1px solid #e8eaed;
+    background: #ffffff;
     overflow: hidden;
 }
 
+.section-head,
 .orders-head {
-    padding: 14px 16px;
+    padding: 17px 18px;
+    border-bottom: 1px solid #eceef2;
     display: flex;
     align-items: center;
     justify-content: space-between;
-    border-bottom: 1px solid #f0f1f3;
+    gap: 16px;
 }
 
-.orders-head p {
+.section-head h3,
+.orders-head h3 {
     margin: 0;
-    font-size: 13px;
+    color: #111827;
+    font-size: 17px;
+    font-weight: 900;
+}
+
+.section-head p,
+.orders-head p {
+    margin: 4px 0 0;
     color: #6b7280;
-    font-weight: 600;
+    font-size: 10px;
 }
 
-.view-all-btn {
-    background: #111;
-    color: #fff;
-    border-radius: 8px;
-    padding: 7px 14px;
-    font-size: 12px;
-    font-weight: 800;
-    text-decoration: none;
-}
-.view-all-btn:hover { background: #333; color: #fff; }
-
-/* ─── ORDER ROW ─── */
-.order-list { padding: 8px 0; }
-
-.order-row {
-    display: flex;
-    align-items: center;
-    gap: 12px;
-    padding: 12px 16px;
-    cursor: pointer;
-    transition: background 0.15s;
-}
-.order-row:hover { background: #f9fafb; }
-.order-row + .order-row { border-top: 1px solid #f3f4f6; }
-
-.order-av {
-    width: 38px;
+.performance-search {
+    width: 230px;
     height: 38px;
-    background: #111;
-    color: #fff;
+    padding: 0 12px;
+    border: 1px solid #d9dee7;
     border-radius: 10px;
     display: flex;
     align-items: center;
-    justify-content: center;
-    font-weight: 900;
-    font-size: 14px;
-    flex-shrink: 0;
+    gap: 8px;
 }
 
-.order-info { flex: 1; min-width: 0; }
-.order-info strong {
-    display: block;
-    font-size: 14px;
-    font-weight: 700;
-    color: #111;
-    white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
-}
-.order-info small {
-    display: block;
-    font-size: 11px;
+.performance-search i {
     color: #9ca3af;
-    margin-top: 2px;
-}
-
-/* ─── BADGES ─── */
-.badge {
-    border-radius: 999px;
-    padding: 5px 12px;
     font-size: 11px;
-    font-weight: 800;
-    text-transform: capitalize;
-    white-space: nowrap;
-    flex-shrink: 0;
 }
 
-.b-pending    { background: #fff; color: #000; border: 1.5px solid #000; }
-.b-designing  { background: #f3f4f6; color: #555; border: 1px solid #d1d5db; }
-.b-production { background: #111; color: #fff; }
-.b-completed  { background: #111; color: #fff; }
-.b-shipped    { background: #fff; color: #000; border: 1.5px dashed #000; }
+.performance-search input {
+    width: 100%;
+    border: 0;
+    outline: 0;
+    background: transparent;
+    font-size: 11px;
+}
 
-/* ─── EMPTY ─── */
-.empty-state {
-    padding: 40px 20px;
+.designer-grid {
+    padding: 14px;
+    display: grid;
+    grid-template-columns:
+        repeat(2, minmax(0, 1fr));
+    gap: 12px;
+}
+
+.designer-card {
+    min-width: 0;
+    padding: 14px;
+    border: 1px solid #e2e6ed;
+    border-radius: 14px;
+    background: #fbfcfd;
+    transition: 0.18s ease;
+}
+
+.designer-card:hover {
+    border-color: #c8ced8;
+    box-shadow: 0 10px 28px rgba(15,23,42,0.07);
+}
+
+.designer-card.working {
+    border-color: #86efac;
+    background: #f3fff7;
+}
+
+.designer-top {
     display: flex;
-    flex-direction: column;
     align-items: center;
     gap: 10px;
-    color: #9ca3af;
 }
-.empty-state i { font-size: 28px; color: #000; }
 
-/* ─── DESKTOP ─── */
-@media (min-width: 769px) {
-    .dash { padding: 28px; }
+.designer-photo {
+    position: relative;
+    width: 43px;
+    height: 43px;
+    flex: 0 0 43px;
+    overflow: visible;
+}
 
-    .hero {
-        flex-direction: row;
-        align-items: center;
-        justify-content: space-between;
-        padding: 28px 30px;
-        border-radius: 22px;
+.designer-photo img,
+.designer-photo > span {
+    width: 100%;
+    height: 100%;
+    border-radius: 50%;
+    object-fit: cover;
+    display: grid;
+    place-items: center;
+    background: #111827;
+    color: #ffffff;
+    font-size: 13px;
+    font-weight: 900;
+}
+
+.working-dot {
+    position: absolute;
+    right: 0;
+    bottom: 1px;
+    width: 11px;
+    height: 11px;
+    border: 2px solid #ffffff;
+    border-radius: 50%;
+    background: #22c55e;
+}
+
+.designer-identity {
+    min-width: 0;
+    flex: 1;
+}
+
+.designer-identity strong {
+    display: block;
+    overflow: hidden;
+    color: #111827;
+    font-size: 12px;
+    font-weight: 900;
+    white-space: nowrap;
+    text-overflow: ellipsis;
+}
+
+.designer-identity small {
+    display: block;
+    margin-top: 3px;
+    color: #6b7280;
+    font-size: 9px;
+}
+
+.record-toggle {
+    width: 31px;
+    height: 31px;
+    border: 1px solid #d9dee7;
+    border-radius: 8px;
+    background: #ffffff;
+    color: #111827;
+    cursor: pointer;
+}
+
+.record-toggle.active {
+    background: #111827;
+    color: #ffffff;
+}
+
+.designer-metrics {
+    margin-top: 13px;
+    display: grid;
+    grid-template-columns:
+        repeat(4, minmax(0, 1fr));
+    border: 1px solid #e7eaf0;
+    border-radius: 10px;
+    background: #ffffff;
+    overflow: hidden;
+}
+
+.designer-metrics > div {
+    min-width: 0;
+    padding: 9px 7px;
+    border-right: 1px solid #eceef2;
+    text-align: center;
+}
+
+.designer-metrics > div:last-child {
+    border-right: 0;
+}
+
+.designer-metrics span,
+.designer-time span {
+    display: block;
+    color: #8a93a3;
+    font-size: 7px;
+    font-weight: 800;
+    text-transform: uppercase;
+}
+
+.designer-metrics strong {
+    display: block;
+    margin-top: 5px;
+    color: #111827;
+    font-size: 16px;
+    font-weight: 900;
+}
+
+.designer-time {
+    margin-top: 10px;
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 8px;
+}
+
+.designer-time > div {
+    padding: 9px 10px;
+    border-radius: 9px;
+    background: #eef1f5;
+}
+
+.designer-time strong {
+    display: block;
+    margin-top: 4px;
+    color: #111827;
+    font-size: 11px;
+}
+
+.working-orders {
+    margin-top: 10px;
+    padding: 9px;
+    border-radius: 9px;
+    background: #dcfce7;
+}
+
+.working-label {
+    display: block;
+    margin-bottom: 6px;
+    color: #166534;
+    font-size: 8px;
+    font-weight: 900;
+    text-transform: uppercase;
+}
+
+.working-label i {
+    margin-right: 4px;
+    font-size: 6px;
+}
+
+.working-orders button {
+    margin: 2px 4px 2px 0;
+    padding: 5px 8px;
+    border: 0;
+    border-radius: 999px;
+    background: #ffffff;
+    color: #166534;
+    cursor: pointer;
+    font-size: 8px;
+    font-weight: 900;
+}
+
+.designer-history {
+    margin-top: 12px;
+    border-top: 1px solid #e4e7ec;
+    padding-top: 11px;
+}
+
+.history-head {
+    margin-bottom: 6px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+}
+
+.history-head strong {
+    font-size: 10px;
+}
+
+.history-head span {
+    color: #8a93a3;
+    font-size: 8px;
+}
+
+.history-row {
+    width: 100%;
+    padding: 8px 2px;
+    border: 0;
+    border-bottom: 1px solid #eceef2;
+    background: transparent;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 10px;
+    text-align: left;
+}
+
+.history-row:last-child {
+    border-bottom: 0;
+}
+
+.history-row div {
+    min-width: 0;
+}
+
+.history-row strong {
+    display: block;
+    overflow: hidden;
+    font-size: 9px;
+    white-space: nowrap;
+    text-overflow: ellipsis;
+}
+
+.history-row small {
+    display: block;
+    margin-top: 2px;
+    color: #8a93a3;
+    font-size: 7px;
+}
+
+.history-status {
+    flex-shrink: 0;
+    padding: 4px 7px;
+    border-radius: 999px;
+    background: #eef1f5;
+    color: #374151;
+    font-size: 7px;
+    font-weight: 900;
+}
+
+.history-status.live {
+    background: #dcfce7;
+    color: #166534;
+}
+
+.history-empty {
+    padding: 12px;
+    color: #9ca3af;
+    text-align: center;
+    font-size: 9px;
+}
+
+.view-all-btn {
+    padding: 7px 13px;
+    border-radius: 8px;
+    background: #111827;
+    color: #ffffff;
+    text-decoration: none;
+    font-size: 9px;
+    font-weight: 900;
+}
+
+.order-list {
+    padding: 5px 0;
+}
+
+.order-row {
+    padding: 11px 16px;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    gap: 11px;
+    transition: background 0.15s ease;
+}
+
+.order-row + .order-row {
+    border-top: 1px solid #f0f2f5;
+}
+
+.order-row:hover {
+    background: #f8fafc;
+}
+
+.order-av {
+    width: 35px;
+    height: 35px;
+    flex: 0 0 35px;
+    border-radius: 9px;
+    background: #111827;
+    color: #ffffff;
+    display: grid;
+    place-items: center;
+    font-size: 11px;
+    font-weight: 900;
+}
+
+.order-info {
+    min-width: 0;
+    flex: 1;
+}
+
+.order-info strong {
+    display: block;
+    overflow: hidden;
+    color: #111827;
+    font-size: 11px;
+    white-space: nowrap;
+    text-overflow: ellipsis;
+}
+
+.order-info small {
+    display: block;
+    margin-top: 3px;
+    color: #9ca3af;
+    font-size: 8px;
+}
+
+.badge {
+    flex-shrink: 0;
+    padding: 5px 9px;
+    border-radius: 999px;
+    font-size: 8px;
+    font-weight: 900;
+}
+
+.empty-state {
+    padding: 35px 20px;
+    color: #9ca3af;
+    text-align: center;
+}
+
+.empty-state i {
+    font-size: 23px;
+}
+
+.empty-state p {
+    margin: 8px 0 0;
+    font-size: 10px;
+}
+
+@media (max-width: 1050px) {
+    .stats {
+        grid-template-columns: repeat(2, 1fr);
     }
 
-    .hero-btn { align-self: auto; }
+    .designer-grid {
+        grid-template-columns: 1fr;
+    }
+}
+
+@media (max-width: 680px) {
+    .dash {
+        padding: 12px;
+    }
+
+    .hero,
+    .section-head,
+    .orders-head {
+        align-items: flex-start;
+        flex-direction: column;
+    }
 
     .stats {
-        grid-template-columns: repeat(4, 1fr);
-        gap: 16px;
+        grid-template-columns: 1fr 1fr;
     }
 
-    .stat-left strong { font-size: 34px; }
+    .performance-search {
+        width: 100%;
+    }
+
+    .designer-metrics {
+        grid-template-columns: 1fr 1fr;
+    }
+
+    .designer-metrics > div:nth-child(2) {
+        border-right: 0;
+    }
+
+    .designer-metrics > div:nth-child(-n + 2) {
+        border-bottom: 1px solid #eceef2;
+    }
 }
 </style>

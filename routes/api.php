@@ -21,11 +21,6 @@ use Illuminate\Support\Facades\Route;
 |--------------------------------------------------------------------------
 */
 
-Route::get('/dashboard', [
-    DashboardController::class,
-    'index'
-]);
-
 Route::post('/login', [
     AuthController::class,
     'login'
@@ -47,6 +42,17 @@ Route::get('/notifications-test', function () {
 */
 
 Route::middleware('auth:sanctum')->group(function () {
+
+    /*
+    |--------------------------------------------------------------------------
+    | Dashboard
+    |--------------------------------------------------------------------------
+    */
+
+    Route::get('/dashboard', [
+        DashboardController::class,
+        'index'
+    ]);
 
     /*
     |--------------------------------------------------------------------------
