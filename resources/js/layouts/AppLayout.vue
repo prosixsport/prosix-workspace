@@ -20,7 +20,11 @@
         ></div>
 
         <!-- SIDEBAR -->
-        <aside class="prosix-sidebar" :class="{ 'sidebar-open': sidebarOpen }">
+        <aside
+            v-if="$route.path !== '/orders'"
+            class="prosix-sidebar"
+            :class="{ 'sidebar-open': sidebarOpen }"
+        >
 
             <button class="sidebar-close-btn" @click="sidebarOpen = false">
                 <i class="fa-solid fa-xmark"></i>
@@ -57,37 +61,104 @@
                     <span>Home</span>
                 </router-link>
 
+                <!-- FACTORY ORDERS -->
                 <router-link
-                    to="/orders"
+                    :to="{ path: '/orders', query: { type: 'factory' } }"
                     class="nav-link-custom"
-                    :class="{ active: $route.path.startsWith('/orders') }"
+                    :class="{
+                        active:
+                            $route.path === '/orders' &&
+                            ($route.query.type || 'factory') === 'factory'
+                    }"
                     @click="clearOrderBadge(); sidebarOpen = false"
                 >
-                    <span class="nav-icon"><i class="fa-solid fa-clipboard-list"></i></span>
+                    <span class="nav-icon">
+                        <i class="fa-solid fa-industry"></i>
+                    </span>
+
                     <span>Factory Orders</span>
-                    <span v-if="showOrderBadge" class="order-badge">{{ orderNotificationCount }}</span>
+
+                    <span
+                        v-if="showOrderBadge"
+                        class="order-badge"
+                    >
+                        {{ orderNotificationCount }}
+                    </span>
                 </router-link>
+
+                <!-- TEAMSTORE ORDERS -->
                 <router-link
-                    to="/orders"
+                    :to="{ path: '/orders', query: { type: 'teamstore' } }"
                     class="nav-link-custom"
-                    :class="{ active: $route.path.startsWith('/orders') }"
+                    :class="{
+                        active:
+                            $route.path === '/orders' &&
+                            $route.query.type === 'teamstore'
+                    }"
                     @click="clearOrderBadge(); sidebarOpen = false"
                 >
-                    <span class="nav-icon"><i class="fa-solid fa-clipboard-list"></i></span>
+                    <span class="nav-icon">
+                        <i class="fa-solid fa-store"></i>
+                    </span>
+
                     <span>TeamStore Orders</span>
-                    <span v-if="showOrderBadge" class="order-badge">{{ orderNotificationCount }}</span>
                 </router-link>
+
+                <!-- PLACE ORDERS -->
                 <router-link
-                    to="/orders"
+                    to="/place-orders"
                     class="nav-link-custom"
-                    :class="{ active: $route.path.startsWith('/orders') }"
+                    :class="{ active: $route.path === '/place-orders' }"
+                    @click="sidebarOpen = false"
+                >
+                    <span class="nav-icon">
+                        <i class="fa-solid fa-cart-shopping"></i>
+                    </span>
+
+                    <span>Place Orders</span>
+
+                    <span
+                        v-if="placeOrderNotificationCount > 0"
+                        class="order-badge"
+                    >
+                        {{ placeOrderNotificationCount }}
+                    </span>
+                </router-link>
+
+                <!-- ARTWORK REQUESTS -->
+                <!-- <router-link
+                    :to="{ path: '/orders', query: { type: 'artwork_request' } }"
+                    class="nav-link-custom"
+                    :class="{
+                        active:
+                            $route.path === '/orders' &&
+                            $route.query.type === 'artwork_request'
+                    }"
                     @click="clearOrderBadge(); sidebarOpen = false"
                 >
-                    <span class="nav-icon"><i class="fa-solid fa-clipboard-list"></i></span>
-                    <span>Artwork Request</span>
-                    <span v-if="showOrderBadge" class="order-badge">{{ orderNotificationCount }}</span>
+                    <span class="nav-icon">
+                        <i class="fa-solid fa-palette"></i>
+                    </span>
+
+                    <span>Artwork Requests</span>
+                </router-link> -->
+                <router-link
+to="/artwork-requests"
+                    class="nav-link-custom"
+                    :class="{
+                        active:
+                            $route.path === '/orders' &&
+                            $route.query.type === 'artwork_request'
+                    }"
+                    @click="clearOrderBadge(); sidebarOpen = false"
+                >
+                    <span class="nav-icon">
+                        <i class="fa-solid fa-palette"></i>
+                    </span>
+
+                    <span>Artwork Requests</span>
                 </router-link>
-             
+
 
                 <router-link
                     v-if="isSuperAdmin || isAdmin"
@@ -156,7 +227,10 @@
         </aside>
 
         <!-- MAIN -->
-        <main class="prosix-main">
+        <main
+            class="prosix-main"
+            :class="{ 'orders-full-width': $route.path === '/orders' }"
+        >
             <slot />
         </main>
 
@@ -211,6 +285,7 @@ export default {
             profileModal: false,
             savingProfile: false,
             orderNotificationCount: 0,
+            placeOrderNotificationCount: 0,
             profileForm: {
                 name: '',
                 about: '',
@@ -245,17 +320,33 @@ export default {
 
     mounted() {
         this.loadOrderNotificationCount()
+        this.loadPlaceOrderNotificationCount()
+
+        window.addEventListener(
+            'place-orders-read-updated',
+            this.loadPlaceOrderNotificationCount
+        )
     },
 
     watch: {
         '$route.path'(newPath) {
             this.sidebarOpen = false
+
             if (newPath.startsWith('/orders')) {
                 this.clearOrderBadge()
             } else {
                 this.loadOrderNotificationCount()
             }
+
+            this.loadPlaceOrderNotificationCount()
         }
+    },
+
+    beforeUnmount() {
+        window.removeEventListener(
+            'place-orders-read-updated',
+            this.loadPlaceOrderNotificationCount
+        )
     },
 
     methods: {
@@ -277,6 +368,23 @@ export default {
         },
 
         clearOrderBadge() { this.orderNotificationCount = 0 },
+
+        async loadPlaceOrderNotificationCount() {
+            try {
+                const response = await axios.get(
+                    '/api/place-orders/unread-count',
+                    { headers: this.headers() }
+                )
+
+                this.placeOrderNotificationCount = Number(
+                    response.data?.count || 0
+                )
+            } catch (error) {
+                console.error('Place order notification error:', error)
+                this.placeOrderNotificationCount = 0
+            }
+        },
+
 
         formatRole(role) {
             if (!role) return 'Member'
@@ -599,4 +707,10 @@ export default {
         padding-top: 56px;
     }
 }
+
+.prosix-main.orders-full-width {
+    margin-left: 0;
+    width: 100%;
+}
+
 </style>

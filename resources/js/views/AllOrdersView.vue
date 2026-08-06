@@ -61,7 +61,7 @@
         <!-- <div class="col-owner">OWNER</div> -->
         <div class="col-actions"></div>
       </div>
-<div v-if="(hasFullOrderAccess || currentUser?.can_create_orders === true) && selectedOrders.length > 1" class="bulk-actions" @click.stop>
+<div v-if="(isSuperAdmin || currentUser?.can_create_orders === true) && selectedOrders.length > 1" class="bulk-actions" @click.stop>
         <strong>{{ selectedOrders.length }}</strong>
 
   <button class="bulk-btn" @click="openBulkMembersModal" :disabled="bulkActionLoading">
@@ -203,7 +203,7 @@
             <div class="order-menu-item" @click="openOrderInfo(order)">
               <i class="fa-solid fa-circle-info"></i> Info
             </div>
-<template v-if="hasFullOrderAccess || currentUser?.can_create_orders === true">
+<template v-if="isSuperAdmin || currentUser?.can_create_orders === true">
                   <div class="order-menu-item" @click="openEditOrder(order)"><i class="fa-solid fa-pen"></i> Edit</div>
               <div class="order-menu-item" @click="duplicateOrder(order)"><i class="fa-solid fa-copy"></i> Duplicate</div>
               <div class="order-menu-item danger" @click="deleteOrder(order)"><i class="fa-solid fa-trash"></i> Delete</div>
@@ -342,7 +342,7 @@
               </div>
             </div>
           </div>
-          <div v-if="hasFullOrderAccess" class="detail-info-item invoice-info-item" style="position:relative" @click.stop>
+          <div v-if="isSuperAdmin" class="detail-info-item invoice-info-item" style="position:relative" @click.stop>
             <button class="invoice-btn" @click="triggerInvoiceUpload">
               <i class="fa-solid fa-file-invoice me-1"></i>Add Invoice
             </button>
@@ -442,7 +442,7 @@
               <div class="payment-read-row balance-row">
                 <span>Balance</span><strong>${{ selectedOrder.paymentBalance || 0 }}</strong>
               </div>
-<div v-if="hasFullOrderAccess || currentUser?.can_create_orders === true" class="payment-admin-editor">
+<div v-if="isSuperAdmin || currentUser?.can_create_orders === true" class="payment-admin-editor">
                     <div class="payment-field">
                   <label class="payment-label">Paid %</label>
                   <div class="payment-percent-row">
@@ -498,22 +498,7 @@
               </div>
 
               <template v-else>
-                <div
-                  class="card-preview-area"
-                  :class="{ 'drag-drop-active': dragActiveCardType === card.type }"
-                  @dragenter.prevent.stop="onDragEnter(card)"
-                  @dragover.prevent.stop="onDragOver($event, card)"
-                  @dragleave.prevent.stop="onDragLeave($event, card)"
-                  @drop.prevent.stop="onDrop($event, card)"
-                >
-                  <div
-                    v-if="dragActiveCardType === card.type"
-                    class="drag-drop-overlay"
-                  >
-                    <i class="fa-solid fa-cloud-arrow-up"></i>
-                    <strong>Drop files here</strong>
-                    <span>{{ card.title }}</span>
-                  </div>
+                <div class="card-preview-area" @dragover.prevent @drop="onDrop($event, card)">
                   <div v-if="card.files && card.files.length" class="card-files-preview">
                     <div v-for="(file, fi) in card.files" :key="fi" class="file-thumb">
                       <img v-if="file.isImage && !file.imageError" :src="file.url" class="file-img" @click.stop="openPreviewFile(file)" @error="file.imageError = true" />
@@ -758,22 +743,7 @@ Saving will update the selected members for all selected orders.
             <button class="modal-close" @click="viewAllCard = null"><i class="fa-solid fa-xmark"></i></button>
           </div>
         </div>
-        <div
-          class="view-all-body"
-          :class="{ 'drag-drop-active': viewAllCard && dragActiveCardType === viewAllCard.type }"
-          @dragenter.prevent.stop="viewAllCard && onDragEnter(viewAllCard)"
-          @dragover.prevent.stop="viewAllCard && onDragOver($event, viewAllCard)"
-          @dragleave.prevent.stop="viewAllCard && onDragLeave($event, viewAllCard)"
-          @drop.prevent.stop="viewAllCard && onDrop($event, viewAllCard)"
-        >
-          <div
-            v-if="viewAllCard && dragActiveCardType === viewAllCard.type"
-            class="drag-drop-overlay drag-drop-overlay-modal"
-          >
-            <i class="fa-solid fa-cloud-arrow-up"></i>
-            <strong>Drop files here</strong>
-            <span>{{ viewAllCard.title }}</span>
-          </div>
+        <div class="view-all-body">
           <div v-if="viewAllCard.files && viewAllCard.files.length" class="view-all-grid">
             <div v-for="(file, fi) in viewAllCard.files" :key="fi" class="view-file-item">
               <img v-if="file.isImage && !file.imageError" :src="file.url" class="view-file-img clickable-file-preview" @click="openPreviewFile(file)" @error="file.imageError = true" />
@@ -867,8 +837,6 @@ export default {
   data() {
       return {
       showShippingAddressMenu: false,
-      dragActiveCardType: null,
-      dragCounter: 0,
       shippingAddressEdit: '',
       sidebarLightMode: false,
       leftWidth: 370,
@@ -971,12 +939,12 @@ activeTracking() {
  canEditNotes() {
   if (!this.selectedOrder || !this.currentUser) return false
 
-  if (this.hasFullOrderAccess) return true
+  if (this.currentUser.role === 'super_admin') return true
 
   return this.currentUser.can_create_orders === true
 },
 canUploadFiles() {
-  return this.hasFullOrderAccess
+  return this.currentUser?.role === 'super_admin'
     || this.currentUser?.can_create_orders === true
     || this.isClient
 },
@@ -984,8 +952,6 @@ canUploadFiles() {
       try { return JSON.parse(localStorage.getItem('user')) || null } catch { return null }
     },
     isSuperAdmin() { return this.currentUser?.role === 'super_admin' },
-    isAdmin() { return this.currentUser?.role === 'admin' },
-    hasFullOrderAccess() { return this.isSuperAdmin || this.isAdmin },
    canCreateOrder() {
   const role = this.currentUser?.role
 
@@ -1190,7 +1156,7 @@ deleteCustomStatus(status) {
   // Client sirf view/download karega
   if (this.isClient) return false;
 
-  return this.hasFullOrderAccess || Number(file?.senderId) === Number(this.currentUser?.id);
+  return this.isSuperAdmin || Number(file?.senderId) === Number(this.currentUser?.id);
 },
   toggleSelectAll() {
   this.selectedOrders = this.selectAll
@@ -1337,14 +1303,14 @@ alert(e.response?.data?.message || 'Orders were not deleted')
     clearSelectedMembers() { this.newOrder.selectedMembers = [] },
 
     triggerInvoiceUpload() {
-      if (!this.hasFullOrderAccess || !this.selectedOrder) return
+      if (!this.isSuperAdmin || !this.selectedOrder) return
       this.$refs.invoiceInput?.click()
     },
 
     async onInvoiceFileChange(event) {
       const files = Array.from(event.target.files || [])
       event.target.value = ''
-      if (!files.length || !this.hasFullOrderAccess || !this.selectedOrder) return
+      if (!files.length || !this.isSuperAdmin || !this.selectedOrder) return
       const formData = new FormData()
       formData.append('card_type', 'invoice_files')
       files.forEach(file => formData.append('files[]', file))
@@ -1896,7 +1862,7 @@ shippingAddress: order.shippingAddress || '',
     getOrderNote(order) { return order.cards?.find(c => c.title === 'Notes')?.noteText || '' },
 
     async duplicateOrder(order) {
-if (!this.hasFullOrderAccess && this.currentUser?.can_create_orders !== true) return
+if (!this.isSuperAdmin && this.currentUser?.can_create_orders !== true) return
       const status = this.statusOptions.find(s => s.label === order.status)
       try {
         const res = await axios.post('/api/orders', {
@@ -1915,7 +1881,7 @@ if (!this.hasFullOrderAccess && this.currentUser?.can_create_orders !== true) re
     },
 
     async deleteOrder(order) {
-if (!this.hasFullOrderAccess && this.currentUser?.can_create_orders !== true) return
+if (!this.isSuperAdmin && this.currentUser?.can_create_orders !== true) return
       if (!confirm('Delete this order?')) return
       try {
         await axios.delete(`/api/orders/${order.id}`, { headers:  this.headers() })
@@ -2138,90 +2104,11 @@ async onFileChange(event, card) {
       catch (e) { console.error('onFileChange error:', e); alert(e.response?.data?.message || 'File upload nahi hui') }
     },
 
-    onDragEnter(card) {
-      if (!this.canUploadFiles || !card || card.type === 'notes') return
-
-      this.dragCounter += 1
-      this.dragActiveCardType = card.type
-    },
-
-    onDragOver(event, card) {
-      if (!this.canUploadFiles || !card || card.type === 'notes') return
-
-      if (event?.dataTransfer) {
-        event.dataTransfer.dropEffect = 'copy'
-      }
-
-      this.dragActiveCardType = card.type
-    },
-
-    onDragLeave(event, card) {
-      if (!card) return
-
-      this.dragCounter = Math.max(0, this.dragCounter - 1)
-
-      const currentTarget = event?.currentTarget
-      const relatedTarget = event?.relatedTarget
-
-      /*
-       * Child element ke andar move karne par overlay hide nahi hoga.
-       */
-      if (
-        currentTarget &&
-        relatedTarget &&
-        currentTarget.contains(relatedTarget)
-      ) {
-        return
-      }
-
-      if (this.dragCounter === 0) {
-        this.dragActiveCardType = null
-      }
-    },
-
     async onDrop(event, card) {
-      this.dragCounter = 0
-      this.dragActiveCardType = null
-
-      if (!this.canUploadFiles || !card || card.type === 'notes') {
-        return
-      }
-
-      const droppedItems = Array.from(
-        event?.dataTransfer?.items || []
-      )
-
-      /*
-       * Browser folder ko direct upload nahi kar sakta.
-       * Folder ke andar files select/drag karni hongi.
-       */
-      const containsFolder = droppedItems.some(item => {
-        const entry = item.webkitGetAsEntry?.()
-        return entry?.isDirectory === true
-      })
-
-      if (containsFolder) {
-        alert('Please folder ke andar ki files drag karein. Complete folder upload supported nahi hai.')
-        return
-      }
-
-      const files = Array.from(
-        event?.dataTransfer?.files || []
-      ).filter(file => file && file.size >= 0)
-
-      if (!files.length) {
-        return
-      }
-
-      try {
-        await this.uploadFilesToOrder(files, card.type)
-      } catch (e) {
-        console.error('onDrop error:', e)
-        alert(
-          e.response?.data?.message ||
-          'File upload nahi hui'
-        )
-      }
+      const files = Array.from(event.dataTransfer.files || [])
+if (!files.length || !this.canUploadFiles || !card || card.type === 'notes') return
+      try { await this.uploadFilesToOrder(files, card.type) }
+      catch (e) { console.error('onDrop error:', e); alert(e.response?.data?.message || 'File upload nahi hui') }
     },
 
   async removeFile(card, index) {
@@ -2245,7 +2132,7 @@ async onFileChange(event, card) {
     openViewAll(card) { this.viewAllCard = card },
 
     openInvoiceFiles() {
-      if (!this.hasFullOrderAccess || !this.selectedOrder?.invoiceFiles?.length) return
+      if (!this.isSuperAdmin || !this.selectedOrder?.invoiceFiles?.length) return
       this.viewAllCard = { title: 'Invoices', type: 'invoice_files', files: this.selectedOrder.invoiceFiles }
     },
 
@@ -4221,61 +4108,4 @@ grid-template-columns: 32px 1fr 118px 38px;
 }
 
 .me-1 { margin-right: 4px; }
-
-/* ================= DRAG AND DROP FILE UPLOAD ================= */
-
-.card-preview-area,
-.view-all-body {
-  position: relative;
-}
-
-.card-preview-area.drag-drop-active,
-.view-all-body.drag-drop-active {
-  outline: 2px dashed #111827;
-  outline-offset: -6px;
-  background: rgba(17, 24, 39, 0.06);
-}
-
-.drag-drop-overlay {
-  position: absolute;
-  inset: 6px;
-  z-index: 30;
-  border: 2px dashed #111827;
-  border-radius: 12px;
-  background: rgba(255, 255, 255, 0.94);
-  color: #111827;
-  pointer-events: none;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  gap: 6px;
-  text-align: center;
-  backdrop-filter: blur(3px);
-}
-
-.drag-drop-overlay i {
-  font-size: 28px;
-}
-
-.drag-drop-overlay strong {
-  font-size: 14px;
-  font-weight: 800;
-}
-
-.drag-drop-overlay span {
-  max-width: 90%;
-  overflow: hidden;
-  color: #6b7280;
-  font-size: 12px;
-  font-weight: 700;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.drag-drop-overlay-modal {
-  inset: 12px;
-  min-height: 180px;
-}
-
 </style>

@@ -9,22 +9,60 @@ use App\Http\Controllers\OrderFileController;
 use App\Http\Controllers\ClientController;
 use App\Http\Controllers\InvoiceController;
 use App\Http\Controllers\NotificationController;
+use App\Http\Controllers\PlaceOrderController;
+use App\Http\Controllers\TeamStoreOrderController;
+use App\Http\Controllers\ArtworkRequestController;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
 
-Route::get('/dashboard', [DashboardController::class, 'index']);
+/*
+|--------------------------------------------------------------------------
+| Public Routes
+|--------------------------------------------------------------------------
+*/
 
-Route::post('/login', [AuthController::class, 'login']);
-Route::post('/register', [AuthController::class, 'register']);
+Route::get('/dashboard', [
+    DashboardController::class,
+    'index'
+]);
+
+Route::post('/login', [
+    AuthController::class,
+    'login'
+]);
+
+Route::post('/register', [
+    AuthController::class,
+    'register'
+]);
 
 Route::get('/notifications-test', function () {
     return \App\Models\OrderNotification::latest()->get();
 });
 
+/*
+|--------------------------------------------------------------------------
+| Authenticated Routes
+|--------------------------------------------------------------------------
+*/
+
 Route::middleware('auth:sanctum')->group(function () {
 
-    Route::post('/logout', [AuthController::class, 'logout']);
-    Route::get('/me', [AuthController::class, 'me']);
+    /*
+    |--------------------------------------------------------------------------
+    | Authentication
+    |--------------------------------------------------------------------------
+    */
+
+    Route::post('/logout', [
+        AuthController::class,
+        'logout'
+    ]);
+
+    Route::get('/me', [
+        AuthController::class,
+        'me'
+    ]);
 
     Route::post('/save-fcm-token', function (Request $request) {
         $request->validate([
@@ -40,92 +78,375 @@ Route::middleware('auth:sanctum')->group(function () {
             'message' => 'FCM token saved',
         ]);
     });
-    // Profile
-    Route::get('/users/{user}/profile', [MemberController::class, 'profile']);
-    Route::post('/me/profile', [MemberController::class, 'updateProfile']);
 
-    // IMPORTANT: Special order routes must be before /orders/{order}
-    Route::get('/orders/recycle-bin', [OrderController::class, 'recycleBin']);
-    Route::get('/order-activities', [OrderController::class, 'allActivities']);
+    /*
+    |--------------------------------------------------------------------------
+    | Prosix Website Orders
+    |--------------------------------------------------------------------------
+    |
+    | Factory Orders in routes se separate hain.
+    | Factory Orders CRM ke andar manually create honge.
+    |
+    */
 
-    // Orders
-    Route::get('/orders', [OrderController::class, 'index']);
-    Route::post('/orders', [OrderController::class, 'store']);
-    Route::get('/orders/{order}', [OrderController::class, 'show']);
-    Route::put('/orders/{order}', [OrderController::class, 'update']);
-    Route::delete('/orders/{order}', [OrderController::class, 'destroy']);
+    /*
+    |--------------------------------------------------------------------------
+    | Place Orders
+    |--------------------------------------------------------------------------
+    */
 
-    Route::post('/orders/{order}/mark-read', [OrderController::class, 'markRead']);
-    Route::get('/orders/{order}/read-info', [OrderController::class, 'readInfo']);
+    Route::get('/place-orders', [
+        PlaceOrderController::class,
+        'index'
+    ]);
 
-    Route::post('/orders/bulk-members', [OrderController::class, 'bulkMembers']);
-    Route::post('/orders/bulk-duplicate', [OrderController::class, 'bulkDuplicate']);
-    Route::post('/orders/bulk-delete', [OrderController::class, 'bulkDelete']);
+    Route::get('/place-orders/unread-count', [
+        PlaceOrderController::class,
+        'unreadCount'
+    ]);
 
-    Route::post('/orders/{id}/restore', [OrderController::class, 'restore']);
-    Route::delete('/orders/{id}/force-delete', [OrderController::class, 'forceDelete']);
-    Route::get('/orders/{order}/activities', [OrderController::class, 'activities']);
+    Route::post('/place-orders/{id}/mark-read', [
+        PlaceOrderController::class,
+        'markRead'
+    ]);
 
-    Route::delete('/order-activities/{activity}', [OrderController::class, 'deleteActivity']);
+    /*
+    |--------------------------------------------------------------------------
+    | TeamStore Orders
+    |--------------------------------------------------------------------------
+    */
 
-    // Order Members
-    Route::post('/orders/{order}/members', [OrderController::class, 'addMember']);
-    Route::delete('/orders/{order}/members/{user}', [OrderController::class, 'removeMember']);
+    Route::get('/teamstore-orders', [
+        TeamStoreOrderController::class,
+        'index'
+    ]);
 
-    // Order Chat
-    Route::get('/orders/{order}/messages', [OrderChatController::class, 'index']);
-    Route::post('/orders/{order}/messages', [OrderChatController::class, 'store']);
-    Route::put('/orders/{order}/messages/{message}', [OrderChatController::class, 'update']);
-    Route::delete('/orders/{order}/messages/{message}/for-me', [OrderChatController::class, 'deleteForMe']);
-    Route::delete('/orders/{order}/messages/{message}/everyone', [OrderChatController::class, 'deleteForEveryone']);
-    Route::get('/orders/{order}/messages/unread-count', [OrderChatController::class, 'unreadCount']);
-    Route::post('/orders/{order}/messages/mark-read', [OrderChatController::class, 'markRead']);
+    Route::get('/teamstore-orders/unread-count', [
+        TeamStoreOrderController::class,
+        'unreadCount'
+    ]);
 
-    // Members
-    Route::get('/members', [MemberController::class, 'index']);
-    Route::post('/members/invite', [MemberController::class, 'invite']);
-    Route::post('/members/{id}/toggle', [MemberController::class, 'toggle']);
-    Route::post('/members/{user}/order-create-permission', [MemberController::class, 'toggleOrderCreatePermission']);
-    Route::delete('/members/{id}', [MemberController::class, 'destroy']);
+    Route::post('/teamstore-orders/{id}/mark-read', [
+        TeamStoreOrderController::class,
+        'markRead'
+    ]);
 
-    // Files
-    Route::get('/orders/{order}/files', [OrderFileController::class, 'index']);
-    Route::post('/orders/{order}/files', [OrderFileController::class, 'store']);
-    Route::post('/orders/{order}/chat-files', [OrderFileController::class, 'storeChatFile']);
-    Route::delete('/order-files/{file}', [OrderFileController::class, 'destroy']);
+    /*
+    |--------------------------------------------------------------------------
+    | Artwork Requests
+    |--------------------------------------------------------------------------
+    */
 
+    Route::get('/artwork-requests', [
+        ArtworkRequestController::class,
+        'index'
+    ]);
 
-   Route::get('/clients', [ClientController::class, 'index']);
+    Route::get('/artwork-requests/unread-count', [
+        ArtworkRequestController::class,
+        'unreadCount'
+    ]);
 
-Route::middleware('superadmin')->group(function () {
-    Route::post('/clients', [ClientController::class, 'store']);
-    Route::get('/clients/{client}', [ClientController::class, 'show']);
-    Route::put('/clients/{client}', [ClientController::class, 'update']);
-    Route::delete('/clients/{client}', [ClientController::class, 'destroy']);
+    Route::post('/artwork-requests/{id}/mark-read', [
+        ArtworkRequestController::class,
+        'markRead'
+    ]);
 
-    Route::apiResource('invoices', InvoiceController::class);
+    /*
+    |--------------------------------------------------------------------------
+    | Profile
+    |--------------------------------------------------------------------------
+    */
+
+    Route::get('/users/{user}/profile', [
+        MemberController::class,
+        'profile'
+    ]);
+
+    Route::post('/me/profile', [
+        MemberController::class,
+        'updateProfile'
+    ]);
+
+    /*
+    |--------------------------------------------------------------------------
+    | Factory Orders
+    |--------------------------------------------------------------------------
+    |
+    | Important:
+    | Special routes hamesha /orders/{order} se pehle honi chahiye.
+    |
+    */
+
+    Route::get('/orders/recycle-bin', [
+        OrderController::class,
+        'recycleBin'
+    ]);
+
+    Route::get('/order-activities', [
+        OrderController::class,
+        'allActivities'
+    ]);
+
+    Route::post('/orders/bulk-members', [
+        OrderController::class,
+        'bulkMembers'
+    ]);
+
+    Route::post('/orders/bulk-duplicate', [
+        OrderController::class,
+        'bulkDuplicate'
+    ]);
+
+    Route::post('/orders/bulk-delete', [
+        OrderController::class,
+        'bulkDelete'
+    ]);
+
+    /*
+    |--------------------------------------------------------------------------
+    | Main Factory Order Routes
+    |--------------------------------------------------------------------------
+    */
+
+    Route::get('/orders', [
+        OrderController::class,
+        'index'
+    ]);
+
+    Route::post('/orders', [
+        OrderController::class,
+        'store'
+    ]);
+
+    Route::get('/orders/{order}', [
+        OrderController::class,
+        'show'
+    ]);
+
+    Route::put('/orders/{order}', [
+        OrderController::class,
+        'update'
+    ]);
+
+    Route::delete('/orders/{order}', [
+        OrderController::class,
+        'destroy'
+    ]);
+
+    /*
+    |--------------------------------------------------------------------------
+    | Factory Order Read Information
+    |--------------------------------------------------------------------------
+    */
+
+    Route::post('/orders/{order}/mark-read', [
+        OrderController::class,
+        'markRead'
+    ]);
+
+    Route::get('/orders/{order}/read-info', [
+        OrderController::class,
+        'readInfo'
+    ]);
+
+    /*
+    |--------------------------------------------------------------------------
+    | Factory Order Recycle Bin Actions
+    |--------------------------------------------------------------------------
+    */
+
+    Route::post('/orders/{id}/restore', [
+        OrderController::class,
+        'restore'
+    ]);
+
+    Route::delete('/orders/{id}/force-delete', [
+        OrderController::class,
+        'forceDelete'
+    ]);
+
+    Route::get('/orders/{order}/activities', [
+        OrderController::class,
+        'activities'
+    ]);
+
+    Route::delete('/order-activities/{activity}', [
+        OrderController::class,
+        'deleteActivity'
+    ]);
+
+    /*
+    |--------------------------------------------------------------------------
+    | Factory Order Members
+    |--------------------------------------------------------------------------
+    */
+
+    Route::post('/orders/{order}/members', [
+        OrderController::class,
+        'addMember'
+    ]);
+
+    Route::delete('/orders/{order}/members/{user}', [
+        OrderController::class,
+        'removeMember'
+    ]);
+
+    /*
+    |--------------------------------------------------------------------------
+    | Factory Order Chat
+    |--------------------------------------------------------------------------
+    */
+
+    Route::get('/orders/{order}/messages', [
+        OrderChatController::class,
+        'index'
+    ]);
+
+    Route::post('/orders/{order}/messages', [
+        OrderChatController::class,
+        'store'
+    ]);
+
+    Route::put('/orders/{order}/messages/{message}', [
+        OrderChatController::class,
+        'update'
+    ]);
+
+    Route::delete('/orders/{order}/messages/{message}/for-me', [
+        OrderChatController::class,
+        'deleteForMe'
+    ]);
+
+    Route::delete('/orders/{order}/messages/{message}/everyone', [
+        OrderChatController::class,
+        'deleteForEveryone'
+    ]);
+
+    Route::get('/orders/{order}/messages/unread-count', [
+        OrderChatController::class,
+        'unreadCount'
+    ]);
+
+    Route::post('/orders/{order}/messages/mark-read', [
+        OrderChatController::class,
+        'markRead'
+    ]);
+
+    /*
+    |--------------------------------------------------------------------------
+    | Factory Order Files
+    |--------------------------------------------------------------------------
+    */
+
+    Route::get('/orders/{order}/files', [
+        OrderFileController::class,
+        'index'
+    ]);
+
+    Route::post('/orders/{order}/files', [
+        OrderFileController::class,
+        'store'
+    ]);
+
+    Route::post('/orders/{order}/chat-files', [
+        OrderFileController::class,
+        'storeChatFile'
+    ]);
+
+    Route::delete('/order-files/{file}', [
+        OrderFileController::class,
+        'destroy'
+    ]);
+
+    /*
+    |--------------------------------------------------------------------------
+    | Members
+    |--------------------------------------------------------------------------
+    */
+
+    Route::get('/members', [
+        MemberController::class,
+        'index'
+    ]);
+
+    Route::post('/members/invite', [
+        MemberController::class,
+        'invite'
+    ]);
+
+    Route::post('/members/{id}/toggle', [
+        MemberController::class,
+        'toggle'
+    ]);
+
+    Route::post('/members/{user}/order-create-permission', [
+        MemberController::class,
+        'toggleOrderCreatePermission'
+    ]);
+
+    Route::delete('/members/{id}', [
+        MemberController::class,
+        'destroy'
+    ]);
+
+    /*
+    |--------------------------------------------------------------------------
+    | Clients
+    |--------------------------------------------------------------------------
+    */
+
+    Route::get('/clients', [
+        ClientController::class,
+        'index'
+    ]);
+
+    Route::middleware('superadmin')->group(function () {
+
+        Route::post('/clients', [
+            ClientController::class,
+            'store'
+        ]);
+
+        Route::get('/clients/{client}', [
+            ClientController::class,
+            'show'
+        ]);
+
+        Route::put('/clients/{client}', [
+            ClientController::class,
+            'update'
+        ]);
+
+        Route::delete('/clients/{client}', [
+            ClientController::class,
+            'destroy'
+        ]);
+
+        Route::apiResource(
+            'invoices',
+            InvoiceController::class
+        );
+    });
+
+    /*
+    |--------------------------------------------------------------------------
+    | Notifications
+    |--------------------------------------------------------------------------
+    */
+
+    Route::get('/notifications', [
+        NotificationController::class,
+        'index'
+    ]);
+
+    Route::post('/notifications/{id}/read', [
+        NotificationController::class,
+        'markRead'
+    ]);
+
+    Route::post('/notifications/mark-all-read', [
+        NotificationController::class,
+        'markAllRead'
+    ]);
 });
-
-    Route::get('/notifications', [NotificationController::class, 'index']);
-    Route::post('/notifications/{id}/read', [NotificationController::class, 'markRead']);
-    Route::post('/notifications/mark-all-read', [NotificationController::class, 'markAllRead']);
-});
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-

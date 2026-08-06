@@ -3,8 +3,15 @@ import { createRouter, createWebHistory } from 'vue-router'
 const routes = [
     { path: '/', redirect: '/login' },
 
-    { path: '/login', component: () => import('./auth/Login.vue') },
-    { path: '/register', component: () => import('./auth/Register.vue') },
+    {
+        path: '/login',
+        component: () => import('./auth/Login.vue')
+    },
+
+    {
+        path: '/register',
+        component: () => import('./auth/Register.vue')
+    },
 
     {
         path: '/dashboard',
@@ -18,35 +25,71 @@ const routes = [
         meta: { requiresAuth: true }
     },
 
+    // Factory Orders
     {
         path: '/orders',
         component: () => import('./views/AllOrdersView.vue'),
         meta: { requiresAuth: true }
     },
 
+    // Prosix Website Place Orders
+    {
+        path: '/place-orders',
+        component: () => import('./views/PlaceOrdersView.vue'),
+        meta: { requiresAuth: true }
+    },
+
+    {
+    path: '/teamstore-orders',
+    component: () => import('./views/TeamStoreOrdersView.vue'),
+    meta: { requiresAuth: true }
+},
+
+// {
+//     path: '/artwork-requests',
+//     component: () => import('./views/ArtworkRequestsView.vue'),
+//     meta: { requiresAuth: true }
+// },
+{
+    path: '/artwork-requests',
+    component: () => import('./views/ArtworkRequestsView.vue'),
+    meta: { requiresAuth: true }
+},
     {
         path: '/clients',
         component: () => import('./views/ClientsView.vue'),
-        meta: { requiresAuth: true, superAdmin: true }
+        meta: {
+            requiresAuth: true,
+            superAdmin: true
+        }
     },
 
     {
         path: '/invoices',
         component: () => import('./views/InvoicesView.vue'),
-        meta: { requiresAuth: true, superAdmin: true }
+        meta: {
+            requiresAuth: true,
+            superAdmin: true
+        }
     },
 
     {
         path: '/activity-logs',
         component: () => import('./views/ActivityLogsView.vue'),
-        meta: { requiresAuth: true, superAdmin: true }
+        meta: {
+            requiresAuth: true,
+            superAdmin: true
+        }
     },
 
     {
         path: '/recycle-bin',
         component: () => import('./views/RecycleBinView.vue'),
-        meta: { requiresAuth: true, superAdmin: true }
-    },
+        meta: {
+            requiresAuth: true,
+            superAdmin: true
+        }
+    }
 ]
 
 const router = createRouter({
