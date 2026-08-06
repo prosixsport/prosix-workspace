@@ -35,7 +35,9 @@ class TeamStoreOrderController extends Controller
 
             return response()->json([
                 'success' => true,
-                'data'    => $responseData['data'] ?? $responseData ?? [],
+                'data'    => $responseData['data']
+                    ?? $responseData
+                    ?? [],
             ]);
         } catch (ConnectionException $exception) {
             Log::error('TeamStore connection error', [
@@ -61,7 +63,7 @@ class TeamStoreOrderController extends Controller
     }
 
     /**
-     * TeamStore unread orders count.
+     * Current CRM user ka TeamStore unread count.
      */
     public function unreadCount(): JsonResponse
     {
@@ -70,13 +72,20 @@ class TeamStoreOrderController extends Controller
                 ->get('/api/crm/teamstore-orders/unread-count');
 
             if ($response->failed()) {
+                Log::error('TeamStore unread count failed', [
+                    'status' => $response->status(),
+                    'body'   => $response->body(),
+                ]);
+
                 return response()->json([
                     'count' => 0,
                 ]);
             }
 
             return response()->json([
-                'count' => (int) ($response->json('count') ?? 0),
+                'count' => (int) (
+                    $response->json('count') ?? 0
+                ),
             ]);
         } catch (\Throwable $exception) {
             Log::error('TeamStore unread count error', [
@@ -90,15 +99,23 @@ class TeamStoreOrderController extends Controller
     }
 
     /**
-     * TeamStore order ko read mark karo.
+     * Current CRM user ke liye TeamStore order read mark karo.
      */
     public function markRead(int $id): JsonResponse
     {
         try {
             $response = $this->prosixRequest()
-                ->post("/api/crm/teamstore-orders/{$id}/mark-read");
+                ->post(
+                    "/api/crm/teamstore-orders/{$id}/mark-read"
+                );
 
             if ($response->failed()) {
+                Log::error('TeamStore mark-read failed', [
+                    'order_id' => $id,
+                    'status'   => $response->status(),
+                    'body'     => $response->body(),
+                ]);
+
                 return response()->json([
                     'success' => false,
                     'message' => 'TeamStore Order read mark nahi hua.',
@@ -122,17 +139,45 @@ class TeamStoreOrderController extends Controller
         }
     }
 
+    /**
+     * Prosix API request client.
+     *
+     * Har request ke sath current CRM user ki
+     * ID, name aur email Prosix ko bheji jati hai.
+     */
     private function prosixRequest()
     {
+        $user = auth()->user();
+
         return Http::baseUrl(
-            rtrim(config('services.prosix.url'), '/')
+            rtrim(
+                (string) config('services.prosix.url'),
+                '/'
+            )
         )
-            ->withToken(config('services.prosix.crm_token'))
+            ->withToken(
+                (string) config(
+                    'services.prosix.crm_token'
+                )
+            )
+            ->withHeaders([
+                'X-CRM-User-ID' =>
+                    (string) $user->id,
+
+                'X-CRM-User-Name' =>
+                    (string) $user->name,
+
+                'X-CRM-User-Email' =>
+                    (string) $user->email,
+            ])
             ->acceptJson()
             ->timeout(30)
             ->retry(2, 500);
     }
 
+    /**
+     * Upstream error status ko safe status mein convert karo.
+     */
     private function safeStatus(int $status): int
     {
         return $status >= 400 && $status <= 599
