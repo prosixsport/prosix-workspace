@@ -1,142 +1,10 @@
 <template>
-  <div class="teamstore-shell">
-    <!-- =========================
-         SIDEBAR
-    ========================== -->
-    <aside class="sidebar" :class="{ open: mobileSidebarOpen }">
-      <div class="brand">
-        <div class="brand-mark">P</div>
-
-        <div>
-          <strong>Prosix Sports</strong>
-          <span>Work Management</span>
-        </div>
-
-        <button
-          class="sidebar-close"
-          type="button"
-          @click="mobileSidebarOpen = false"
-        >
-          <i class="fa-solid fa-xmark"></i>
-        </button>
-      </div>
-
-      <div class="profile-card">
-        <div class="profile-avatar">
-          <img
-            v-if="currentUserAvatar"
-            :src="currentUserAvatar"
-            alt="Profile"
-            @error="hideBrokenImage"
-          />
-
-          <span v-else>
-            {{ currentUserInitial }}
-          </span>
-        </div>
-
-        <div class="profile-info">
-          <strong>{{ currentUserName }}</strong>
-          <small>{{ currentUserRole }}</small>
-        </div>
-
-        <i class="fa-solid fa-pen profile-edit-icon"></i>
-      </div>
-
-      <nav class="sidebar-nav">
-        <RouterLink to="/dashboard" class="nav-link">
-          <i class="fa-solid fa-house"></i>
-          <span>Home</span>
-        </RouterLink>
-
-        <RouterLink to="/orders" class="nav-link">
-          <i class="fa-solid fa-industry"></i>
-          <span>Factory Orders</span>
-        </RouterLink>
-
-        <RouterLink to="/teamstore-orders" class="nav-link active">
-          <i class="fa-solid fa-store"></i>
-          <span>TeamStore Orders</span>
-
-          <b v-if="unreadCount > 0" class="nav-count">
-            {{ unreadCount }}
-          </b>
-        </RouterLink>
-
-        <RouterLink to="/place-orders" class="nav-link">
-          <i class="fa-solid fa-cart-shopping"></i>
-          <span>Place Orders</span>
-        </RouterLink>
-
-        <RouterLink to="/artwork-requests" class="nav-link">
-          <i class="fa-solid fa-palette"></i>
-          <span>Artwork Requests</span>
-        </RouterLink>
-
-        <RouterLink to="/members" class="nav-link">
-          <i class="fa-solid fa-users"></i>
-          <span>Members</span>
-        </RouterLink>
-
-        <RouterLink
-          v-if="isSuperAdmin"
-          to="/clients"
-          class="nav-link"
-        >
-          <i class="fa-solid fa-user-tie"></i>
-          <span>Clients</span>
-        </RouterLink>
-
-        <RouterLink
-          v-if="isSuperAdmin"
-          to="/invoices"
-          class="nav-link"
-        >
-          <i class="fa-solid fa-file-invoice-dollar"></i>
-          <span>Invoices</span>
-        </RouterLink>
-
-        <RouterLink
-          v-if="isSuperAdmin"
-          to="/activity-logs"
-          class="nav-link"
-        >
-          <i class="fa-solid fa-clock-rotate-left"></i>
-          <span>Activity Logs</span>
-        </RouterLink>
-
-        <RouterLink
-          v-if="isSuperAdmin"
-          to="/recycle-bin"
-          class="nav-link"
-        >
-          <i class="fa-solid fa-recycle"></i>
-          <span>Recycle Bin</span>
-        </RouterLink>
-      </nav>
-    </aside>
-
-    <div
-      v-if="mobileSidebarOpen"
-      class="sidebar-backdrop"
-      @click="mobileSidebarOpen = false"
-    ></div>
-
-    <!-- =========================
-         MAIN CONTENT
-    ========================== -->
+  <AppLayout>
+    <div class="teamstore-page">
     <main class="main-content">
       <!-- Top header -->
       <header class="topbar">
         <div class="topbar-left">
-          <button
-            type="button"
-            class="mobile-menu"
-            @click="mobileSidebarOpen = true"
-          >
-            <i class="fa-solid fa-bars"></i>
-          </button>
-
           <button
             type="button"
             class="back-button"
@@ -155,6 +23,15 @@
         </div>
 
         <div class="topbar-actions">
+          <button
+            type="button"
+            class="manage-status-button"
+            @click="statusManagerOpen = true"
+          >
+            <i class="fa-solid fa-sliders"></i>
+            Manage Statuses
+          </button>
+
           <label class="search-box">
             <i class="fa-solid fa-magnifying-glass"></i>
 
@@ -245,7 +122,7 @@
           >
             <span
               class="summary-dot"
-              :class="statusDotClass(tab.key)"
+              :style="statusDotStyle(tab.key)"
             ></span>
 
             <span>{{ tab.label }}</span>
@@ -429,13 +306,14 @@
                         type="button"
                         class="status-trigger"
                         :class="statusClass(order.status)"
+                        :style="statusPillStyle(order.status)"
                         :disabled="isSaving(order.id)"
                         @click.stop="toggleStatusMenu(order)"
                       >
                         <span class="status-trigger-dot"></span>
 
                         <span class="status-trigger-label">
-                          {{ formatLabel(order.status || 'new') }}
+                          {{ statusLabel(order.status || 'new') }}
                         </span>
 
                         <i class="fa-solid fa-chevron-down"></i>
@@ -451,7 +329,7 @@
                         </div>
 
                         <button
-                          v-for="option in standardStatusOptions"
+                          v-for="option in statusOptions"
                           :key="option.value"
                           type="button"
                           class="status-option"
@@ -464,7 +342,7 @@
                         >
                           <span
                             class="option-dot"
-                            :class="statusDotClass(option.value)"
+                            :style="{ backgroundColor: option.color }"
                           ></span>
 
                           {{ option.label }}
@@ -647,8 +525,9 @@
             <span
               class="status-badge large"
               :class="statusClass(selectedOrder.status)"
+              :style="statusPillStyle(selectedOrder.status)"
             >
-              {{ formatLabel(selectedOrder.status || 'new') }}
+              {{ statusLabel(selectedOrder.status || 'new') }}
             </span>
 
             <button
@@ -741,10 +620,11 @@
                       type="button"
                       class="status-trigger modal-status-trigger"
                       :class="statusClass(selectedOrder.status)"
+                      :style="statusPillStyle(selectedOrder.status)"
                       @click.stop="toggleStatusMenu(selectedOrder)"
                     >
                       <span class="status-trigger-dot"></span>
-                      {{ formatLabel(selectedOrder.status || 'new') }}
+                      {{ statusLabel(selectedOrder.status || 'new') }}
                       <i class="fa-solid fa-chevron-down"></i>
                     </button>
 
@@ -754,7 +634,7 @@
                       @click.stop
                     >
                       <button
-                        v-for="option in standardStatusOptions"
+                        v-for="option in statusOptions"
                         :key="option.value"
                         type="button"
                         class="status-option"
@@ -767,7 +647,7 @@
                       >
                         <span
                           class="option-dot"
-                          :class="statusDotClass(option.value)"
+                          :style="{ backgroundColor: option.color }"
                         ></span>
                         {{ option.label }}
                       </button>
@@ -918,14 +798,186 @@
         </div>
       </section>
     </div>
-  </div>
+
+      <!-- =========================
+           STATUS MANAGER
+      ========================== -->
+      <div
+        v-if="statusManagerOpen"
+        class="status-manager-overlay"
+        @click.self="closeStatusManager"
+      >
+        <section class="status-manager-modal">
+          <header class="status-manager-header">
+            <div>
+              <span class="manager-eyebrow">TEAMSTORE SETTINGS</span>
+              <h2>Manage Order Statuses</h2>
+              <p>
+                Add custom statuses, edit their display names and choose colors.
+              </p>
+            </div>
+
+            <button
+              type="button"
+              class="manager-close"
+              @click="closeStatusManager"
+            >
+              <i class="fa-solid fa-xmark"></i>
+            </button>
+          </header>
+
+          <div class="status-manager-body">
+            <section class="add-status-card">
+              <div class="manager-section-title">
+                <div>
+                  <h3>Add New Status</h3>
+                  <p>
+                    New status will stay in the dropdown on this browser.
+                  </p>
+                </div>
+              </div>
+
+              <div class="add-status-form">
+                <div class="manager-field manager-field-grow">
+                  <label>Status Name</label>
+                  <input
+                    v-model="newStatusName"
+                    type="text"
+                    placeholder="e.g. Printing, QC, Packing"
+                    @keyup.enter="addCustomStatusDefinition"
+                  />
+                </div>
+
+                <div class="manager-field color-field">
+                  <label>Color</label>
+
+                  <div class="color-picker-box">
+                    <input
+                      v-model="newStatusColor"
+                      type="color"
+                    />
+                    <span>{{ newStatusColor }}</span>
+                  </div>
+                </div>
+
+                <button
+                  type="button"
+                  class="add-status-button"
+                  :disabled="!String(newStatusName || '').trim()"
+                  @click="addCustomStatusDefinition"
+                >
+                  <i class="fa-solid fa-plus"></i>
+                  Add Status
+                </button>
+              </div>
+            </section>
+
+            <section class="status-list-card">
+              <div class="manager-section-title">
+                <div>
+                  <h3>Available Statuses</h3>
+                  <p>
+                    Edit name or color, then click Save.
+                  </p>
+                </div>
+
+                <span class="status-total">
+                  {{ statusOptions.length }} statuses
+                </span>
+              </div>
+
+              <div class="status-manager-list">
+                <article
+                  v-for="option in statusOptions"
+                  :key="option.value"
+                  class="status-manager-row"
+                >
+                  <span
+                    class="manager-color-preview"
+                    :style="{ backgroundColor: option.color }"
+                  ></span>
+
+                  <div class="manager-status-main">
+                    <label>Display Name</label>
+                    <input
+                      v-model="option.label"
+                      type="text"
+                    />
+                    <small>
+                      Value: {{ option.value }}
+                    </small>
+                  </div>
+
+                  <div class="manager-color-control">
+                    <label>Color</label>
+
+                    <input
+                      v-model="option.color"
+                      type="color"
+                    />
+                  </div>
+
+                  <div class="manager-preview">
+                    <label>Preview</label>
+
+                    <span
+                      class="manager-preview-pill"
+                      :style="statusPillStyleFromOption(option)"
+                    >
+                      <i
+                        :style="{ backgroundColor: option.color }"
+                      ></i>
+                      {{ option.label }}
+                    </span>
+                  </div>
+
+                  <div class="manager-row-actions">
+                    <button
+                      type="button"
+                      class="save-status-setting"
+                      @click="saveStatusDefinitions"
+                    >
+                      <i class="fa-solid fa-check"></i>
+                      Save
+                    </button>
+
+                    <button
+                      v-if="option.custom"
+                      type="button"
+                      class="delete-status-setting"
+                      @click="deleteCustomStatusDefinition(option)"
+                    >
+                      <i class="fa-solid fa-trash"></i>
+                    </button>
+                  </div>
+                </article>
+              </div>
+            </section>
+
+            <div class="manager-footer-note">
+              <i class="fa-solid fa-circle-info"></i>
+              Status name/color settings are saved in this browser. The selected
+              order status itself still saves to Prosix through your existing API.
+            </div>
+          </div>
+        </section>
+      </div>
+
+    </div>
+  </AppLayout>
+
 </template>
 
 <script>
 import axios from 'axios'
+import AppLayout from '../layouts/AppLayout.vue'
 
 export default {
   name: 'TeamStoreOrdersView',
+
+  components: {
+    AppLayout
+  },
 
   data() {
     return {
@@ -941,23 +993,18 @@ export default {
       trackingSaveTimers: {},
       mobileSidebarOpen: false,
 
-      standardStatusOptions: [
-        { value: 'new', label: 'New' },
-        { value: 'confirmed', label: 'Confirmed' },
-        { value: 'production', label: 'Production' },
-        { value: 'shipped', label: 'Shipped' },
-        { value: 'delivered', label: 'Delivered' },
-        { value: 'cancelled', label: 'Cancelled' }
-      ],
+      statusManagerOpen: false,
+      newStatusName: '',
+      newStatusColor: '#7c3aed',
+      customStatuses: [],
 
-      statusTabs: [
-        { key: 'all', label: 'All' },
-        { key: 'new', label: 'New' },
-        { key: 'confirmed', label: 'Confirmed' },
-        { key: 'production', label: 'Production' },
-        { key: 'shipped', label: 'Shipped' },
-        { key: 'delivered', label: 'Delivered' },
-        { key: 'cancelled', label: 'Cancelled' }
+      standardStatusOptions: [
+        { value: 'new', label: 'New', color: '#8b5cf6', custom: false },
+        { value: 'confirmed', label: 'Confirmed', color: '#4f7df3', custom: false },
+        { value: 'production', label: 'Production', color: '#f59e0b', custom: false },
+        { value: 'shipped', label: 'Shipped', color: '#0ea5e9', custom: false },
+        { value: 'delivered', label: 'Delivered', color: '#10b981', custom: false },
+        { value: 'cancelled', label: 'Cancelled', color: '#ef4444', custom: false }
       ]
     }
   },
@@ -1074,23 +1121,40 @@ export default {
       )
     },
 
+    statusOptions() {
+      return [
+        ...this.standardStatusOptions,
+        ...this.customStatuses
+      ]
+    },
+
     statusTabsWithCustom() {
-      const base = [...this.statusTabs]
+      const tabs = [
+        {
+          key: 'all',
+          label: 'All',
+          color: '#667085'
+        },
+        ...this.statusOptions.map(option => ({
+          key: option.value,
+          label: option.label,
+          color: option.color
+        }))
+      ]
 
       const known = new Set(
-        base.map(tab =>
+        tabs.map(tab =>
           String(tab.key).toLowerCase()
         )
       )
 
-      const customs = this.orders
+      const unknownFromOrders = this.orders
         .map(order =>
           String(order.status || '').trim()
         )
         .filter(Boolean)
-        .filter(
-          status =>
-            !known.has(status.toLowerCase())
+        .filter(status =>
+          !known.has(status.toLowerCase())
         )
         .filter(
           (status, index, array) =>
@@ -1102,10 +1166,11 @@ export default {
         )
         .map(status => ({
           key: status.toLowerCase(),
-          label: this.formatLabel(status)
+          label: this.formatLabel(status),
+          color: '#667085'
         }))
 
-      return [...base, ...customs]
+      return [...tabs, ...unknownFromOrders]
     },
 
     selectedOrders() {
@@ -1188,6 +1253,8 @@ export default {
   },
 
   async mounted() {
+    this.loadStatusDefinitions()
+
     document.addEventListener(
       'click',
       this.closeAllStatusMenus
@@ -1219,6 +1286,240 @@ export default {
         Authorization:
           `Bearer ${localStorage.getItem('token')}`,
         Accept: 'application/json'
+      }
+    },
+
+    loadStatusDefinitions() {
+      try {
+        const raw = localStorage.getItem(
+          'teamstore_status_definitions_v1'
+        )
+
+        if (!raw) {
+          return
+        }
+
+        const saved = JSON.parse(raw)
+
+        if (Array.isArray(saved?.standard)) {
+          this.standardStatusOptions =
+            this.standardStatusOptions.map(defaultOption => {
+              const stored = saved.standard.find(
+                item => item.value === defaultOption.value
+              )
+
+              return stored
+                ? {
+                    ...defaultOption,
+                    label:
+                      String(stored.label || defaultOption.label).trim() ||
+                      defaultOption.label,
+                    color:
+                      stored.color ||
+                      defaultOption.color
+                  }
+                : defaultOption
+            })
+        }
+
+        if (Array.isArray(saved?.custom)) {
+          this.customStatuses = saved.custom
+            .filter(item => item?.value && item?.label)
+            .map(item => ({
+              value: String(item.value),
+              label: String(item.label),
+              color: item.color || '#667085',
+              custom: true
+            }))
+        }
+      } catch (error) {
+        console.warn(
+          'Could not load TeamStore status definitions:',
+          error
+        )
+      }
+    },
+
+    saveStatusDefinitions() {
+      this.standardStatusOptions =
+        this.standardStatusOptions.map(option => ({
+          ...option,
+          label:
+            String(option.label || '').trim() ||
+            this.formatLabel(option.value),
+          color: option.color || '#667085',
+          custom: false
+        }))
+
+      this.customStatuses =
+        this.customStatuses.map(option => ({
+          ...option,
+          label:
+            String(option.label || '').trim() ||
+            this.formatLabel(option.value),
+          color: option.color || '#667085',
+          custom: true
+        }))
+
+      localStorage.setItem(
+        'teamstore_status_definitions_v1',
+        JSON.stringify({
+          standard: this.standardStatusOptions,
+          custom: this.customStatuses
+        })
+      )
+    },
+
+    addCustomStatusDefinition() {
+      const label =
+        String(this.newStatusName || '').trim()
+
+      if (!label) {
+        return
+      }
+
+      let value = this.slug(label)
+
+      if (!value) {
+        return
+      }
+
+      const existingValues = new Set(
+        this.statusOptions.map(option =>
+          String(option.value).toLowerCase()
+        )
+      )
+
+      if (existingValues.has(value.toLowerCase())) {
+        alert('This status already exists.')
+        return
+      }
+
+      this.customStatuses.push({
+        value,
+        label,
+        color: this.newStatusColor || '#7c3aed',
+        custom: true
+      })
+
+      this.newStatusName = ''
+      this.newStatusColor = '#7c3aed'
+
+      this.saveStatusDefinitions()
+    },
+
+    deleteCustomStatusDefinition(option) {
+      if (!option?.custom) {
+        return
+      }
+
+      const used = this.orders.some(
+        order =>
+          String(order.status || '').toLowerCase() ===
+          String(option.value || '').toLowerCase()
+      )
+
+      if (used) {
+        const confirmed = window.confirm(
+          `"${option.label}" is currently used by one or more orders. ` +
+          'Delete it from the dropdown anyway? Existing orders will keep their current status.'
+        )
+
+        if (!confirmed) {
+          return
+        }
+      }
+
+      this.customStatuses =
+        this.customStatuses.filter(
+          item => item.value !== option.value
+        )
+
+      this.saveStatusDefinitions()
+    },
+
+    closeStatusManager() {
+      this.saveStatusDefinitions()
+      this.statusManagerOpen = false
+    },
+
+    statusOption(status) {
+      const value =
+        String(status || 'new').toLowerCase()
+
+      return this.statusOptions.find(
+        option =>
+          String(option.value).toLowerCase() === value
+      ) || null
+    },
+
+    statusLabel(status) {
+      return (
+        this.statusOption(status)?.label ||
+        this.formatLabel(status || 'new')
+      )
+    },
+
+    hexToRgba(hex, alpha = 0.12) {
+      const clean =
+        String(hex || '#667085')
+          .replace('#', '')
+          .trim()
+
+      const normalized =
+        clean.length === 3
+          ? clean
+              .split('')
+              .map(char => char + char)
+              .join('')
+          : clean.padEnd(6, '0').slice(0, 6)
+
+      const number =
+        Number.parseInt(normalized, 16)
+
+      const r = (number >> 16) & 255
+      const g = (number >> 8) & 255
+      const b = number & 255
+
+      return `rgba(${r}, ${g}, ${b}, ${alpha})`
+    },
+
+    statusPillStyle(status) {
+      const color =
+        this.statusOption(status)?.color ||
+        '#667085'
+
+      return {
+        color,
+        backgroundColor:
+          this.hexToRgba(color, 0.13),
+        borderColor:
+          this.hexToRgba(color, 0.24)
+      }
+    },
+
+    statusPillStyleFromOption(option) {
+      const color =
+        option?.color || '#667085'
+
+      return {
+        color,
+        backgroundColor:
+          this.hexToRgba(color, 0.13),
+        borderColor:
+          this.hexToRgba(color, 0.24)
+      }
+    },
+
+    statusDotStyle(status) {
+      return {
+        backgroundColor:
+          this.statusOption(status)?.color ||
+          (
+            String(status).toLowerCase() === 'all'
+              ? '#667085'
+              : '#667085'
+          )
       }
     },
 
@@ -2003,7 +2304,7 @@ export default {
                 <h2>${this.escapeHtml(order.order_number || `#${order.id}`)}</h2>
               </div>
 
-              <span>${this.escapeHtml(this.formatLabel(order.status || 'new'))}</span>
+              <span>${this.escapeHtml(this.statusLabel(order.status || 'new'))}</span>
             </header>
 
             <div class="details">
@@ -2164,7 +2465,571 @@ export default {
               @media print {
                 body { padding: 0; }
               }
-            </style>
+
+/* ==========================================================
+   APP LAYOUT INTEGRATION + READABLE PROFESSIONAL TYPOGRAPHY
+   ========================================================== */
+
+.teamstore-page {
+  width: 100%;
+  min-width: 0;
+  min-height: 100vh;
+  background: #f5f6f8;
+  color: #101828;
+  font-family:
+    Inter,
+    ui-sans-serif,
+    system-ui,
+    -apple-system,
+    BlinkMacSystemFont,
+    "Segoe UI",
+    sans-serif;
+}
+
+.teamstore-page .main-content {
+  width: 100%;
+  min-width: 0;
+}
+
+/* The sidebar belongs to AppLayout now. */
+.teamstore-page .mobile-menu {
+  display: none !important;
+}
+
+/* Bigger readable typography */
+.topbar h1 {
+  font-size: 24px !important;
+}
+
+.eyebrow {
+  font-size: 10px !important;
+}
+
+.page-subtitle {
+  font-size: 12px !important;
+}
+
+.section-heading h2,
+.panel-header h2,
+.items-heading h3 {
+  font-size: 16px !important;
+}
+
+.section-heading p,
+.panel-header p,
+.items-heading p {
+  font-size: 11px !important;
+}
+
+.category-info strong {
+  font-size: 12px !important;
+}
+
+.category-info small {
+  font-size: 10px !important;
+}
+
+.status-summary {
+  min-width: 118px !important;
+  height: 40px !important;
+  font-size: 12px !important;
+}
+
+.status-summary strong {
+  font-size: 11px !important;
+}
+
+.orders-table th {
+  padding: 12px 10px !important;
+  font-size: 10px !important;
+}
+
+.orders-table td {
+  padding: 12px 10px !important;
+  font-size: 12px !important;
+}
+
+.order-number-cell strong,
+.customer-cell strong,
+.shipping-cell strong {
+  font-size: 12px !important;
+}
+
+.order-number-cell small,
+.customer-cell small,
+.shipping-cell small {
+  font-size: 9px !important;
+}
+
+.category-tags span {
+  font-size: 9px !important;
+}
+
+.plain-text,
+.date-cell {
+  font-size: 11px !important;
+}
+
+.status-control {
+  width: 165px !important;
+}
+
+.status-trigger {
+  width: 165px !important;
+  height: 38px !important;
+  padding: 0 12px !important;
+  border-width: 1px !important;
+  border-style: solid !important;
+  font-size: 11px !important;
+}
+
+.status-menu {
+  width: 245px !important;
+}
+
+.status-menu-title {
+  font-size: 9px !important;
+}
+
+.status-option,
+.custom-status-toggle {
+  min-height: 37px !important;
+  font-size: 11px !important;
+}
+
+.custom-status-box input {
+  height: 38px !important;
+  font-size: 11px !important;
+}
+
+.custom-status-box button {
+  height: 35px !important;
+  font-size: 10px !important;
+}
+
+.remark-column {
+  width: 210px !important;
+}
+
+.line-editor {
+  width: 195px !important;
+}
+
+.line-input {
+  height: 37px !important;
+  font-size: 12px !important;
+}
+
+.tracking-column {
+  width: 245px !important;
+}
+
+.tracking-editor {
+  width: 225px !important;
+}
+
+.tracking-input-wrap {
+  height: 40px !important;
+}
+
+.tracking-input-wrap input {
+  font-size: 12px !important;
+}
+
+.tracking-meta small,
+.tracking-meta span {
+  font-size: 9px !important;
+}
+
+.view-button,
+.secondary-button,
+.primary-button,
+.refresh-button {
+  font-size: 11px !important;
+}
+
+.view-button {
+  height: 36px !important;
+}
+
+.search-box {
+  width: 330px !important;
+  height: 42px !important;
+}
+
+.search-box input {
+  font-size: 12px !important;
+}
+
+.new-count {
+  height: 38px !important;
+  font-size: 11px !important;
+}
+
+/* Manage Status button */
+.manage-status-button {
+  height: 42px;
+  padding: 0 14px;
+  border: 1px solid #dfe3e8;
+  border-radius: 10px;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  background: #fff;
+  color: #111827;
+  cursor: pointer;
+  font-size: 11px;
+  font-weight: 850;
+  white-space: nowrap;
+  transition: .18s ease;
+}
+
+.manage-status-button:hover {
+  border-color: #111827;
+  background: #f9fafb;
+}
+
+/* ==========================================================
+   STATUS MANAGER
+   ========================================================== */
+.status-manager-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 5000;
+  padding: 28px;
+  overflow-y: auto;
+  display: flex;
+  align-items: flex-start;
+  justify-content: center;
+  background: rgba(15, 23, 42, .56);
+  backdrop-filter: blur(3px);
+}
+
+.status-manager-modal {
+  width: min(940px, 100%);
+  overflow: hidden;
+  border: 1px solid #e4e7ec;
+  border-radius: 18px;
+  background: #fff;
+  box-shadow:
+    0 28px 70px
+    rgba(15, 23, 42, .24);
+}
+
+.status-manager-header {
+  padding: 22px 24px;
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 20px;
+  background: #111827;
+  color: #fff;
+}
+
+.manager-eyebrow {
+  display: block;
+  margin-bottom: 5px;
+  color: #98a2b3;
+  font-size: 9px;
+  font-weight: 900;
+  letter-spacing: .12em;
+}
+
+.status-manager-header h2 {
+  margin: 0;
+  font-size: 21px;
+}
+
+.status-manager-header p {
+  margin: 6px 0 0;
+  color: #c4cad4;
+  font-size: 11px;
+}
+
+.manager-close {
+  width: 38px;
+  height: 38px;
+  flex-shrink: 0;
+  border: 0;
+  border-radius: 10px;
+  display: grid;
+  place-items: center;
+  background: #242c3a;
+  color: #fff;
+  cursor: pointer;
+}
+
+.status-manager-body {
+  padding: 20px;
+  background: #f7f8fa;
+}
+
+.add-status-card,
+.status-list-card {
+  border: 1px solid #e4e7ec;
+  border-radius: 14px;
+  background: #fff;
+}
+
+.add-status-card {
+  padding: 16px;
+}
+
+.status-list-card {
+  margin-top: 14px;
+  padding: 16px;
+}
+
+.manager-section-title {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 15px;
+}
+
+.manager-section-title h3 {
+  margin: 0;
+  color: #101828;
+  font-size: 14px;
+}
+
+.manager-section-title p {
+  margin: 4px 0 0;
+  color: #98a2b3;
+  font-size: 10px;
+}
+
+.status-total {
+  padding: 6px 9px;
+  border-radius: 999px;
+  background: #f2f4f7;
+  color: #475467;
+  font-size: 9px;
+  font-weight: 850;
+}
+
+.add-status-form {
+  margin-top: 14px;
+  display: flex;
+  align-items: flex-end;
+  gap: 10px;
+}
+
+.manager-field {
+  min-width: 0;
+}
+
+.manager-field-grow {
+  flex: 1;
+}
+
+.manager-field label,
+.manager-status-main label,
+.manager-color-control label,
+.manager-preview label {
+  display: block;
+  margin-bottom: 6px;
+  color: #667085;
+  font-size: 9px;
+  font-weight: 800;
+}
+
+.manager-field input[type="text"],
+.manager-status-main input {
+  width: 100%;
+  height: 40px;
+  padding: 0 11px;
+  border: 1px solid #d0d5dd;
+  border-radius: 9px;
+  outline: 0;
+  color: #101828;
+  font-size: 12px;
+}
+
+.manager-field input[type="text"]:focus,
+.manager-status-main input:focus {
+  border-color: #111827;
+}
+
+.color-field {
+  width: 145px;
+}
+
+.color-picker-box {
+  height: 40px;
+  padding: 0 9px;
+  border: 1px solid #d0d5dd;
+  border-radius: 9px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.color-picker-box input {
+  width: 27px;
+  height: 27px;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  cursor: pointer;
+}
+
+.color-picker-box span {
+  color: #667085;
+  font-size: 10px;
+}
+
+.add-status-button {
+  height: 40px;
+  padding: 0 14px;
+  border: 0;
+  border-radius: 9px;
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  background: #111827;
+  color: #fff;
+  cursor: pointer;
+  font-size: 11px;
+  font-weight: 850;
+}
+
+.add-status-button:disabled {
+  opacity: .45;
+  cursor: not-allowed;
+}
+
+.status-manager-list {
+  margin-top: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.status-manager-row {
+  padding: 11px;
+  border: 1px solid #eaecf0;
+  border-radius: 11px;
+  display: grid;
+  grid-template-columns:
+    12px minmax(180px, 1fr) 70px 170px 95px;
+  align-items: end;
+  gap: 11px;
+  background: #fff;
+}
+
+.manager-color-preview {
+  width: 10px;
+  height: 42px;
+  border-radius: 999px;
+  align-self: center;
+}
+
+.manager-status-main small {
+  display: block;
+  margin-top: 4px;
+  color: #98a2b3;
+  font-size: 8px;
+}
+
+.manager-color-control input {
+  width: 48px;
+  height: 40px;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  cursor: pointer;
+}
+
+.manager-preview-pill {
+  min-height: 36px;
+  padding: 0 10px;
+  border: 1px solid transparent;
+  border-radius: 9px;
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  font-size: 10px;
+  font-weight: 850;
+}
+
+.manager-preview-pill i {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+}
+
+.manager-row-actions {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+}
+
+.save-status-setting,
+.delete-status-setting {
+  height: 36px;
+  border: 0;
+  border-radius: 8px;
+  cursor: pointer;
+  font-size: 9px;
+  font-weight: 850;
+}
+
+.save-status-setting {
+  padding: 0 10px;
+  background: #111827;
+  color: #fff;
+}
+
+.delete-status-setting {
+  width: 36px;
+  background: #fee4e2;
+  color: #b42318;
+}
+
+.manager-footer-note {
+  margin-top: 12px;
+  padding: 10px 12px;
+  border: 1px solid #e4e7ec;
+  border-radius: 10px;
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  background: #fff;
+  color: #667085;
+  font-size: 9px;
+  line-height: 1.5;
+}
+
+@media (max-width: 900px) {
+  .topbar-actions {
+    flex-wrap: wrap;
+  }
+
+  .search-box {
+    width: min(100%, 330px) !important;
+  }
+
+  .add-status-form {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .color-field {
+    width: 100%;
+  }
+
+  .status-manager-row {
+    grid-template-columns: 10px 1fr 60px;
+  }
+
+  .manager-preview,
+  .manager-row-actions {
+    grid-column: 2 / -1;
+  }
+}
+
+</style>
           </head>
 
           <body>
