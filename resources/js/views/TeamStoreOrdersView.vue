@@ -100,7 +100,7 @@
       <section class="filters-row">
         <div class="status-tabs">
           <button
-            v-for="tab in statusTabs"
+            v-for="tab in statusTabsWithCustom"
             :key="tab.key"
             type="button"
             :class="{ active: activeStatus === tab.key }"
@@ -194,6 +194,7 @@
                 <th>Customer</th>
                 <th>Contact</th>
                 <th>Status</th>
+                <th>Remark</th>
                 <th>Shipping</th>
                 <th>Tracking</th>
                 <th>Date</th>
@@ -297,12 +298,73 @@
                 </td>
 
                 <td>
-                  <span
-                    class="status-badge"
-                    :class="statusClass(order.status)"
-                  >
-                    {{ formatLabel(order.status || 'new') }}
-                  </span>
+                  <div class="status-editor">
+                    <select
+                      :value="rowStatusSelection(order)"
+                      class="status-select"
+                      :disabled="isSaving(order.id)"
+                      @change="onRowStatusSelect(order, $event.target.value)"
+                    >
+                      <option
+                        v-for="option in standardStatusOptions"
+                        :key="option.value"
+                        :value="option.value"
+                      >
+                        {{ option.label }}
+                      </option>
+
+                      <option value="__custom__">
+                        Custom Status...
+                      </option>
+                    </select>
+
+                    <div
+                      v-if="rowUsesCustomStatus(order)"
+                      class="custom-status-row"
+                    >
+                      <input
+                        v-model="order._custom_status"
+                        type="text"
+                        placeholder="Type custom status"
+                        :disabled="isSaving(order.id)"
+                        @keyup.enter="saveRowCustomStatus(order)"
+                      />
+
+                      <button
+                        type="button"
+                        :disabled="isSaving(order.id)"
+                        @click="saveRowCustomStatus(order)"
+                      >
+                        Save
+                      </button>
+                    </div>
+                  </div>
+                </td>
+
+                <td>
+                  <div class="remark-editor">
+                    <textarea
+                      v-model="order._remark"
+                      rows="2"
+                      placeholder="Write remark..."
+                      :disabled="isSaving(order.id)"
+                    ></textarea>
+
+                    <button
+                      type="button"
+                      :disabled="
+                        isSaving(order.id) ||
+                        String(order._remark ?? '') === String(order.remark ?? '')
+                      "
+                      @click="saveRemark(order)"
+                    >
+                      {{
+                        isSaving(order.id)
+                          ? 'Saving...'
+                          : 'Save'
+                      }}
+                    </button>
+                  </div>
                 </td>
 
                 <td>
@@ -486,36 +548,113 @@
               </dl>
             </article>
 
-            <article class="detail-card">
+            <article class="detail-card order-edit-card">
               <h3>
                 <i class="fa-solid fa-circle-info"></i>
                 Order Information
               </h3>
 
-              <dl>
-                <div>
-                  <dt>Status</dt>
-                  <dd>{{ formatLabel(selectedOrder.status || 'new') }}</dd>
+              <div class="modal-edit-grid">
+                <div class="modal-field">
+                  <label>Status</label>
+
+                  <select
+                    :value="rowStatusSelection(selectedOrder)"
+                    class="modal-status-select"
+                    :disabled="isSaving(selectedOrder.id)"
+                    @change="
+                      onRowStatusSelect(
+                        selectedOrder,
+                        $event.target.value
+                      )
+                    "
+                  >
+                    <option
+                      v-for="option in standardStatusOptions"
+                      :key="option.value"
+                      :value="option.value"
+                    >
+                      {{ option.label }}
+                    </option>
+
+                    <option value="__custom__">
+                      Custom Status...
+                    </option>
+                  </select>
+
+                  <div
+                    v-if="rowUsesCustomStatus(selectedOrder)"
+                    class="modal-custom-status"
+                  >
+                    <input
+                      v-model="selectedOrder._custom_status"
+                      type="text"
+                      placeholder="Type custom status"
+                      :disabled="isSaving(selectedOrder.id)"
+                      @keyup.enter="saveRowCustomStatus(selectedOrder)"
+                    />
+
+                    <button
+                      type="button"
+                      :disabled="isSaving(selectedOrder.id)"
+                      @click="saveRowCustomStatus(selectedOrder)"
+                    >
+                      Save Status
+                    </button>
+                  </div>
                 </div>
 
-                <div>
-                  <dt>Payment Status</dt>
-                  <dd>
+                <div class="modal-field">
+                  <label>Payment Status</label>
+                  <div class="readonly-field">
                     {{
                       formatLabel(
                         selectedOrder.payment_status || 'pending'
                       )
                     }}
-                  </dd>
+                  </div>
                 </div>
 
-                <div class="full-row">
-                  <dt>Categories</dt>
-                  <dd>
+                <div class="modal-field full-row">
+                  <label>Categories</label>
+                  <div class="readonly-field">
                     {{ orderCategories(selectedOrder).join(', ') }}
-                  </dd>
+                  </div>
                 </div>
-              </dl>
+
+                <div class="modal-field full-row">
+                  <label>Remark</label>
+
+                  <textarea
+                    v-model="selectedOrder._remark"
+                    rows="4"
+                    class="modal-remark-input"
+                    placeholder="Write internal remark..."
+                    :disabled="isSaving(selectedOrder.id)"
+                  ></textarea>
+
+                  <button
+                    type="button"
+                    class="modal-save-remark"
+                    :disabled="
+                      isSaving(selectedOrder.id) ||
+                      String(selectedOrder._remark ?? '') ===
+                        String(selectedOrder.remark ?? '')
+                    "
+                    @click="saveRemark(selectedOrder)"
+                  >
+                    {{
+                      isSaving(selectedOrder.id)
+                        ? 'Saving...'
+                        : 'Save Remark'
+                    }}
+                  </button>
+
+                  <small class="internal-note">
+                    Remark is internal and is not emailed to the customer.
+                  </small>
+                </div>
+              </div>
             </article>
           </section>
 
@@ -620,6 +759,16 @@ export default {
       search: '',
       activeCategory: 'all',
       activeStatus: 'all',
+      savingOrderIds: [],
+
+      standardStatusOptions: [
+        { value: 'new', label: 'New' },
+        { value: 'confirmed', label: 'Confirmed' },
+        { value: 'production', label: 'Production' },
+        { value: 'shipped', label: 'Shipped' },
+        { value: 'delivered', label: 'Delivered' },
+        { value: 'cancelled', label: 'Cancelled' }
+      ],
 
       statusTabs: [
         { key: 'all', label: 'All' },
@@ -691,6 +840,31 @@ export default {
           category => category.key === this.activeCategory
         )?.label || 'All Categories'
       )
+    },
+
+    statusTabsWithCustom() {
+      const base = [...this.statusTabs]
+      const known = new Set(
+        base.map(tab => String(tab.key).toLowerCase())
+      )
+
+      const customs = this.orders
+        .map(order => String(order.status || '').trim())
+        .filter(Boolean)
+        .filter(status => !known.has(status.toLowerCase()))
+        .filter(
+          (status, index, array) =>
+            array.findIndex(
+              value =>
+                value.toLowerCase() === status.toLowerCase()
+            ) === index
+        )
+        .map(status => ({
+          key: status.toLowerCase(),
+          label: this.formatLabel(status)
+        }))
+
+      return [...base, ...customs]
     },
 
     selectedOrders() {
@@ -783,12 +957,175 @@ export default {
           response.data ??
           []
 
-        this.orders = Array.isArray(data) ? data : []
+        this.orders = (Array.isArray(data) ? data : []).map(
+          order => this.prepareOrder(order)
+        )
       } catch (error) {
         console.error('TeamStore orders fetch error:', error)
         this.orders = []
       } finally {
         this.loading = false
+      }
+    },
+
+    prepareOrder(order) {
+      const prepared = {
+        ...order,
+        _remark: order?.remark ?? '',
+        _custom_status: ''
+      }
+
+      if (!this.isStandardStatus(prepared.status)) {
+        prepared._custom_status = prepared.status || ''
+      }
+
+      return prepared
+    },
+
+    isStandardStatus(status) {
+      const value = String(status || '').trim().toLowerCase()
+
+      return this.standardStatusOptions.some(
+        option => option.value === value
+      )
+    },
+
+    rowUsesCustomStatus(order) {
+      return !this.isStandardStatus(order?.status)
+    },
+
+    rowStatusSelection(order) {
+      return this.isStandardStatus(order?.status)
+        ? String(order.status).toLowerCase()
+        : '__custom__'
+    },
+
+    isSaving(orderId) {
+      return this.savingOrderIds.includes(Number(orderId))
+    },
+
+    setSaving(orderId, state) {
+      const id = Number(orderId)
+
+      if (state) {
+        if (!this.savingOrderIds.includes(id)) {
+          this.savingOrderIds = [
+            ...this.savingOrderIds,
+            id
+          ]
+        }
+        return
+      }
+
+      this.savingOrderIds =
+        this.savingOrderIds.filter(
+          savingId => savingId !== id
+        )
+    },
+
+    async onRowStatusSelect(order, value) {
+      if (value === '__custom__') {
+        if (this.isStandardStatus(order.status)) {
+          order.status = order._custom_status || ''
+        }
+
+        if (!order._custom_status) {
+          order._custom_status = ''
+        }
+
+        return
+      }
+
+      await this.updateRemoteOrder(order, {
+        status: value
+      })
+    },
+
+    async saveRowCustomStatus(order) {
+      const value =
+        String(order._custom_status || '').trim()
+
+      if (!value) {
+        alert('Please type a custom status.')
+        return
+      }
+
+      await this.updateRemoteOrder(order, {
+        status: value
+      })
+    },
+
+    async saveRemark(order) {
+      await this.updateRemoteOrder(order, {
+        remark: order._remark ?? ''
+      })
+    },
+
+    async updateRemoteOrder(order, payload) {
+      if (!order?.id || this.isSaving(order.id)) {
+        return
+      }
+
+      this.setSaving(order.id, true)
+
+      try {
+        const response = await axios.put(
+          `/api/teamstore-orders/${order.id}`,
+          payload,
+          {
+            headers: this.headers()
+          }
+        )
+
+        const updated =
+          response.data?.data || {}
+
+        if (Object.prototype.hasOwnProperty.call(updated, 'status')) {
+          order.status = updated.status
+
+          if (!this.isStandardStatus(updated.status)) {
+            order._custom_status = updated.status || ''
+          } else {
+            order._custom_status = ''
+          }
+        }
+
+        if (Object.prototype.hasOwnProperty.call(updated, 'remark')) {
+          order.remark = updated.remark ?? ''
+          order._remark = updated.remark ?? ''
+        }
+
+        /*
+         * selectedOrder same object reference ho sakta hai,
+         * phir bhi explicit sync safe hai.
+         */
+        if (
+          this.selectedOrder &&
+          Number(this.selectedOrder.id) === Number(order.id)
+        ) {
+          this.selectedOrder.status = order.status
+          this.selectedOrder.remark = order.remark
+          this.selectedOrder._remark = order._remark
+          this.selectedOrder._custom_status =
+            order._custom_status
+        }
+      } catch (error) {
+        console.error(
+          'TeamStore order update error:',
+          error
+        )
+
+        alert(
+          error?.response?.data?.message ||
+          'Order update failed.'
+        )
+
+        /*
+         * Failed remark ko stored value par wapas lao.
+         */
+        order._remark = order.remark ?? ''
+      } finally {
+        this.setSaving(order.id, false)
       }
     },
 
@@ -998,7 +1335,172 @@ export default {
                 body { padding: 0; }
                 .print-order { break-inside: avoid; }
               }
-            </style>
+
+/* ── Status + Remark Sync Editors ── */
+.status-editor {
+  min-width: 150px;
+}
+
+.status-select,
+.modal-status-select {
+  width: 100%;
+  padding: 7px 9px;
+  border: 1px solid #d9dde5;
+  border-radius: 8px;
+  background: #ffffff;
+  color: #111827;
+  font-size: 10px;
+  font-weight: 800;
+  outline: none;
+}
+
+.status-select:focus,
+.modal-status-select:focus {
+  border-color: #111827;
+}
+
+.custom-status-row,
+.modal-custom-status {
+  margin-top: 6px;
+  display: flex;
+  align-items: center;
+  gap: 5px;
+}
+
+.custom-status-row input,
+.modal-custom-status input {
+  min-width: 0;
+  flex: 1;
+  padding: 7px 8px;
+  border: 1px solid #d9dde5;
+  border-radius: 7px;
+  font-size: 9px;
+  outline: none;
+}
+
+.custom-status-row button,
+.modal-custom-status button {
+  flex-shrink: 0;
+  padding: 7px 9px;
+  border: 0;
+  border-radius: 7px;
+  background: #111827;
+  color: #ffffff;
+  font-size: 8px;
+  font-weight: 900;
+  cursor: pointer;
+}
+
+.remark-editor {
+  min-width: 190px;
+}
+
+.remark-editor textarea {
+  width: 100%;
+  min-height: 50px;
+  resize: vertical;
+  padding: 7px 8px;
+  border: 1px solid #d9dde5;
+  border-radius: 8px;
+  background: #ffffff;
+  color: #111827;
+  font-size: 9px;
+  line-height: 1.4;
+  outline: none;
+}
+
+.remark-editor button {
+  margin-top: 5px;
+  padding: 6px 9px;
+  border: 0;
+  border-radius: 7px;
+  background: #111827;
+  color: #ffffff;
+  font-size: 8px;
+  font-weight: 900;
+  cursor: pointer;
+}
+
+.remark-editor button:disabled,
+.custom-status-row button:disabled,
+.modal-custom-status button:disabled,
+.modal-save-remark:disabled {
+  opacity: .45;
+  cursor: not-allowed;
+}
+
+.order-edit-card {
+  grid-column: 1 / -1;
+}
+
+.modal-edit-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.modal-field {
+  min-width: 0;
+}
+
+.modal-field.full-row {
+  grid-column: 1 / -1;
+}
+
+.modal-field label {
+  display: block;
+  margin-bottom: 5px;
+  color: #6b7280;
+  font-size: 9px;
+  font-weight: 900;
+  text-transform: uppercase;
+}
+
+.readonly-field {
+  min-height: 38px;
+  padding: 9px 10px;
+  border: 1px solid #e5e7eb;
+  border-radius: 8px;
+  background: #f8fafc;
+  color: #111827;
+  font-size: 10px;
+  font-weight: 700;
+}
+
+.modal-remark-input {
+  width: 100%;
+  min-height: 90px;
+  resize: vertical;
+  padding: 10px;
+  border: 1px solid #d9dde5;
+  border-radius: 9px;
+  background: #ffffff;
+  color: #111827;
+  font-size: 10px;
+  line-height: 1.5;
+  outline: none;
+}
+
+.modal-save-remark {
+  margin-top: 7px;
+  padding: 8px 12px;
+  border: 0;
+  border-radius: 8px;
+  background: #111827;
+  color: #ffffff;
+  font-size: 9px;
+  font-weight: 900;
+  cursor: pointer;
+}
+
+.internal-note {
+  display: block;
+  margin-top: 7px;
+  color: #9ca3af;
+  font-size: 8px;
+}
+
+</style>
           </head>
           <body>
             <header class="print-logo">
@@ -1019,6 +1521,17 @@ export default {
     },
 
     async openOrder(order) {
+      if (typeof order._remark === 'undefined') {
+        order._remark = order.remark ?? ''
+      }
+
+      if (typeof order._custom_status === 'undefined') {
+        order._custom_status =
+          this.isStandardStatus(order.status)
+            ? ''
+            : (order.status || '')
+      }
+
       this.selectedOrder = order
       document.body.style.overflow = 'hidden'
 
@@ -1159,14 +1672,28 @@ export default {
     },
 
     statusCount(status) {
-      if (status === 'all') {
-        return this.orders.length
-      }
+      const normalizedStatus =
+        String(status || 'all').toLowerCase()
 
-      return this.orders.filter(
-        order =>
-          String(order.status || 'new').toLowerCase() === status
-      ).length
+      return this.orders.filter(order => {
+        const categoryMatch =
+          this.activeCategory === 'all' ||
+          this.normalizedItems(order).some(item => {
+            const category = this.itemCategoryData(item)
+            const key = category.id
+              ? `category-${category.id}`
+              : this.slug(category.name)
+
+            return key === this.activeCategory
+          })
+
+        const statusMatch =
+          normalizedStatus === 'all' ||
+          String(order.status || 'new')
+            .toLowerCase() === normalizedStatus
+
+        return categoryMatch && statusMatch
+      }).length
     },
 
     slug(value) {
@@ -1204,7 +1731,7 @@ export default {
     },
 
     statusClass(status) {
-      return `status-${String(status || 'new').toLowerCase()}`
+      return `status-${this.slug(status || 'new')}`
     },
 
     formatLabel(value) {

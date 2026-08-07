@@ -4,30 +4,28 @@ namespace App\Http\Controllers;
 
 use Illuminate\Http\Client\ConnectionException;
 use Illuminate\Http\JsonResponse;
+use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
 
 class TeamStoreOrderController extends Controller
 {
-    /**
-     * Prosix TeamStore ke tamam orders.
-     */
-    public function index(): JsonResponse
+    public function index(Request $request): JsonResponse
     {
         try {
-            $response = $this->prosixRequest()
+            $response = $this->prosixRequest($request)
                 ->get('/api/crm/teamstore-orders');
 
             if ($response->failed()) {
                 Log::error('TeamStore Orders fetch failed', [
                     'status' => $response->status(),
-                    'body'   => $response->body(),
+                    'body' => $response->body(),
                 ]);
 
                 return response()->json([
                     'success' => false,
                     'message' => 'TeamStore Orders load nahi ho sake.',
-                    'data'    => [],
+                    'data' => [],
                 ], $this->safeStatus($response->status()));
             }
 
@@ -35,7 +33,7 @@ class TeamStoreOrderController extends Controller
 
             return response()->json([
                 'success' => true,
-                'data'    => $responseData['data']
+                'data' => $responseData['data']
                     ?? $responseData
                     ?? [],
             ]);
@@ -47,7 +45,7 @@ class TeamStoreOrderController extends Controller
             return response()->json([
                 'success' => false,
                 'message' => 'Prosix TeamStore ke sath connection nahi ho saka.',
-                'data'    => [],
+                'data' => [],
             ], 503);
         } catch (\Throwable $exception) {
             Log::error('TeamStore Orders controller error', [
@@ -57,26 +55,18 @@ class TeamStoreOrderController extends Controller
             return response()->json([
                 'success' => false,
                 'message' => 'TeamStore Orders load karte waqt error aa gaya.',
-                'data'    => [],
+                'data' => [],
             ], 500);
         }
     }
 
-    /**
-     * Current CRM user ka TeamStore unread count.
-     */
-    public function unreadCount(): JsonResponse
+    public function unreadCount(Request $request): JsonResponse
     {
         try {
-            $response = $this->prosixRequest()
+            $response = $this->prosixRequest($request)
                 ->get('/api/crm/teamstore-orders/unread-count');
 
             if ($response->failed()) {
-                Log::error('TeamStore unread count failed', [
-                    'status' => $response->status(),
-                    'body'   => $response->body(),
-                ]);
-
                 return response()->json([
                     'count' => 0,
                 ]);
@@ -98,24 +88,17 @@ class TeamStoreOrderController extends Controller
         }
     }
 
-    /**
-     * Current CRM user ke liye TeamStore order read mark karo.
-     */
-    public function markRead(int $id): JsonResponse
-    {
+    public function markRead(
+        Request $request,
+        int $id
+    ): JsonResponse {
         try {
-            $response = $this->prosixRequest()
+            $response = $this->prosixRequest($request)
                 ->post(
                     "/api/crm/teamstore-orders/{$id}/mark-read"
                 );
 
             if ($response->failed()) {
-                Log::error('TeamStore mark-read failed', [
-                    'order_id' => $id,
-                    'status'   => $response->status(),
-                    'body'     => $response->body(),
-                ]);
-
                 return response()->json([
                     'success' => false,
                     'message' => 'TeamStore Order read mark nahi hua.',
@@ -129,7 +112,7 @@ class TeamStoreOrderController extends Controller
         } catch (\Throwable $exception) {
             Log::error('TeamStore mark-read error', [
                 'order_id' => $id,
-                'message'  => $exception->getMessage(),
+                'message' => $exception->getMessage(),
             ]);
 
             return response()->json([
@@ -139,45 +122,104 @@ class TeamStoreOrderController extends Controller
         }
     }
 
-    /**
-     * Prosix API request client.
-     *
-     * Har request ke sath current CRM user ki
-     * ID, name aur email Prosix ko bheji jati hai.
+    /*
+     * CRM -> Prosix original TeamStore order update.
+     * Status Prosix DB mein save hoga.
+     * Prosix API status change par customer email bhejegi.
+     * Remark internal rahega.
      */
-    private function prosixRequest()
+    public function update(
+        Request $request,
+        int $id
+    ): JsonResponse {
+        $validated = $request->validate([
+            'status' => 'sometimes|required|string|max:100',
+            'remark' => 'sometimes|nullable|string|max:5000',
+        ]);
+
+        if (
+            !array_key_exists('status', $validated) &&
+            !array_key_exists('remark', $validated)
+        ) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Status ya remark required hai.',
+            ], 422);
+        }
+
+        try {
+            $response = $this->prosixRequest($request)
+                ->put(
+                    "/api/crm/teamstore-orders/{$id}",
+                    $validated
+                );
+
+            if ($response->failed()) {
+                Log::error('TeamStore update failed', [
+                    'order_id' => $id,
+                    'status' => $response->status(),
+                    'body' => $response->body(),
+                ]);
+
+                return response()->json([
+                    'success' => false,
+                    'message' =>
+                        $response->json('message')
+                        ?? 'TeamStore Order update nahi hua.',
+                ], $this->safeStatus($response->status()));
+            }
+
+            return response()->json(
+                $response->json()
+            );
+        } catch (ConnectionException $exception) {
+            Log::error('TeamStore update connection error', [
+                'order_id' => $id,
+                'message' => $exception->getMessage(),
+            ]);
+
+            return response()->json([
+                'success' => false,
+                'message' =>
+                    'Prosix.com ke sath connection nahi ho saka.',
+            ], 503);
+        } catch (\Throwable $exception) {
+            Log::error('TeamStore update error', [
+                'order_id' => $id,
+                'message' => $exception->getMessage(),
+            ]);
+
+            return response()->json([
+                'success' => false,
+                'message' =>
+                    'TeamStore Order update karte waqt error aa gaya.',
+            ], 500);
+        }
+    }
+
+    private function prosixRequest(Request $request)
     {
-        $user = auth()->user();
+        $user = $request->user();
 
         return Http::baseUrl(
-            rtrim(
-                (string) config('services.prosix.url'),
-                '/'
-            )
+            rtrim(config('services.prosix.url'), '/')
         )
             ->withToken(
-                (string) config(
-                    'services.prosix.crm_token'
-                )
+                config('services.prosix.crm_token')
             )
             ->withHeaders([
                 'X-CRM-User-ID' =>
-                    (string) $user->id,
-
+                    (string) ($user?->id ?? ''),
                 'X-CRM-User-Name' =>
-                    (string) $user->name,
-
+                    (string) ($user?->name ?? ''),
                 'X-CRM-User-Email' =>
-                    (string) $user->email,
+                    (string) ($user?->email ?? ''),
             ])
             ->acceptJson()
             ->timeout(30)
             ->retry(2, 500);
     }
 
-    /**
-     * Upstream error status ko safe status mein convert karo.
-     */
     private function safeStatus(int $status): int
     {
         return $status >= 400 && $status <= 599
