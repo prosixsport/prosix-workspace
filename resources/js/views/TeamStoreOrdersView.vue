@@ -1,433 +1,628 @@
 <template>
-  <div class="teamstore-page">
-    <header class="page-header">
-      <div class="header-left">
-        <button
-          type="button"
-          class="back-button"
-          @click="$router.push('/dashboard')"
-        >
-          <i class="fa-solid fa-arrow-left"></i>
-        </button>
+  <div class="teamstore-shell">
+    <!-- =========================
+         SIDEBAR
+    ========================== -->
+    <aside class="sidebar" :class="{ open: mobileSidebarOpen }">
+      <div class="brand">
+        <div class="brand-mark">P</div>
 
         <div>
-          <p class="eyebrow">Prosix TeamStore</p>
-          <h1>TeamStore Orders</h1>
-          <span>
-            Category-wise orders received from TeamStore
+          <strong>Prosix Sports</strong>
+          <span>Work Management</span>
+        </div>
+
+        <button
+          class="sidebar-close"
+          type="button"
+          @click="mobileSidebarOpen = false"
+        >
+          <i class="fa-solid fa-xmark"></i>
+        </button>
+      </div>
+
+      <div class="profile-card">
+        <div class="profile-avatar">
+          <img
+            v-if="currentUserAvatar"
+            :src="currentUserAvatar"
+            alt="Profile"
+            @error="hideBrokenImage"
+          />
+
+          <span v-else>
+            {{ currentUserInitial }}
           </span>
         </div>
-      </div>
 
-      <div class="header-actions">
-        <div class="search-box">
-          <i class="fa-solid fa-magnifying-glass"></i>
-
-          <input
-            v-model="search"
-            type="text"
-            placeholder="Search order, customer or category..."
-          />
+        <div class="profile-info">
+          <strong>{{ currentUserName }}</strong>
+          <small>{{ currentUserRole }}</small>
         </div>
 
-        <span
-          v-if="unreadCount > 0"
-          class="new-count"
-        >
-          {{ unreadCount }} new
-        </span>
+        <i class="fa-solid fa-pen profile-edit-icon"></i>
       </div>
-    </header>
 
-    <main class="page-content">
-      <section class="category-section">
-        <div class="section-heading">
+      <nav class="sidebar-nav">
+        <RouterLink to="/dashboard" class="nav-link">
+          <i class="fa-solid fa-house"></i>
+          <span>Home</span>
+        </RouterLink>
+
+        <RouterLink to="/orders" class="nav-link">
+          <i class="fa-solid fa-industry"></i>
+          <span>Factory Orders</span>
+        </RouterLink>
+
+        <RouterLink to="/teamstore-orders" class="nav-link active">
+          <i class="fa-solid fa-store"></i>
+          <span>TeamStore Orders</span>
+
+          <b v-if="unreadCount > 0" class="nav-count">
+            {{ unreadCount }}
+          </b>
+        </RouterLink>
+
+        <RouterLink to="/place-orders" class="nav-link">
+          <i class="fa-solid fa-cart-shopping"></i>
+          <span>Place Orders</span>
+        </RouterLink>
+
+        <RouterLink to="/artwork-requests" class="nav-link">
+          <i class="fa-solid fa-palette"></i>
+          <span>Artwork Requests</span>
+        </RouterLink>
+
+        <RouterLink to="/members" class="nav-link">
+          <i class="fa-solid fa-users"></i>
+          <span>Members</span>
+        </RouterLink>
+
+        <RouterLink
+          v-if="isSuperAdmin"
+          to="/clients"
+          class="nav-link"
+        >
+          <i class="fa-solid fa-user-tie"></i>
+          <span>Clients</span>
+        </RouterLink>
+
+        <RouterLink
+          v-if="isSuperAdmin"
+          to="/invoices"
+          class="nav-link"
+        >
+          <i class="fa-solid fa-file-invoice-dollar"></i>
+          <span>Invoices</span>
+        </RouterLink>
+
+        <RouterLink
+          v-if="isSuperAdmin"
+          to="/activity-logs"
+          class="nav-link"
+        >
+          <i class="fa-solid fa-clock-rotate-left"></i>
+          <span>Activity Logs</span>
+        </RouterLink>
+
+        <RouterLink
+          v-if="isSuperAdmin"
+          to="/recycle-bin"
+          class="nav-link"
+        >
+          <i class="fa-solid fa-recycle"></i>
+          <span>Recycle Bin</span>
+        </RouterLink>
+      </nav>
+    </aside>
+
+    <div
+      v-if="mobileSidebarOpen"
+      class="sidebar-backdrop"
+      @click="mobileSidebarOpen = false"
+    ></div>
+
+    <!-- =========================
+         MAIN CONTENT
+    ========================== -->
+    <main class="main-content">
+      <!-- Top header -->
+      <header class="topbar">
+        <div class="topbar-left">
+          <button
+            type="button"
+            class="mobile-menu"
+            @click="mobileSidebarOpen = true"
+          >
+            <i class="fa-solid fa-bars"></i>
+          </button>
+
+          <button
+            type="button"
+            class="back-button"
+            @click="$router.push('/dashboard')"
+          >
+            <i class="fa-solid fa-arrow-left"></i>
+          </button>
+
           <div>
-            <h2>Order Categories</h2>
-            <p>Select a category to view related orders.</p>
+            <p class="eyebrow">PROSIX TEAMSTORE</p>
+            <h1>TeamStore Orders</h1>
+            <span class="page-subtitle">
+              Category-wise orders received from TeamStore
+            </span>
+          </div>
+        </div>
+
+        <div class="topbar-actions">
+          <label class="search-box">
+            <i class="fa-solid fa-magnifying-glass"></i>
+
+            <input
+              v-model="search"
+              type="search"
+              placeholder="Search order, customer, category..."
+            />
+          </label>
+
+          <span v-if="unreadCount > 0" class="new-count">
+            {{ unreadCount }} new
+          </span>
+        </div>
+      </header>
+
+      <section class="workspace">
+        <!-- =========================
+             CATEGORIES
+        ========================== -->
+        <section class="card category-section">
+          <div class="section-heading">
+            <div>
+              <h2>Order Categories</h2>
+              <p>
+                Select a category to view its orders and status summary.
+              </p>
+            </div>
+
+            <button
+              type="button"
+              class="refresh-button"
+              :disabled="loading"
+              @click="fetchOrders"
+            >
+              <i
+                class="fa-solid fa-rotate"
+                :class="{ 'fa-spin': loading }"
+              ></i>
+              Refresh
+            </button>
           </div>
 
-          <button
-            type="button"
-            class="refresh-button"
-            :disabled="loading"
-            @click="fetchOrders"
-          >
-            <i
-              class="fa-solid fa-rotate"
-              :class="{ 'fa-spin': loading }"
-            ></i>
-            Refresh
-          </button>
-        </div>
+          <div class="category-grid">
+            <button
+              v-for="category in categoryCards"
+              :key="category.key"
+              type="button"
+              class="category-card"
+              :class="{ active: activeCategory === category.key }"
+              @click="selectCategory(category.key)"
+            >
+              <span class="category-icon">
+                <img
+                  v-if="category.image"
+                  :src="category.image"
+                  :alt="category.label"
+                  @error="hideBrokenImage"
+                />
 
-        <div class="category-grid">
-          <button
-            v-for="category in categoryCards"
-            :key="category.key"
-            type="button"
-            class="category-card"
-            :class="{ active: activeCategory === category.key }"
-            @click="activeCategory = category.key"
-          >
-            <span class="category-icon">
-              <img
-                v-if="category.image"
-                :src="category.image"
-                :alt="category.label"
-                @error="hideBrokenImage"
-              />
+                <i v-else :class="category.icon"></i>
+              </span>
 
-              <i
-                v-else
-                :class="category.icon"
-              ></i>
-            </span>
+              <span class="category-info">
+                <strong>{{ category.label }}</strong>
+                <small>
+                  {{ category.count }}
+                  {{ category.count === 1 ? 'order' : 'orders' }}
+                </small>
+              </span>
 
-            <span class="category-info">
-              <strong>{{ category.label }}</strong>
-              <small>
-                {{ category.count }}
-                {{ category.count === 1 ? 'order' : 'orders' }}
-              </small>
-            </span>
+              <i class="fa-solid fa-chevron-right card-arrow"></i>
+            </button>
+          </div>
+        </section>
 
-            <i class="fa-solid fa-chevron-right card-arrow"></i>
-          </button>
-        </div>
-      </section>
-
-      <section class="filters-row">
-        <div class="status-tabs">
+        <!-- =========================
+             STATUS SUMMARY
+        ========================== -->
+        <section class="status-section">
           <button
             v-for="tab in statusTabsWithCustom"
             :key="tab.key"
             type="button"
+            class="status-summary"
             :class="{ active: activeStatus === tab.key }"
             @click="activeStatus = tab.key"
           >
             <span
-              class="status-dot"
-              :class="`dot-${tab.key}`"
+              class="summary-dot"
+              :class="statusDotClass(tab.key)"
             ></span>
 
-            {{ tab.label }}
+            <span>{{ tab.label }}</span>
 
             <strong>{{ statusCount(tab.key) }}</strong>
           </button>
-        </div>
-      </section>
+        </section>
 
-      <section class="orders-panel">
-        <div class="panel-header">
-          <div>
-            <h2>
-              {{ activeCategoryLabel }}
-            </h2>
+        <!-- =========================
+             ORDER TABLE
+        ========================== -->
+        <section class="card orders-panel">
+          <div class="panel-header">
+            <div>
+              <h2>{{ activeCategoryLabel }}</h2>
+              <p>
+                {{ filteredOrders.length }}
+                {{ filteredOrders.length === 1 ? 'order' : 'orders' }}
+              </p>
+            </div>
 
-            <p>
-              {{ filteredOrders.length }}
-              {{ filteredOrders.length === 1 ? 'order' : 'orders' }}
-            </p>
-          </div>
+            <div class="bulk-actions">
+              <span v-if="selectedIds.length" class="selected-label">
+                {{ selectedIds.length }} selected
+              </span>
 
-          <div class="bulk-actions">
-            <span v-if="selectedIds.length">
-              {{ selectedIds.length }} selected
-            </span>
-
-            <button
-              type="button"
-              class="select-visible-button"
-              @click="toggleVisibleSelection"
-            >
-              <i class="fa-regular fa-square-check"></i>
-              {{ allVisibleSelected ? 'Clear Visible' : 'Select Visible' }}
-            </button>
-
-            <button
-              type="button"
-              class="print-selected-button"
-              :disabled="selectedIds.length === 0"
-              @click="printSelectedOrders"
-            >
-              <i class="fa-solid fa-print"></i>
-              Print Selected
-            </button>
-          </div>
-        </div>
-
-        <div
-          v-if="loading"
-          class="empty-state"
-        >
-          <i class="fa-solid fa-spinner fa-spin"></i>
-          <h3>Loading TeamStore orders...</h3>
-        </div>
-
-        <div
-          v-else-if="filteredOrders.length === 0"
-          class="empty-state"
-        >
-          <i class="fa-solid fa-box-open"></i>
-          <h3>No orders found</h3>
-          <p>Try another category, status or search.</p>
-        </div>
-
-        <div
-          v-else
-          class="table-wrap"
-        >
-          <table class="orders-table">
-            <thead>
-              <tr>
-                <th class="check-column">
-                  <input
-                    type="checkbox"
-                    :checked="allVisibleSelected"
-                    @change="toggleVisibleSelection"
-                  />
-                </th>
-                <th>Order</th>
-                <th>Category</th>
-                <th>Items</th>
-                <th>Customer</th>
-                <th>Contact</th>
-                <th>Status</th>
-                <th>Remark</th>
-                <th>Shipping</th>
-                <th>Tracking</th>
-                <th>Date</th>
-                <th>Action</th>
-              </tr>
-            </thead>
-
-            <tbody>
-              <tr
-                v-for="order in filteredOrders"
-                :key="order.id"
-                :class="{ unread: !order.is_read }"
+              <button
+                type="button"
+                class="secondary-button"
+                @click="toggleVisibleSelection"
               >
-                <td class="check-column">
-                  <input
-                    type="checkbox"
-                    :checked="isSelected(order.id)"
-                    @change="toggleOrder(order.id)"
-                  />
-                </td>
+                <i class="fa-regular fa-square-check"></i>
+                {{ allVisibleSelected ? 'Clear Visible' : 'Select Visible' }}
+              </button>
 
-                <td>
-                  <div class="order-number-cell">
-                    <span
-                      v-if="!order.is_read"
-                      class="unread-dot"
-                    ></span>
+              <button
+                type="button"
+                class="primary-button"
+                :disabled="selectedIds.length === 0"
+                @click="printSelectedOrders"
+              >
+                <i class="fa-solid fa-print"></i>
+                Print Selected
+              </button>
+            </div>
+          </div>
 
-                    <div>
+          <div v-if="loading" class="empty-state">
+            <i class="fa-solid fa-spinner fa-spin"></i>
+            <h3>Loading TeamStore orders...</h3>
+          </div>
+
+          <div
+            v-else-if="filteredOrders.length === 0"
+            class="empty-state"
+          >
+            <i class="fa-solid fa-box-open"></i>
+            <h3>No orders found</h3>
+            <p>Try another category, status or search.</p>
+          </div>
+
+          <div v-else class="table-wrap">
+            <table class="orders-table">
+              <thead>
+                <tr>
+                  <th class="check-column">
+                    <input
+                      type="checkbox"
+                      :checked="allVisibleSelected"
+                      @change="toggleVisibleSelection"
+                    />
+                  </th>
+
+                  <th>Order</th>
+                  <th>Category</th>
+                  <th>Items</th>
+                  <th>Customer</th>
+                  <th>Contact</th>
+                  <th>Status</th>
+                  <th>Remark</th>
+                  <th>Shipping</th>
+                  <th>Tracking</th>
+                  <th>Date</th>
+                  <th>Action</th>
+                </tr>
+              </thead>
+
+              <tbody>
+                <tr
+                  v-for="order in filteredOrders"
+                  :key="order.id"
+                  :class="{ unread: !order.is_read }"
+                >
+                  <td class="check-column">
+                    <input
+                      type="checkbox"
+                      :checked="isSelected(order.id)"
+                      @change="toggleOrder(order.id)"
+                    />
+                  </td>
+
+                  <td>
+                    <div class="order-number-cell">
+                      <span
+                        v-if="!order.is_read"
+                        class="unread-dot"
+                      ></span>
+
+                      <div>
+                        <strong>
+                          {{ order.order_number || `#${order.id}` }}
+                        </strong>
+                        <small>ID #{{ order.id }}</small>
+                      </div>
+                    </div>
+                  </td>
+
+                  <td>
+                    <div class="category-tags">
+                      <span
+                        v-for="category in orderCategories(order).slice(0, 2)"
+                        :key="category"
+                      >
+                        {{ category }}
+                      </span>
+
+                      <em v-if="orderCategories(order).length > 2">
+                        +{{ orderCategories(order).length - 2 }}
+                      </em>
+                    </div>
+                  </td>
+
+                  <td>
+                    <div class="item-thumbnails">
+                      <span
+                        v-for="(item, index) in normalizedItems(order).slice(0, 3)"
+                        :key="item.id || index"
+                        class="item-thumb"
+                      >
+                        <img
+                          v-if="itemImage(item)"
+                          :src="itemImage(item)"
+                          :alt="itemName(item)"
+                          @error="hideBrokenImage"
+                        />
+
+                        <i v-else class="fa-solid fa-shirt"></i>
+                      </span>
+
+                      <span
+                        v-if="normalizedItems(order).length > 3"
+                        class="more-items"
+                      >
+                        +{{ normalizedItems(order).length - 3 }}
+                      </span>
+                    </div>
+                  </td>
+
+                  <td>
+                    <div class="customer-cell">
                       <strong>
-                        {{ order.order_number || `#${order.id}` }}
+                        {{ order.customer_name || 'Unknown customer' }}
                       </strong>
 
-                      <small>
-                        ID #{{ order.id }}
+                      <small>{{ order.email || 'No email' }}</small>
+                    </div>
+                  </td>
+
+                  <td>
+                    <span class="plain-text">
+                      {{ order.phone || '—' }}
+                    </span>
+                  </td>
+
+                  <!-- =========================
+                       PROFESSIONAL STATUS
+                  ========================== -->
+                  <td class="status-column">
+                    <div class="status-control">
+                      <button
+                        type="button"
+                        class="status-trigger"
+                        :class="statusClass(order.status)"
+                        :disabled="isSaving(order.id)"
+                        @click.stop="toggleStatusMenu(order)"
+                      >
+                        <span class="status-trigger-dot"></span>
+
+                        <span class="status-trigger-label">
+                          {{ formatLabel(order.status || 'new') }}
+                        </span>
+
+                        <i class="fa-solid fa-chevron-down"></i>
+                      </button>
+
+                      <div
+                        v-if="order._status_menu"
+                        class="status-menu"
+                        @click.stop
+                      >
+                        <div class="status-menu-title">
+                          Change Status
+                        </div>
+
+                        <button
+                          v-for="option in standardStatusOptions"
+                          :key="option.value"
+                          type="button"
+                          class="status-option"
+                          :class="{
+                            selected:
+                              String(order.status || '').toLowerCase() ===
+                              option.value
+                          }"
+                          @click="selectStandardStatus(order, option.value)"
+                        >
+                          <span
+                            class="option-dot"
+                            :class="statusDotClass(option.value)"
+                          ></span>
+
+                          {{ option.label }}
+
+                          <i
+                            v-if="
+                              String(order.status || '').toLowerCase() ===
+                              option.value
+                            "
+                            class="fa-solid fa-check"
+                          ></i>
+                        </button>
+
+                        <div class="custom-divider"></div>
+
+                        <button
+                          type="button"
+                          class="custom-status-toggle"
+                          @click="order._custom_open = !order._custom_open"
+                        >
+                          <i class="fa-solid fa-pen"></i>
+                          Custom Status
+                        </button>
+
+                        <div
+                          v-if="order._custom_open"
+                          class="custom-status-box"
+                        >
+                          <input
+                            v-model="order._custom_status"
+                            type="text"
+                            placeholder="e.g. Printing, Hold, Packing"
+                            @keyup.enter="saveCustomStatus(order)"
+                          />
+
+                          <button
+                            type="button"
+                            :disabled="
+                              isSaving(order.id) ||
+                              !String(order._custom_status || '').trim()
+                            "
+                            @click="saveCustomStatus(order)"
+                          >
+                            Save
+                          </button>
+                        </div>
+                      </div>
+
+                      <small
+                        v-if="isSaving(order.id)"
+                        class="saving-text"
+                      >
+                        Saving...
                       </small>
                     </div>
-                  </div>
-                </td>
+                  </td>
 
-                <td>
-                  <div class="category-tags">
-                    <span
-                      v-for="category in orderCategories(order).slice(0, 2)"
-                      :key="category"
-                    >
-                      {{ category }}
-                    </span>
-
-                    <em
-                      v-if="orderCategories(order).length > 2"
-                    >
-                      +{{ orderCategories(order).length - 2 }}
-                    </em>
-                  </div>
-                </td>
-
-                <td>
-                  <div class="item-thumbnails">
-                    <span
-                      v-for="(item, index) in normalizedItems(order).slice(0, 3)"
-                      :key="item.id || index"
-                      class="item-thumb"
-                    >
-                      <img
-                        v-if="itemImage(item)"
-                        :src="itemImage(item)"
-                        :alt="itemName(item)"
-                        @error="hideBrokenImage"
+                  <!-- =========================
+                       REMARK — LINE AUTO SAVE
+                  ========================== -->
+                  <td class="remark-column">
+                    <div class="line-editor">
+                      <input
+                        v-model="order._remark"
+                        type="text"
+                        class="line-input"
+                        placeholder="Write remark..."
+                        :disabled="isSaving(order.id)"
+                        @input="queueRemarkSave(order)"
+                        @blur="saveRemarkNow(order)"
+                        @keyup.enter="$event.target.blur()"
                       />
 
-                      <i
-                        v-else
-                        class="fa-solid fa-shirt"
-                      ></i>
-                    </span>
-
-                    <span
-                      v-if="normalizedItems(order).length > 3"
-                      class="more-items"
-                    >
-                      +{{ normalizedItems(order).length - 3 }}
-                    </span>
-                  </div>
-                </td>
-
-                <td>
-                  <div class="customer-cell">
-                    <strong>
-                      {{ order.customer_name || 'Unknown customer' }}
-                    </strong>
-
-                    <small>{{ order.email || 'No email' }}</small>
-                  </div>
-                </td>
-
-                <td>
-                  <span class="plain-text">
-                    {{ order.phone || '—' }}
-                  </span>
-                </td>
-
-                <td>
-                  <div class="clean-status-wrap">
-                    <select
-                      :value="rowStatusSelection(order)"
-                      class="clean-status-select"
-                      :class="statusClass(order.status)"
-                      :disabled="isSaving(order.id)"
-                      @change="onRowStatusSelect(order, $event.target.value)"
-                    >
-                      <option
-                        v-for="option in standardStatusOptions"
-                        :key="option.value"
-                        :value="option.value"
+                      <span
+                        class="autosave-state"
+                        :class="{ saved: order._remark_saved }"
                       >
-                        {{ option.label }}
-                      </option>
+                        {{
+                          isSaving(order.id)
+                            ? 'Saving...'
+                            : order._remark_saved
+                              ? 'Saved'
+                              : ''
+                        }}
+                      </span>
+                    </div>
+                  </td>
 
-                      <option value="__custom__">
-                        Custom...
-                      </option>
-                    </select>
+                  <td>
+                    <div class="shipping-cell">
+                      <strong>{{ order.shipping_city || '—' }}</strong>
+                      <small>{{ order.shipping_province || '' }}</small>
+                    </div>
+                  </td>
 
-                    <input
-                      v-if="rowUsesCustomStatus(order)"
-                      v-model="order._custom_status"
-                      type="text"
-                      class="clean-custom-status"
-                      placeholder="Custom status"
-                      :disabled="isSaving(order.id)"
-                      @keyup.enter="saveRowCustomStatus(order)"
-                      @blur="saveRowCustomStatus(order)"
-                    />
+                  <!-- =========================
+                       TRACKING — WIDER FIELD
+                  ========================== -->
+                  <td class="tracking-column">
+                    <div class="tracking-editor">
+                      <div class="tracking-input-wrap">
+                        <i class="fa-solid fa-barcode"></i>
 
-                    <span
-                      v-if="isSaving(order.id)"
-                      class="inline-saving"
-                    >
-                      Saving...
+                        <input
+                          v-model="order._tracking_number"
+                          type="text"
+                          placeholder="Enter tracking number"
+                          :disabled="isSaving(order.id)"
+                          @input="queueTrackingSave(order)"
+                          @blur="saveTrackingNow(order)"
+                          @keyup.enter="$event.target.blur()"
+                        />
+                      </div>
+
+                      <div class="tracking-meta">
+                        <small>
+                          {{ order.courier_name || 'No courier selected' }}
+                        </small>
+
+                        <span
+                          v-if="
+                            order._tracking_saved &&
+                            !isSaving(order.id)
+                          "
+                        >
+                          Saved
+                        </span>
+                      </div>
+                    </div>
+                  </td>
+
+                  <td>
+                    <span class="date-cell">
+                      {{ formatDate(order.created_at) }}
                     </span>
-                  </div>
-                </td>
+                  </td>
 
-                <td>
-                  <div class="line-editor">
-                    <input
-                      v-model="order._remark"
-                      type="text"
-                      class="line-input"
-                      placeholder="Add remark..."
-                      :disabled="isSaving(order.id)"
-                      @input="queueRemarkSave(order)"
-                      @blur="saveRemarkNow(order)"
-                      @keyup.enter="$event.target.blur()"
-                    />
-
-                    <span
-                      class="line-state"
-                      :class="{ saved: order._remark_saved }"
+                  <td>
+                    <button
+                      type="button"
+                      class="view-button"
+                      @click="openOrder(order)"
                     >
-                      {{
-                        isSaving(order.id)
-                          ? 'Saving...'
-                          : order._remark_saved
-                            ? 'Saved'
-                            : ''
-                      }}
-                    </span>
-                  </div>
-                </td>
-
-                <td>
-                  <div class="shipping-cell">
-                    <strong>
-                      {{ order.shipping_city || '—' }}
-                    </strong>
-
-                    <small>
-                      {{ order.shipping_province || '' }}
-                    </small>
-                  </div>
-                </td>
-
-                <td>
-                  <div class="tracking-inline-editor">
-                    <input
-                      v-model="order._tracking_number"
-                      type="text"
-                      class="tracking-line-input"
-                      placeholder="Tracking #"
-                      :disabled="isSaving(order.id)"
-                      @input="queueTrackingSave(order)"
-                      @blur="saveTrackingNow(order)"
-                      @keyup.enter="$event.target.blur()"
-                    />
-
-                    <small>
-                      {{ order.courier_name || 'No courier' }}
-                    </small>
-
-                    <span
-                      v-if="order._tracking_saved && !isSaving(order.id)"
-                      class="tracking-saved"
-                    >
-                      Saved
-                    </span>
-                  </div>
-                </td>
-
-                <td>
-                  <span class="date-cell">
-                    {{ formatDate(order.created_at) }}
-                  </span>
-                </td>
-
-                <td>
-                  <button
-                    type="button"
-                    class="view-button"
-                    @click="openOrder(order)"
-                  >
-                    <i class="fa-regular fa-eye"></i>
-                    View
-                  </button>
-                </td>
-              </tr>
-            </tbody>
-          </table>
-        </div>
+                      <i class="fa-regular fa-eye"></i>
+                      View
+                    </button>
+                  </td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </section>
       </section>
     </main>
 
+    <!-- =========================
+         VIEW ORDER MODAL
+    ========================== -->
     <div
       v-if="selectedOrder"
       class="modal-overlay"
@@ -437,14 +632,12 @@
         <header class="modal-header">
           <div>
             <p>TeamStore Order</p>
-
             <h2>
               {{
                 selectedOrder.order_number ||
                 `Order #${selectedOrder.id}`
               }}
             </h2>
-
             <span>
               {{ selectedOrder.customer_name || 'Customer' }}
             </span>
@@ -533,144 +726,112 @@
               </dl>
             </article>
 
-            <article class="detail-card">
+            <article class="detail-card full-card">
               <h3>
-                <i class="fa-solid fa-truck-fast"></i>
-                Tracking Information
+                <i class="fa-solid fa-sliders"></i>
+                Production Controls
               </h3>
 
-              <dl>
-                <div>
-                  <dt>Courier</dt>
-                  <dd>{{ selectedOrder.courier_name || '—' }}</dd>
+              <div class="modal-control-grid">
+                <div class="modal-control">
+                  <label>Status</label>
+
+                  <div class="status-control modal-status-control">
+                    <button
+                      type="button"
+                      class="status-trigger modal-status-trigger"
+                      :class="statusClass(selectedOrder.status)"
+                      @click.stop="toggleStatusMenu(selectedOrder)"
+                    >
+                      <span class="status-trigger-dot"></span>
+                      {{ formatLabel(selectedOrder.status || 'new') }}
+                      <i class="fa-solid fa-chevron-down"></i>
+                    </button>
+
+                    <div
+                      v-if="selectedOrder._status_menu"
+                      class="status-menu modal-status-menu"
+                      @click.stop
+                    >
+                      <button
+                        v-for="option in standardStatusOptions"
+                        :key="option.value"
+                        type="button"
+                        class="status-option"
+                        @click="
+                          selectStandardStatus(
+                            selectedOrder,
+                            option.value
+                          )
+                        "
+                      >
+                        <span
+                          class="option-dot"
+                          :class="statusDotClass(option.value)"
+                        ></span>
+                        {{ option.label }}
+                      </button>
+
+                      <div class="custom-divider"></div>
+
+                      <div class="custom-status-box always-open">
+                        <input
+                          v-model="selectedOrder._custom_status"
+                          type="text"
+                          placeholder="Custom status..."
+                          @keyup.enter="saveCustomStatus(selectedOrder)"
+                        />
+
+                        <button
+                          type="button"
+                          @click="saveCustomStatus(selectedOrder)"
+                        >
+                          Save
+                        </button>
+                      </div>
+                    </div>
+                  </div>
                 </div>
 
-                <div>
-                  <dt>Tracking Number</dt>
-                  <dd>
+                <div class="modal-control">
+                  <label>Tracking Number</label>
+
+                  <div class="modal-field-input">
+                    <i class="fa-solid fa-barcode"></i>
+
                     <input
                       v-model="selectedOrder._tracking_number"
                       type="text"
-                      class="modal-line-input"
                       placeholder="Enter tracking number"
-                      :disabled="isSaving(selectedOrder.id)"
                       @input="queueTrackingSave(selectedOrder)"
                       @blur="saveTrackingNow(selectedOrder)"
                       @keyup.enter="$event.target.blur()"
                     />
-                  </dd>
-                </div>
-
-                <div>
-                  <dt>Dispatch Date</dt>
-                  <dd>{{ formatDate(selectedOrder.dispatch_date) }}</dd>
-                </div>
-
-                <div>
-                  <dt>Delivered Date</dt>
-                  <dd>{{ formatDate(selectedOrder.delivered_date) }}</dd>
-                </div>
-              </dl>
-            </article>
-
-            <article class="detail-card order-edit-card">
-              <h3>
-                <i class="fa-solid fa-circle-info"></i>
-                Order Information
-              </h3>
-
-              <div class="modal-edit-grid">
-                <div class="modal-field">
-                  <label>Status</label>
-
-                  <select
-                    :value="rowStatusSelection(selectedOrder)"
-                    class="modal-status-select"
-                    :disabled="isSaving(selectedOrder.id)"
-                    @change="
-                      onRowStatusSelect(
-                        selectedOrder,
-                        $event.target.value
-                      )
-                    "
-                  >
-                    <option
-                      v-for="option in standardStatusOptions"
-                      :key="option.value"
-                      :value="option.value"
-                    >
-                      {{ option.label }}
-                    </option>
-
-                    <option value="__custom__">
-                      Custom Status...
-                    </option>
-                  </select>
-
-                  <div
-                    v-if="rowUsesCustomStatus(selectedOrder)"
-                    class="modal-custom-status"
-                  >
-                    <input
-                      v-model="selectedOrder._custom_status"
-                      type="text"
-                      placeholder="Type custom status"
-                      :disabled="isSaving(selectedOrder.id)"
-                      @keyup.enter="saveRowCustomStatus(selectedOrder)"
-                    />
-
-                    <button
-                      type="button"
-                      :disabled="isSaving(selectedOrder.id)"
-                      @click="saveRowCustomStatus(selectedOrder)"
-                    >
-                      Save Status
-                    </button>
                   </div>
                 </div>
 
-                <div class="modal-field">
-                  <label>Payment Status</label>
-                  <div class="readonly-field">
-                    {{
-                      formatLabel(
-                        selectedOrder.payment_status || 'pending'
-                      )
-                    }}
-                  </div>
-                </div>
-
-                <div class="modal-field full-row">
-                  <label>Categories</label>
-                  <div class="readonly-field">
-                    {{ orderCategories(selectedOrder).join(', ') }}
-                  </div>
-                </div>
-
-                <div class="modal-field full-row">
+                <div class="modal-control full-row">
                   <label>Remark</label>
 
                   <div class="modal-line-editor">
                     <input
                       v-model="selectedOrder._remark"
                       type="text"
-                      class="modal-line-input"
-                      placeholder="Type remark..."
-                      :disabled="isSaving(selectedOrder.id)"
+                      placeholder="Type internal remark..."
                       @input="queueRemarkSave(selectedOrder)"
                       @blur="saveRemarkNow(selectedOrder)"
                       @keyup.enter="$event.target.blur()"
                     />
 
-                    <span class="modal-auto-save-note">
+                    <small>
                       {{
                         isSaving(selectedOrder.id)
                           ? 'Saving...'
                           : selectedOrder._remark_saved
                             ? 'Saved'
-                            : 'Auto save'
+                            : 'Auto-save'
                       }}
-                    </span>
+                    </small>
                   </div>
                 </div>
               </div>
@@ -705,26 +866,26 @@
                     @error="hideBrokenImage"
                   />
 
-                  <i
-                    v-else
-                    class="fa-solid fa-shirt"
-                  ></i>
+                  <i v-else class="fa-solid fa-shirt"></i>
                 </div>
 
                 <div class="modal-item-info">
                   <span>{{ itemCategory(item) }}</span>
-
                   <h4>{{ itemName(item) }}</h4>
 
                   <div class="item-meta">
                     <em>
                       Size:
-                      <strong>{{ item.size || item.selected_size || '—' }}</strong>
+                      <strong>
+                        {{ item.size || item.selected_size || '—' }}
+                      </strong>
                     </em>
 
                     <em>
                       Qty:
-                      <strong>{{ item.quantity || item.qty || 1 }}</strong>
+                      <strong>
+                        {{ item.quantity || item.qty || 1 }}
+                      </strong>
                     </em>
 
                     <em v-if="item.color || item.selected_color">
@@ -738,10 +899,7 @@
               </article>
             </div>
 
-            <div
-              v-else
-              class="no-items"
-            >
+            <div v-else class="no-items">
               No item details found.
             </div>
           </section>
@@ -781,6 +939,7 @@ export default {
       savingOrderIds: [],
       remarkSaveTimers: {},
       trackingSaveTimers: {},
+      mobileSidebarOpen: false,
 
       standardStatusOptions: [
         { value: 'new', label: 'New' },
@@ -804,6 +963,47 @@ export default {
   },
 
   computed: {
+    currentUser() {
+      try {
+        return JSON.parse(localStorage.getItem('user')) || {}
+      } catch {
+        return {}
+      }
+    },
+
+    currentUserName() {
+      return (
+        this.currentUser.name ||
+        this.currentUser.full_name ||
+        'Prosix User'
+      )
+    },
+
+    currentUserRole() {
+      return this.formatLabel(
+        this.currentUser.role || 'member'
+      )
+    },
+
+    currentUserAvatar() {
+      return (
+        this.currentUser.profile_photo_url ||
+        this.currentUser.avatar ||
+        ''
+      )
+    },
+
+    currentUserInitial() {
+      return String(this.currentUserName)
+        .trim()
+        .charAt(0)
+        .toUpperCase()
+    },
+
+    isSuperAdmin() {
+      return this.currentUser?.role === 'super_admin'
+    },
+
     unreadCount() {
       return this.orders.filter(order => !order.is_read).length
     },
@@ -814,6 +1014,7 @@ export default {
       this.orders.forEach(order => {
         this.normalizedItems(order).forEach(item => {
           const category = this.itemCategoryData(item)
+
           const key = category.id
             ? `category-${category.id}`
             : this.slug(category.name)
@@ -823,8 +1024,11 @@ export default {
               key,
               id: category.id,
               label: category.name,
-              image: category.image || this.itemImage(item),
-              icon: this.categoryIcon(category.name),
+              image:
+                category.image ||
+                this.itemImage(item),
+              icon:
+                this.categoryIcon(category.name),
               orderIds: new Set()
             })
           }
@@ -838,8 +1042,14 @@ export default {
           ...category,
           count: category.orderIds.size
         }))
-        .filter(category => category.label !== 'Other' || category.count > 0)
-        .sort((a, b) => a.label.localeCompare(b.label))
+        .filter(
+          category =>
+            category.label !== 'Other' ||
+            category.count > 0
+        )
+        .sort((a, b) =>
+          a.label.localeCompare(b.label)
+        )
     },
 
     categoryCards() {
@@ -858,26 +1068,36 @@ export default {
     activeCategoryLabel() {
       return (
         this.categoryCards.find(
-          category => category.key === this.activeCategory
+          category =>
+            category.key === this.activeCategory
         )?.label || 'All Categories'
       )
     },
 
     statusTabsWithCustom() {
       const base = [...this.statusTabs]
+
       const known = new Set(
-        base.map(tab => String(tab.key).toLowerCase())
+        base.map(tab =>
+          String(tab.key).toLowerCase()
+        )
       )
 
       const customs = this.orders
-        .map(order => String(order.status || '').trim())
+        .map(order =>
+          String(order.status || '').trim()
+        )
         .filter(Boolean)
-        .filter(status => !known.has(status.toLowerCase()))
+        .filter(
+          status =>
+            !known.has(status.toLowerCase())
+        )
         .filter(
           (status, index, array) =>
             array.findIndex(
               value =>
-                value.toLowerCase() === status.toLowerCase()
+                value.toLowerCase() ===
+                status.toLowerCase()
             ) === index
         )
         .map(status => ({
@@ -890,7 +1110,9 @@ export default {
 
     selectedOrders() {
       return this.orders.filter(order =>
-        this.selectedIds.includes(Number(order.id))
+        this.selectedIds.includes(
+          Number(order.id)
+        )
       )
     },
 
@@ -898,33 +1120,44 @@ export default {
       return (
         this.filteredOrders.length > 0 &&
         this.filteredOrders.every(order =>
-          this.selectedIds.includes(Number(order.id))
+          this.selectedIds.includes(
+            Number(order.id)
+          )
         )
       )
     },
 
     filteredOrders() {
-      const query = String(this.search || '').trim().toLowerCase()
+      const query = String(this.search || '')
+        .trim()
+        .toLowerCase()
 
       return this.orders.filter(order => {
-        const status = String(order.status || 'new').toLowerCase()
+        const status =
+          String(order.status || 'new')
+            .toLowerCase()
 
         const statusMatch =
           this.activeStatus === 'all' ||
           status === this.activeStatus
 
-        const categories = this.orderCategories(order)
+        const categories =
+          this.orderCategories(order)
 
         const categoryMatch =
           this.activeCategory === 'all' ||
-          this.normalizedItems(order).some(item => {
-            const category = this.itemCategoryData(item)
-            const key = category.id
-              ? `category-${category.id}`
-              : this.slug(category.name)
+          this.normalizedItems(order).some(
+            item => {
+              const category =
+                this.itemCategoryData(item)
 
-            return key === this.activeCategory
-          })
+              const key = category.id
+                ? `category-${category.id}`
+                : this.slug(category.name)
+
+              return key === this.activeCategory
+            }
+          )
 
         const searchMatch =
           !query ||
@@ -937,6 +1170,7 @@ export default {
             order.shipping_city,
             order.courier_name,
             order.tracking_number,
+            order.remark,
             ...categories
           ].some(value =>
             String(value || '')
@@ -944,13 +1178,39 @@ export default {
               .includes(query)
           )
 
-        return statusMatch && categoryMatch && searchMatch
+        return (
+          statusMatch &&
+          categoryMatch &&
+          searchMatch
+        )
       })
     }
   },
 
   async mounted() {
+    document.addEventListener(
+      'click',
+      this.closeAllStatusMenus
+    )
+
     await this.fetchOrders()
+  },
+
+  beforeUnmount() {
+    document.removeEventListener(
+      'click',
+      this.closeAllStatusMenus
+    )
+
+    document.body.style.overflow = ''
+
+    Object.values(
+      this.remarkSaveTimers
+    ).forEach(timer => clearTimeout(timer))
+
+    Object.values(
+      this.trackingSaveTimers
+    ).forEach(timer => clearTimeout(timer))
   },
 
   methods: {
@@ -978,11 +1238,17 @@ export default {
           response.data ??
           []
 
-        this.orders = (Array.isArray(data) ? data : []).map(
-          order => this.prepareOrder(order)
+        this.orders = (
+          Array.isArray(data) ? data : []
+        ).map(order =>
+          this.prepareOrder(order)
         )
       } catch (error) {
-        console.error('TeamStore orders fetch error:', error)
+        console.error(
+          'TeamStore orders fetch error:',
+          error
+        )
+
         this.orders = []
       } finally {
         this.loading = false
@@ -994,88 +1260,127 @@ export default {
         ...order,
         _remark: order?.remark ?? '',
         _remark_saved: false,
-        _tracking_number: order?.tracking_number ?? '',
+        _tracking_number:
+          order?.tracking_number ?? '',
         _tracking_saved: false,
-        _custom_status: ''
-      }
-
-      if (!this.isStandardStatus(prepared.status)) {
-        prepared._custom_status = prepared.status || ''
+        _custom_status:
+          this.isStandardStatus(order?.status)
+            ? ''
+            : (order?.status || ''),
+        _status_menu: false,
+        _custom_open: false
       }
 
       return prepared
     },
 
+    selectCategory(key) {
+      this.activeCategory = key
+      this.activeStatus = 'all'
+    },
+
     isStandardStatus(status) {
-      const value = String(status || '').trim().toLowerCase()
+      const value =
+        String(status || '')
+          .trim()
+          .toLowerCase()
 
       return this.standardStatusOptions.some(
         option => option.value === value
       )
     },
 
-    rowUsesCustomStatus(order) {
-      return !this.isStandardStatus(order?.status)
+    toggleStatusMenu(order) {
+      const nextState = !order._status_menu
+
+      this.orders.forEach(item => {
+        item._status_menu = false
+      })
+
+      if (
+        this.selectedOrder &&
+        Number(this.selectedOrder.id) !==
+          Number(order.id)
+      ) {
+        this.selectedOrder._status_menu = false
+      }
+
+      order._status_menu = nextState
     },
 
-    rowStatusSelection(order) {
-      return this.isStandardStatus(order?.status)
-        ? String(order.status).toLowerCase()
-        : '__custom__'
+    closeAllStatusMenus() {
+      this.orders.forEach(order => {
+        order._status_menu = false
+      })
+
+      if (this.selectedOrder) {
+        this.selectedOrder._status_menu = false
+      }
+    },
+
+    async selectStandardStatus(
+      order,
+      value
+    ) {
+      order._status_menu = false
+      order._custom_open = false
+      order._custom_status = ''
+
+      await this.updateRemoteOrder(
+        order,
+        { status: value }
+      )
+    },
+
+    async saveCustomStatus(order) {
+      const value =
+        String(
+          order._custom_status || ''
+        ).trim()
+
+      if (!value) {
+        return
+      }
+
+      const success =
+        await this.updateRemoteOrder(
+          order,
+          { status: value }
+        )
+
+      if (success) {
+        order._status_menu = false
+        order._custom_open = false
+      }
     },
 
     isSaving(orderId) {
-      return this.savingOrderIds.includes(Number(orderId))
+      return this.savingOrderIds.includes(
+        Number(orderId)
+      )
     },
 
     setSaving(orderId, state) {
       const id = Number(orderId)
 
       if (state) {
-        if (!this.savingOrderIds.includes(id)) {
+        if (
+          !this.savingOrderIds.includes(id)
+        ) {
           this.savingOrderIds = [
             ...this.savingOrderIds,
             id
           ]
         }
+
         return
       }
 
       this.savingOrderIds =
         this.savingOrderIds.filter(
-          savingId => savingId !== id
+          savingId =>
+            savingId !== id
         )
-    },
-
-    async onRowStatusSelect(order, value) {
-      if (value === '__custom__') {
-        order._custom_status =
-          this.isStandardStatus(order.status)
-            ? ''
-            : (order.status || '')
-
-        return
-      }
-
-      order._custom_status = ''
-
-      await this.updateRemoteOrder(order, {
-        status: value
-      })
-    },
-
-    async saveRowCustomStatus(order) {
-      const value =
-        String(order._custom_status || '').trim()
-
-      if (!value) {
-        alert('Please type a custom status.')
-        return
-      }
-
-      await this.updateRemoteOrder(order, {
-        status: value
-      })
     },
 
     queueRemarkSave(order) {
@@ -1083,39 +1388,55 @@ export default {
 
       order._remark_saved = false
 
-      if (this.remarkSaveTimers[id]) {
-        clearTimeout(this.remarkSaveTimers[id])
+      if (
+        this.remarkSaveTimers[id]
+      ) {
+        clearTimeout(
+          this.remarkSaveTimers[id]
+        )
       }
 
-      this.remarkSaveTimers[id] = setTimeout(() => {
-        this.saveRemarkNow(order)
-      }, 700)
+      this.remarkSaveTimers[id] =
+        setTimeout(() => {
+          this.saveRemarkNow(order)
+        }, 800)
     },
 
     async saveRemarkNow(order) {
       const id = Number(order.id)
 
-      if (this.remarkSaveTimers[id]) {
-        clearTimeout(this.remarkSaveTimers[id])
+      if (
+        this.remarkSaveTimers[id]
+      ) {
+        clearTimeout(
+          this.remarkSaveTimers[id]
+        )
+
         delete this.remarkSaveTimers[id]
       }
 
-      const nextValue = String(order._remark ?? '')
+      const nextValue =
+        String(order._remark ?? '')
 
-      if (nextValue === String(order.remark ?? '')) {
+      if (
+        nextValue ===
+        String(order.remark ?? '')
+      ) {
         return
       }
 
-      const success = await this.updateRemoteOrder(order, {
-        remark: nextValue
-      })
+      const success =
+        await this.updateRemoteOrder(
+          order,
+          { remark: nextValue }
+        )
 
       if (success) {
         order._remark_saved = true
 
         setTimeout(() => {
           order._remark_saved = false
-        }, 1300)
+        }, 1400)
       }
     },
 
@@ -1124,46 +1445,69 @@ export default {
 
       order._tracking_saved = false
 
-      if (this.trackingSaveTimers[id]) {
-        clearTimeout(this.trackingSaveTimers[id])
+      if (
+        this.trackingSaveTimers[id]
+      ) {
+        clearTimeout(
+          this.trackingSaveTimers[id]
+        )
       }
 
-      this.trackingSaveTimers[id] = setTimeout(() => {
-        this.saveTrackingNow(order)
-      }, 700)
+      this.trackingSaveTimers[id] =
+        setTimeout(() => {
+          this.saveTrackingNow(order)
+        }, 800)
     },
 
     async saveTrackingNow(order) {
       const id = Number(order.id)
 
-      if (this.trackingSaveTimers[id]) {
-        clearTimeout(this.trackingSaveTimers[id])
+      if (
+        this.trackingSaveTimers[id]
+      ) {
+        clearTimeout(
+          this.trackingSaveTimers[id]
+        )
+
         delete this.trackingSaveTimers[id]
       }
 
       const nextValue =
-        String(order._tracking_number ?? '').trim()
+        String(
+          order._tracking_number ?? ''
+        ).trim()
 
-      if (nextValue === String(order.tracking_number ?? '')) {
+      if (
+        nextValue ===
+        String(order.tracking_number ?? '')
+      ) {
         return
       }
 
-      const success = await this.updateRemoteOrder(order, {
-        tracking_number: nextValue
-      })
+      const success =
+        await this.updateRemoteOrder(
+          order,
+          { tracking_number: nextValue }
+        )
 
       if (success) {
         order._tracking_saved = true
 
         setTimeout(() => {
           order._tracking_saved = false
-        }, 1300)
+        }, 1400)
       }
     },
 
-    async updateRemoteOrder(order, payload) {
-      if (!order?.id || this.isSaving(order.id)) {
-        return
+    async updateRemoteOrder(
+      order,
+      payload
+    ) {
+      if (
+        !order?.id ||
+        this.isSaving(order.id)
+      ) {
+        return false
       }
 
       this.setSaving(order.id, true)
@@ -1180,41 +1524,47 @@ export default {
         const updated =
           response.data?.data || {}
 
-        if (Object.prototype.hasOwnProperty.call(updated, 'status')) {
-          order.status = updated.status
-
-          if (!this.isStandardStatus(updated.status)) {
-            order._custom_status = updated.status || ''
-          } else {
-            order._custom_status = ''
-          }
-        }
-
-        if (Object.prototype.hasOwnProperty.call(updated, 'remark')) {
-          order.remark = updated.remark ?? ''
-          order._remark = updated.remark ?? ''
-        }
-
-        if (Object.prototype.hasOwnProperty.call(updated, 'tracking_number')) {
-          order.tracking_number = updated.tracking_number ?? ''
-          order._tracking_number = updated.tracking_number ?? ''
-        }
-
-        /*
-         * selectedOrder same object reference ho sakta hai,
-         * phir bhi explicit sync safe hai.
-         */
         if (
-          this.selectedOrder &&
-          Number(this.selectedOrder.id) === Number(order.id)
+          Object.prototype.hasOwnProperty.call(
+            updated,
+            'status'
+          )
         ) {
-          this.selectedOrder.status = order.status
-          this.selectedOrder.remark = order.remark
-          this.selectedOrder._remark = order._remark
-          this.selectedOrder._custom_status =
-            order._custom_status
-          this.selectedOrder._tracking_number =
-            order._tracking_number
+          order.status =
+            updated.status
+
+          order._custom_status =
+            this.isStandardStatus(
+              updated.status
+            )
+              ? ''
+              : (updated.status || '')
+        }
+
+        if (
+          Object.prototype.hasOwnProperty.call(
+            updated,
+            'remark'
+          )
+        ) {
+          order.remark =
+            updated.remark ?? ''
+
+          order._remark =
+            updated.remark ?? ''
+        }
+
+        if (
+          Object.prototype.hasOwnProperty.call(
+            updated,
+            'tracking_number'
+          )
+        ) {
+          order.tracking_number =
+            updated.tracking_number ?? ''
+
+          order._tracking_number =
+            updated.tracking_number ?? ''
         }
 
         return true
@@ -1224,48 +1574,63 @@ export default {
           error
         )
 
+        order._remark =
+          order.remark ?? ''
+
+        order._tracking_number =
+          order.tracking_number ?? ''
+
         alert(
           error?.response?.data?.message ||
           'Order update failed.'
         )
 
-        /*
-         * Failed remark ko stored value par wapas lao.
-         */
-        order._remark = order.remark ?? ''
-        order._tracking_number = order.tracking_number ?? ''
-
         return false
       } finally {
-        this.setSaving(order.id, false)
+        this.setSaving(
+          order.id,
+          false
+        )
       }
     },
 
     isSelected(orderId) {
-      return this.selectedIds.includes(Number(orderId))
+      return this.selectedIds.includes(
+        Number(orderId)
+      )
     },
 
     toggleOrder(orderId) {
       const id = Number(orderId)
 
-      if (this.selectedIds.includes(id)) {
-        this.selectedIds = this.selectedIds.filter(
-          selectedId => selectedId !== id
-        )
+      if (
+        this.selectedIds.includes(id)
+      ) {
+        this.selectedIds =
+          this.selectedIds.filter(
+            selectedId =>
+              selectedId !== id
+          )
       } else {
-        this.selectedIds = [...this.selectedIds, id]
+        this.selectedIds = [
+          ...this.selectedIds,
+          id
+        ]
       }
     },
 
     toggleVisibleSelection() {
-      const visibleIds = this.filteredOrders.map(
-        order => Number(order.id)
-      )
+      const visibleIds =
+        this.filteredOrders.map(
+          order => Number(order.id)
+        )
 
       if (this.allVisibleSelected) {
-        this.selectedIds = this.selectedIds.filter(
-          id => !visibleIds.includes(id)
-        )
+        this.selectedIds =
+          this.selectedIds.filter(
+            id =>
+              !visibleIds.includes(id)
+          )
       } else {
         this.selectedIds = [
           ...new Set([
@@ -1276,598 +1641,7 @@ export default {
       }
     },
 
-    escapeHtml(value) {
-      return String(value ?? '')
-        .replaceAll('&', '&amp;')
-        .replaceAll('<', '&lt;')
-        .replaceAll('>', '&gt;')
-        .replaceAll('"', '&quot;')
-        .replaceAll("'", '&#039;')
-    },
-
-    printSelectedOrders() {
-      const orders = this.selectedOrders
-
-      if (!orders.length) {
-        return
-      }
-
-      const rows = orders.map(order => {
-        const items = this.normalizedItems(order)
-          .map(item => {
-            const image = this.itemImage(item)
-
-            return `
-              <div class="print-item">
-                ${
-                  image
-                    ? `<img src="${this.escapeHtml(image)}" alt="">`
-                    : '<div class="print-placeholder">No Image</div>'
-                }
-                <div>
-                  <strong>${this.escapeHtml(this.itemName(item))}</strong>
-                  <span>Category: ${this.escapeHtml(this.itemCategory(item))}</span>
-                  <span>Size: ${this.escapeHtml(item.size || item.selected_size || '—')}</span>
-                  <span>Qty: ${this.escapeHtml(item.quantity || item.qty || 1)}</span>
-                  ${
-                    item.color || item.selected_color
-                      ? `<span>Color: ${this.escapeHtml(item.color || item.selected_color)}</span>`
-                      : ''
-                  }
-                </div>
-              </div>
-            `
-          })
-          .join('')
-
-        return `
-          <section class="print-order">
-            <div class="print-order-head">
-              <div>
-                <small>ORDER</small>
-                <h2>${this.escapeHtml(order.order_number || `Order #${order.id}`)}</h2>
-              </div>
-              <span>${this.escapeHtml(this.formatLabel(order.status || 'new'))}</span>
-            </div>
-
-            <div class="print-details">
-              <p><b>Customer:</b> ${this.escapeHtml(order.customer_name || '—')}</p>
-              <p><b>Phone:</b> ${this.escapeHtml(order.phone || '—')}</p>
-              <p><b>Email:</b> ${this.escapeHtml(order.email || '—')}</p>
-              <p><b>City:</b> ${this.escapeHtml(order.shipping_city || '—')}</p>
-              <p><b>Address:</b> ${this.escapeHtml(order.shipping_address || '—')}</p>
-              <p><b>Courier:</b> ${this.escapeHtml(order.courier_name || '—')}</p>
-              <p><b>Tracking:</b> ${this.escapeHtml(order.tracking_number || '—')}</p>
-              <p><b>Date:</b> ${this.escapeHtml(this.formatDate(order.created_at))}</p>
-            </div>
-
-            <h3>Items</h3>
-            <div class="print-items">
-              ${items || '<p>No item details found.</p>'}
-            </div>
-          </section>
-        `
-      }).join('')
-
-      const printWindow = window.open('', '_blank', 'width=1100,height=800')
-
-      if (!printWindow) {
-        alert('Please allow popups to print selected orders.')
-        return
-      }
-
-      printWindow.document.write(`
-        <!doctype html>
-        <html>
-          <head>
-            <title>TeamStore Orders</title>
-            <style>
-              * { box-sizing: border-box; }
-              body {
-                margin: 0;
-                padding: 28px;
-                color: #111;
-                font-family: Arial, sans-serif;
-                background: #fff;
-              }
-              .print-logo {
-                margin-bottom: 22px;
-                text-align: center;
-                border-bottom: 2px solid #111;
-                padding-bottom: 14px;
-              }
-              .print-logo h1 { margin: 0; font-size: 26px; }
-              .print-logo p { margin: 4px 0 0; color: #666; }
-              .print-order {
-                margin-bottom: 24px;
-                border: 1px solid #ddd;
-                border-radius: 12px;
-                overflow: hidden;
-                page-break-inside: avoid;
-              }
-              .print-order-head {
-                padding: 14px 16px;
-                background: #111827;
-                color: #fff;
-                display: flex;
-                align-items: center;
-                justify-content: space-between;
-              }
-              .print-order-head small { color: #aaa; }
-              .print-order-head h2 { margin: 3px 0 0; font-size: 18px; }
-              .print-order-head > span {
-                padding: 6px 10px;
-                border-radius: 999px;
-                background: #fff;
-                color: #111;
-                font-size: 11px;
-                font-weight: 700;
-              }
-              .print-details {
-                padding: 14px 16px;
-                display: grid;
-                grid-template-columns: repeat(2, 1fr);
-                gap: 8px 18px;
-              }
-              .print-details p { margin: 0; font-size: 12px; }
-              .print-order > h3 { margin: 4px 16px 10px; font-size: 14px; }
-              .print-items {
-                padding: 0 16px 16px;
-                display: grid;
-                grid-template-columns: repeat(2, 1fr);
-                gap: 10px;
-              }
-              .print-item {
-                padding: 9px;
-                border: 1px solid #ddd;
-                border-radius: 9px;
-                display: flex;
-                gap: 10px;
-              }
-              .print-item img,
-              .print-placeholder {
-                width: 62px;
-                height: 62px;
-                flex-shrink: 0;
-                border-radius: 7px;
-                object-fit: contain;
-                background: #f3f4f6;
-              }
-              .print-placeholder {
-                color: #777;
-                font-size: 9px;
-                display: grid;
-                place-items: center;
-              }
-              .print-item strong,
-              .print-item span { display: block; }
-              .print-item strong { margin-bottom: 5px; font-size: 12px; }
-              .print-item span { margin-top: 2px; color: #555; font-size: 10px; }
-              @media print {
-                body { padding: 0; }
-                .print-order { break-inside: avoid; }
-              }
-
-/* ── Status + Remark Sync Editors ── */
-.status-editor {
-  min-width: 150px;
-}
-
-.status-select,
-.modal-status-select {
-  width: 100%;
-  padding: 7px 9px;
-  border: 1px solid #d9dde5;
-  border-radius: 8px;
-  background: #ffffff;
-  color: #111827;
-  font-size: 10px;
-  font-weight: 800;
-  outline: none;
-}
-
-.status-select:focus,
-.modal-status-select:focus {
-  border-color: #111827;
-}
-
-.custom-status-row,
-.modal-custom-status {
-  margin-top: 6px;
-  display: flex;
-  align-items: center;
-  gap: 5px;
-}
-
-.custom-status-row input,
-.modal-custom-status input {
-  min-width: 0;
-  flex: 1;
-  padding: 7px 8px;
-  border: 1px solid #d9dde5;
-  border-radius: 7px;
-  font-size: 9px;
-  outline: none;
-}
-
-.custom-status-row button,
-.modal-custom-status button {
-  flex-shrink: 0;
-  padding: 7px 9px;
-  border: 0;
-  border-radius: 7px;
-  background: #111827;
-  color: #ffffff;
-  font-size: 8px;
-  font-weight: 900;
-  cursor: pointer;
-}
-
-.remark-editor {
-  min-width: 190px;
-}
-
-.remark-editor textarea {
-  width: 100%;
-  min-height: 50px;
-  resize: vertical;
-  padding: 7px 8px;
-  border: 1px solid #d9dde5;
-  border-radius: 8px;
-  background: #ffffff;
-  color: #111827;
-  font-size: 9px;
-  line-height: 1.4;
-  outline: none;
-}
-
-.remark-editor button {
-  margin-top: 5px;
-  padding: 6px 9px;
-  border: 0;
-  border-radius: 7px;
-  background: #111827;
-  color: #ffffff;
-  font-size: 8px;
-  font-weight: 900;
-  cursor: pointer;
-}
-
-.remark-editor button:disabled,
-.custom-status-row button:disabled,
-.modal-custom-status button:disabled,
-.modal-save-remark:disabled {
-  opacity: .45;
-  cursor: not-allowed;
-}
-
-.order-edit-card {
-  grid-column: 1 / -1;
-}
-
-.modal-edit-grid {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 12px;
-}
-
-.modal-field {
-  min-width: 0;
-}
-
-.modal-field.full-row {
-  grid-column: 1 / -1;
-}
-
-.modal-field label {
-  display: block;
-  margin-bottom: 5px;
-  color: #6b7280;
-  font-size: 9px;
-  font-weight: 900;
-  text-transform: uppercase;
-}
-
-.readonly-field {
-  min-height: 38px;
-  padding: 9px 10px;
-  border: 1px solid #e5e7eb;
-  border-radius: 8px;
-  background: #f8fafc;
-  color: #111827;
-  font-size: 10px;
-  font-weight: 700;
-}
-
-.modal-remark-input {
-  width: 100%;
-  min-height: 90px;
-  resize: vertical;
-  padding: 10px;
-  border: 1px solid #d9dde5;
-  border-radius: 9px;
-  background: #ffffff;
-  color: #111827;
-  font-size: 10px;
-  line-height: 1.5;
-  outline: none;
-}
-
-.modal-save-remark {
-  margin-top: 7px;
-  padding: 8px 12px;
-  border: 0;
-  border-radius: 8px;
-  background: #111827;
-  color: #ffffff;
-  font-size: 9px;
-  font-weight: 900;
-  cursor: pointer;
-}
-
-.internal-note {
-  display: block;
-  margin-top: 7px;
-  color: #9ca3af;
-  font-size: 8px;
-}
-
-
-/* =========================================================
-   CLEAN TEAMSTORE TABLE — COMPACT EDITORS
-   ========================================================= */
-
-.teamstore-page {
-  width: 100%;
-  min-width: 0;
-  min-height: 100%;
-  background: #f6f7f9;
-}
-
-/* Keep page inside AppLayout/sidebar content area */
-.page-header {
-  min-height: 82px;
-  padding: 17px 22px;
-}
-
-.page-content {
-  padding: 18px 22px 30px;
-}
-
-.category-section,
-.orders-panel {
-  border-radius: 13px;
-}
-
-.category-section {
-  padding: 15px;
-}
-
-.category-grid {
-  margin-top: 13px;
-  grid-template-columns: repeat(auto-fill, minmax(165px, 1fr));
-  gap: 9px;
-}
-
-.category-card {
-  min-height: 68px;
-  padding: 9px 10px;
-  border-radius: 11px;
-}
-
-.category-icon {
-  width: 40px;
-  height: 40px;
-  border-radius: 9px;
-}
-
-.filters-row {
-  margin: 11px 0;
-}
-
-.status-tabs {
-  gap: 6px;
-}
-
-.status-tabs button {
-  min-width: 100px;
-  height: 36px;
-  padding: 0 10px;
-  border-radius: 9px;
-  font-size: 10px;
-}
-
-.orders-table th,
-.orders-table td {
-  padding-top: 9px;
-  padding-bottom: 9px;
-}
-
-.clean-status-wrap {
-  min-width: 125px;
-  position: relative;
-}
-
-.clean-status-select {
-  width: 125px;
-  height: 31px;
-  padding: 0 26px 0 9px;
-  border: 1px solid transparent;
-  border-radius: 999px;
-  outline: 0;
-  font-size: 9px;
-  font-weight: 900;
-  cursor: pointer;
-  appearance: auto;
-}
-
-.clean-status-select.status-new {
-  background: #f3e8ff;
-  color: #7e22ce;
-}
-
-.clean-status-select.status-confirmed {
-  background: #dbeafe;
-  color: #1d4ed8;
-}
-
-.clean-status-select.status-production {
-  background: #fef3c7;
-  color: #a16207;
-}
-
-.clean-status-select.status-shipped {
-  background: #e0f2fe;
-  color: #0369a1;
-}
-
-.clean-status-select.status-delivered {
-  background: #dcfce7;
-  color: #15803d;
-}
-
-.clean-status-select.status-cancelled {
-  background: #fee2e2;
-  color: #b91c1c;
-}
-
-.clean-custom-status {
-  width: 125px;
-  margin-top: 4px;
-  padding: 5px 3px;
-  border: 0;
-  border-bottom: 1px solid #111827;
-  outline: 0;
-  background: transparent;
-  font-size: 9px;
-}
-
-.inline-saving {
-  display: block;
-  margin-top: 3px;
-  color: #94a3b8;
-  font-size: 7px;
-}
-
-.line-editor {
-  min-width: 155px;
-  position: relative;
-}
-
-.line-input,
-.tracking-line-input,
-.modal-line-input {
-  width: 100%;
-  padding: 6px 3px;
-  border: 0;
-  border-bottom: 1px solid #cbd5e1;
-  border-radius: 0;
-  outline: 0;
-  background: transparent;
-  color: #111827;
-  font-size: 10px;
-  transition: border-color .18s ease;
-}
-
-.line-input:focus,
-.tracking-line-input:focus,
-.modal-line-input:focus {
-  border-bottom-color: #111827;
-}
-
-.line-input::placeholder,
-.tracking-line-input::placeholder,
-.modal-line-input::placeholder {
-  color: #a8b0bd;
-}
-
-.line-state,
-.tracking-saved {
-  position: absolute;
-  right: 2px;
-  bottom: -10px;
-  color: #94a3b8;
-  font-size: 7px;
-}
-
-.line-state.saved,
-.tracking-saved {
-  color: #16a34a;
-}
-
-.tracking-inline-editor {
-  min-width: 135px;
-  position: relative;
-}
-
-.tracking-inline-editor small {
-  display: block;
-  margin-top: 3px;
-  color: #94a3b8;
-  font-size: 7px;
-}
-
-.modal-line-editor {
-  position: relative;
-  padding-bottom: 14px;
-}
-
-.modal-auto-save-note {
-  position: absolute;
-  right: 0;
-  bottom: 0;
-  color: #94a3b8;
-  font-size: 8px;
-}
-
-.modal-line-input {
-  font-size: 11px;
-}
-
-@media (max-width: 1200px) {
-  .page-header,
-  .page-content {
-    padding-left: 14px;
-    padding-right: 14px;
-  }
-}
-
-</style>
-          </head>
-          <body>
-            <header class="print-logo">
-              <h1>PROSIX SPORTS</h1>
-              <p>TeamStore Orders Production Sheet</p>
-            </header>
-            ${rows}
-          </body>
-        </html>
-      `)
-
-      printWindow.document.close()
-      printWindow.focus()
-
-      setTimeout(() => {
-        printWindow.print()
-      }, 450)
-    },
-
     async openOrder(order) {
-      if (typeof order._remark === 'undefined') {
-        order._remark = order.remark ?? ''
-      }
-
-      if (typeof order._custom_status === 'undefined') {
-        order._custom_status =
-          this.isStandardStatus(order.status)
-            ? ''
-            : (order.status || '')
-      }
-
-      if (typeof order._tracking_number === 'undefined') {
-        order._tracking_number = order.tracking_number ?? ''
-      }
-
       this.selectedOrder = order
       document.body.style.overflow = 'hidden'
 
@@ -1887,14 +1661,23 @@ export default {
         order.is_read = true
 
         window.dispatchEvent(
-          new CustomEvent('teamstore-orders-read-updated')
+          new CustomEvent(
+            'teamstore-orders-read-updated'
+          )
         )
       } catch (error) {
-        console.error('TeamStore mark-read error:', error)
+        console.error(
+          'TeamStore mark-read error:',
+          error
+        )
       }
     },
 
     closeOrder() {
+      if (this.selectedOrder) {
+        this.selectedOrder._status_menu = false
+      }
+
       this.selectedOrder = null
       document.body.style.overflow = ''
     },
@@ -1908,8 +1691,12 @@ export default {
 
       if (typeof items === 'string') {
         try {
-          const parsed = JSON.parse(items)
-          return Array.isArray(parsed) ? parsed : []
+          const parsed =
+            JSON.parse(items)
+
+          return Array.isArray(parsed)
+            ? parsed
+            : []
         } catch {
           return []
         }
@@ -1930,7 +1717,8 @@ export default {
 
     itemCategoryData(item) {
       const nestedCategory =
-        item?.category && typeof item.category === 'object'
+        item?.category &&
+        typeof item.category === 'object'
           ? item.category
           : null
 
@@ -1963,13 +1751,18 @@ export default {
     },
 
     itemCategory(item) {
-      return this.itemCategoryData(item).name
+      return this.itemCategoryData(
+        item
+      ).name
     },
 
     orderCategories(order) {
-      const categories = this.normalizedItems(order)
-        .map(item => this.itemCategory(item))
-        .filter(Boolean)
+      const categories =
+        this.normalizedItems(order)
+          .map(item =>
+            this.itemCategory(item)
+          )
+          .filter(Boolean)
 
       return [...new Set(categories)]
     },
@@ -2009,27 +1802,52 @@ export default {
 
     statusCount(status) {
       const normalizedStatus =
-        String(status || 'all').toLowerCase()
+        String(status || 'all')
+          .toLowerCase()
 
       return this.orders.filter(order => {
         const categoryMatch =
           this.activeCategory === 'all' ||
-          this.normalizedItems(order).some(item => {
-            const category = this.itemCategoryData(item)
-            const key = category.id
-              ? `category-${category.id}`
-              : this.slug(category.name)
+          this.normalizedItems(order).some(
+            item => {
+              const category =
+                this.itemCategoryData(item)
 
-            return key === this.activeCategory
-          })
+              const key = category.id
+                ? `category-${category.id}`
+                : this.slug(category.name)
+
+              return (
+                key ===
+                this.activeCategory
+              )
+            }
+          )
 
         const statusMatch =
           normalizedStatus === 'all' ||
           String(order.status || 'new')
-            .toLowerCase() === normalizedStatus
+            .toLowerCase() ===
+            normalizedStatus
 
-        return categoryMatch && statusMatch
+        return (
+          categoryMatch &&
+          statusMatch
+        )
       }).length
+    },
+
+    statusClass(status) {
+      return `status-${this.slug(
+        status || 'new'
+      )}`
+    },
+
+    statusDotClass(status) {
+      const slug =
+        this.slug(status || 'new')
+
+      return `dot-${slug}`
     },
 
     slug(value) {
@@ -2041,9 +1859,14 @@ export default {
     },
 
     categoryIcon(name) {
-      const value = String(name || '').toLowerCase()
+      const value =
+        String(name || '')
+          .toLowerCase()
 
-      if (value.includes('shirt') || value.includes('jersey')) {
+      if (
+        value.includes('shirt') ||
+        value.includes('jersey')
+      ) {
         return 'fa-solid fa-shirt'
       }
 
@@ -2051,29 +1874,35 @@ export default {
         return 'fa-solid fa-bag-shopping'
       }
 
-      if (value.includes('cap') || value.includes('hat')) {
+      if (
+        value.includes('cap') ||
+        value.includes('hat')
+      ) {
         return 'fa-solid fa-hat-cowboy'
       }
 
-      if (value.includes('jacket') || value.includes('outerwear')) {
+      if (
+        value.includes('jacket') ||
+        value.includes('outerwear')
+      ) {
         return 'fa-solid fa-vest'
       }
 
-      if (value.includes('football')) {
+      if (
+        value.includes('football')
+      ) {
         return 'fa-solid fa-football'
       }
 
       return 'fa-solid fa-box'
     },
 
-    statusClass(status) {
-      return `status-${this.slug(status || 'new')}`
-    },
-
     formatLabel(value) {
       return String(value || '')
-        .replaceAll('_', ' ')
-        .replace(/\b\w/g, letter => letter.toUpperCase())
+        .replace(/[_-]+/g, ' ')
+        .replace(/\b\w/g, char =>
+          char.toUpperCase()
+        )
     },
 
     formatDate(value) {
@@ -2083,15 +1912,20 @@ export default {
 
       const date = new Date(value)
 
-      if (Number.isNaN(date.getTime())) {
-        return value
+      if (
+        Number.isNaN(date.getTime())
+      ) {
+        return '—'
       }
 
-      return date.toLocaleDateString('en-US', {
-        day: '2-digit',
-        month: 'short',
-        year: 'numeric'
-      })
+      return date.toLocaleDateString(
+        'en-US',
+        {
+          month: 'short',
+          day: '2-digit',
+          year: 'numeric'
+        }
+      )
     },
 
     formatDateTime(value) {
@@ -2101,30 +1935,256 @@ export default {
 
       const date = new Date(value)
 
-      if (Number.isNaN(date.getTime())) {
-        return value
+      if (
+        Number.isNaN(date.getTime())
+      ) {
+        return '—'
       }
 
-      return date.toLocaleString('en-US', {
-        day: '2-digit',
-        month: 'short',
-        year: 'numeric',
-        hour: '2-digit',
-        minute: '2-digit'
-      })
+      return date.toLocaleString(
+        'en-US',
+        {
+          month: 'short',
+          day: '2-digit',
+          year: 'numeric',
+          hour: '2-digit',
+          minute: '2-digit'
+        }
+      )
+    },
+
+    escapeHtml(value) {
+      return String(value ?? '')
+        .replaceAll('&', '&amp;')
+        .replaceAll('<', '&lt;')
+        .replaceAll('>', '&gt;')
+        .replaceAll('"', '&quot;')
+        .replaceAll("'", '&#039;')
+    },
+
+    printSelectedOrders() {
+      const orders = this.selectedOrders
+
+      if (!orders.length) {
+        return
+      }
+
+      const rows = orders.map(order => {
+        const items =
+          this.normalizedItems(order)
+            .map(item => {
+              const image =
+                this.itemImage(item)
+
+              return `
+                <div class="item">
+                  ${
+                    image
+                      ? `<img src="${this.escapeHtml(image)}" alt="">`
+                      : '<div class="placeholder">No Image</div>'
+                  }
+
+                  <div>
+                    <strong>${this.escapeHtml(this.itemName(item))}</strong>
+                    <span>Category: ${this.escapeHtml(this.itemCategory(item))}</span>
+                    <span>Size: ${this.escapeHtml(item.size || item.selected_size || '—')}</span>
+                    <span>Qty: ${this.escapeHtml(item.quantity || item.qty || 1)}</span>
+                  </div>
+                </div>
+              `
+            })
+            .join('')
+
+        return `
+          <section class="order">
+            <header>
+              <div>
+                <small>ORDER</small>
+                <h2>${this.escapeHtml(order.order_number || `#${order.id}`)}</h2>
+              </div>
+
+              <span>${this.escapeHtml(this.formatLabel(order.status || 'new'))}</span>
+            </header>
+
+            <div class="details">
+              <p><b>Customer:</b> ${this.escapeHtml(order.customer_name || '—')}</p>
+              <p><b>Phone:</b> ${this.escapeHtml(order.phone || '—')}</p>
+              <p><b>Email:</b> ${this.escapeHtml(order.email || '—')}</p>
+              <p><b>City:</b> ${this.escapeHtml(order.shipping_city || '—')}</p>
+              <p><b>Tracking:</b> ${this.escapeHtml(order.tracking_number || '—')}</p>
+              <p><b>Remark:</b> ${this.escapeHtml(order.remark || '—')}</p>
+            </div>
+
+            <div class="items">
+              ${items || '<p>No item details found.</p>'}
+            </div>
+          </section>
+        `
+      }).join('')
+
+      const printWindow =
+        window.open(
+          '',
+          '_blank',
+          'width=1100,height=800'
+        )
+
+      if (!printWindow) {
+        alert(
+          'Please allow popups to print.'
+        )
+
+        return
+      }
+
+      printWindow.document.write(`
+        <!doctype html>
+        <html>
+          <head>
+            <title>TeamStore Orders</title>
+
+            <style>
+              * { box-sizing: border-box; }
+
+              body {
+                margin: 0;
+                padding: 24px;
+                color: #111;
+                font-family: Arial, sans-serif;
+                background: #fff;
+              }
+
+              .brand {
+                margin-bottom: 20px;
+                padding-bottom: 12px;
+                border-bottom: 2px solid #111;
+                text-align: center;
+              }
+
+              .brand h1 {
+                margin: 0;
+                font-size: 23px;
+              }
+
+              .brand p {
+                margin: 4px 0 0;
+                color: #666;
+              }
+
+              .order {
+                margin-bottom: 18px;
+                border: 1px solid #ddd;
+                border-radius: 10px;
+                overflow: hidden;
+                page-break-inside: avoid;
+              }
+
+              .order header {
+                padding: 12px 14px;
+                display: flex;
+                align-items: center;
+                justify-content: space-between;
+                background: #111827;
+                color: white;
+              }
+
+              .order header h2 {
+                margin: 3px 0 0;
+                font-size: 17px;
+              }
+
+              .order header > span {
+                padding: 5px 9px;
+                border-radius: 999px;
+                background: white;
+                color: #111;
+                font-size: 10px;
+                font-weight: 700;
+              }
+
+              .details {
+                padding: 12px 14px;
+                display: grid;
+                grid-template-columns: repeat(2, 1fr);
+                gap: 6px 16px;
+              }
+
+              .details p {
+                margin: 0;
+                font-size: 11px;
+              }
+
+              .items {
+                padding: 0 14px 14px;
+                display: grid;
+                grid-template-columns: repeat(2, 1fr);
+                gap: 9px;
+              }
+
+              .item {
+                padding: 8px;
+                display: flex;
+                gap: 9px;
+                border: 1px solid #ddd;
+                border-radius: 8px;
+              }
+
+              .item img,
+              .placeholder {
+                width: 56px;
+                height: 56px;
+                border-radius: 6px;
+                object-fit: contain;
+                background: #f3f4f6;
+              }
+
+              .placeholder {
+                display: grid;
+                place-items: center;
+                color: #777;
+                font-size: 8px;
+              }
+
+              .item strong,
+              .item span {
+                display: block;
+              }
+
+              .item strong {
+                margin-bottom: 4px;
+                font-size: 11px;
+              }
+
+              .item span {
+                margin-top: 2px;
+                color: #555;
+                font-size: 9px;
+              }
+
+              @media print {
+                body { padding: 0; }
+              }
+            </style>
+          </head>
+
+          <body>
+            <div class="brand">
+              <h1>PROSIX SPORTS</h1>
+              <p>TeamStore Orders Production Sheet</p>
+            </div>
+
+            ${rows}
+          </body>
+        </html>
+      `)
+
+      printWindow.document.close()
+      printWindow.focus()
+
+      setTimeout(() => {
+        printWindow.print()
+      }, 400)
     }
-  },
-
-  beforeUnmount() {
-    document.body.style.overflow = ''
-
-    Object.values(this.remarkSaveTimers).forEach(timer => {
-      clearTimeout(timer)
-    })
-
-    Object.values(this.trackingSaveTimers).forEach(timer => {
-      clearTimeout(timer)
-    })
   }
 }
 </script>
@@ -2134,69 +2194,297 @@ export default {
   box-sizing: border-box;
 }
 
-.teamstore-page {
+.teamstore-shell {
   min-height: 100vh;
+  display: flex;
   background: #f5f6f8;
-  color: #111827;
+  color: #101828;
+  font-family:
+    Inter,
+    ui-sans-serif,
+    system-ui,
+    -apple-system,
+    BlinkMacSystemFont,
+    "Segoe UI",
+    sans-serif;
 }
 
-.page-header {
-  min-height: 106px;
-  padding: 22px 32px;
-  border-bottom: 1px solid #e5e7eb;
-  background: #ffffff;
+/* =========================
+   SIDEBAR
+========================= */
+.sidebar {
+  width: 240px;
+  min-width: 240px;
+  min-height: 100vh;
+  position: sticky;
+  top: 0;
+  align-self: flex-start;
+  z-index: 50;
+  background:
+    linear-gradient(
+      180deg,
+      #11141d 0%,
+      #0d1017 100%
+    );
+  color: #fff;
+  padding: 14px 12px 20px;
+}
+
+.brand {
+  height: 46px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 0 4px;
+}
+
+.brand-mark {
+  width: 32px;
+  height: 32px;
+  border-radius: 9px;
+  display: grid;
+  place-items: center;
+  background: #fff;
+  color: #10131b;
+  font-size: 14px;
+  font-weight: 950;
+  font-style: italic;
+}
+
+.brand strong,
+.brand span {
+  display: block;
+}
+
+.brand strong {
+  font-size: 12px;
+  font-weight: 850;
+}
+
+.brand span {
+  margin-top: 1px;
+  color: #7f8796;
+  font-size: 7px;
+  font-weight: 600;
+}
+
+.sidebar-close {
+  display: none;
+  margin-left: auto;
+  width: 30px;
+  height: 30px;
+  border: 0;
+  border-radius: 8px;
+  background: #202532;
+  color: #fff;
+}
+
+.profile-card {
+  margin-top: 10px;
+  min-height: 65px;
+  padding: 10px;
+  border: 1px solid #2b303d;
+  border-radius: 13px;
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  background: #181c25;
+}
+
+.profile-avatar {
+  width: 38px;
+  height: 38px;
+  flex-shrink: 0;
+  overflow: hidden;
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  background: #2c3240;
+  color: #fff;
+  font-size: 13px;
+  font-weight: 900;
+}
+
+.profile-avatar img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.profile-info {
+  min-width: 0;
+  flex: 1;
+}
+
+.profile-info strong,
+.profile-info small {
+  display: block;
+}
+
+.profile-info strong {
+  overflow: hidden;
+  color: #fff;
+  font-size: 10px;
+  font-weight: 850;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.profile-info small {
+  margin-top: 3px;
+  color: #8f97a7;
+  font-size: 8px;
+}
+
+.profile-edit-icon {
+  color: #7d8595;
+  font-size: 9px;
+}
+
+.sidebar-nav {
+  margin-top: 15px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.nav-link {
+  min-height: 39px;
+  padding: 0 10px;
+  border-radius: 9px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  color: #aeb5c3;
+  text-decoration: none;
+  font-size: 9px;
+  font-weight: 750;
+  transition: .18s ease;
+}
+
+.nav-link i {
+  width: 15px;
+  text-align: center;
+  color: #8992a3;
+}
+
+.nav-link:hover {
+  background: #171c25;
+  color: #fff;
+}
+
+.nav-link.active {
+  background: #1b202a;
+  color: #fff;
+}
+
+.nav-link.active i {
+  color: #fff;
+}
+
+.nav-count {
+  margin-left: auto;
+  min-width: 23px;
+  height: 23px;
+  padding: 0 6px;
+  border-radius: 999px;
+  display: grid;
+  place-items: center;
+  background: #fff;
+  color: #111827;
+  font-size: 8px;
+  font-weight: 900;
+}
+
+/* =========================
+   MAIN
+========================= */
+.main-content {
+  min-width: 0;
+  flex: 1;
+}
+
+.topbar {
+  min-height: 82px;
+  padding: 16px 24px;
+  border-bottom: 1px solid #e6e8ec;
   display: flex;
   align-items: center;
   justify-content: space-between;
   gap: 20px;
+  background: #fff;
 }
 
-.header-left,
-.header-actions {
+.topbar-left,
+.topbar-actions,
+.header-left {
   display: flex;
   align-items: center;
-  gap: 14px;
 }
 
-.back-button {
-  width: 42px;
-  height: 42px;
-  border: 1px solid #d9dde5;
-  border-radius: 12px;
-  background: #ffffff;
+.topbar-left {
+  gap: 12px;
+}
+
+.back-button,
+.mobile-menu {
+  width: 38px;
+  height: 38px;
+  flex-shrink: 0;
+  border: 1px solid #dfe3e8;
+  border-radius: 10px;
+  display: grid;
+  place-items: center;
+  background: #fff;
   color: #111827;
   cursor: pointer;
 }
 
+.mobile-menu {
+  display: none;
+}
+
 .eyebrow {
   margin: 0 0 3px;
-  color: #2563eb;
-  font-size: 10px;
-  font-weight: 900;
-  letter-spacing: .12em;
-  text-transform: uppercase;
+  color: #516fff;
+  font-size: 7px;
+  font-weight: 950;
+  letter-spacing: .16em;
 }
 
-.page-header h1 {
+.topbar h1 {
   margin: 0;
-  font-size: 24px;
+  color: #101828;
+  font-size: 18px;
+  line-height: 1.1;
 }
 
-.page-header span {
-  color: #6b7280;
-  font-size: 12px;
+.page-subtitle {
+  display: block;
+  margin-top: 4px;
+  color: #7a8393;
+  font-size: 9px;
+}
+
+.topbar-actions {
+  gap: 10px;
 }
 
 .search-box {
-  width: 330px;
-  height: 42px;
-  padding: 0 13px;
-  border: 1px solid #d9dde5;
-  border-radius: 12px;
-  background: #ffffff;
+  width: 285px;
+  height: 38px;
+  padding: 0 11px;
+  border: 1px solid #dfe3e8;
+  border-radius: 10px;
   display: flex;
   align-items: center;
-  gap: 9px;
+  gap: 8px;
+  background: #fff;
+}
+
+.search-box i {
+  color: #7c8492;
+  font-size: 10px;
 }
 
 .search-box input {
@@ -2204,30 +2492,40 @@ export default {
   border: 0;
   outline: 0;
   background: transparent;
+  color: #111827;
+  font-size: 10px;
 }
 
 .new-count {
-  padding: 8px 12px;
+  height: 34px;
+  padding: 0 12px;
   border-radius: 999px;
+  display: flex;
+  align-items: center;
   background: #111827;
-  color: #ffffff !important;
+  color: #fff;
+  font-size: 9px;
   font-weight: 900;
 }
 
-.page-content {
-  padding: 24px 32px 36px;
+.workspace {
+  padding: 18px 22px 34px;
 }
 
-.category-section,
-.orders-panel {
-  border: 1px solid #e2e5ea;
-  border-radius: 18px;
-  background: #ffffff;
-  box-shadow: 0 8px 30px rgba(15, 23, 42, .04);
+.card {
+  border: 1px solid #e5e8ed;
+  border-radius: 14px;
+  background: #fff;
+  box-shadow:
+    0 7px 20px
+    rgba(16, 24, 40, .035);
 }
 
+/* =========================
+   CATEGORIES
+========================= */
 .category-section {
-  padding: 20px;
+  padding: 15px;
 }
 
 .section-heading,
@@ -2236,79 +2534,91 @@ export default {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 14px;
+  gap: 15px;
 }
 
 .section-heading h2,
 .panel-header h2,
 .items-heading h3 {
   margin: 0;
-  font-size: 17px;
+  color: #101828;
+  font-size: 12px;
 }
 
 .section-heading p,
 .panel-header p,
 .items-heading p {
-  margin: 4px 0 0;
-  color: #6b7280;
-  font-size: 11px;
+  margin: 3px 0 0;
+  color: #8a93a3;
+  font-size: 8px;
+}
+
+.refresh-button,
+.secondary-button,
+.primary-button,
+.view-button {
+  border: 0;
+  cursor: pointer;
+  font-weight: 800;
 }
 
 .refresh-button {
-  height: 36px;
-  padding: 0 13px;
-  border: 1px solid #d9dde5;
-  border-radius: 10px;
-  background: #ffffff;
+  height: 34px;
+  padding: 0 11px;
+  border: 1px solid #dfe3e8;
+  border-radius: 9px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  background: #fff;
   color: #111827;
-  font-weight: 800;
-  cursor: pointer;
+  font-size: 9px;
 }
 
 .category-grid {
-  margin-top: 18px;
+  margin-top: 13px;
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(195px, 1fr));
-  gap: 12px;
+  grid-template-columns:
+    repeat(auto-fill, minmax(165px, 1fr));
+  gap: 9px;
 }
 
 .category-card {
-  min-height: 82px;
-  padding: 12px;
-  border: 1px solid #e2e5ea;
-  border-radius: 14px;
-  background: #ffffff;
-  color: #111827;
-  text-align: left;
-  cursor: pointer;
+  min-height: 68px;
+  padding: 9px 10px;
+  border: 1px solid #e0e4ea;
+  border-radius: 11px;
   display: flex;
   align-items: center;
-  gap: 11px;
+  gap: 10px;
+  background: #fff;
+  text-align: left;
+  cursor: pointer;
   transition: .18s ease;
 }
 
 .category-card:hover {
-  transform: translateY(-2px);
-  border-color: #9ca3af;
+  border-color: #c8ced8;
+  transform: translateY(-1px);
 }
 
 .category-card.active {
   border-color: #111827;
   background: #111827;
-  color: #ffffff;
+  color: #fff;
 }
 
 .category-icon {
-  width: 48px;
-  height: 48px;
+  width: 40px;
+  height: 40px;
   flex-shrink: 0;
-  border: 1px solid #e5e7eb;
-  border-radius: 12px;
-  background: #f8fafc;
-  color: #111827;
+  overflow: hidden;
+  border: 1px solid #e3e7ec;
+  border-radius: 9px;
   display: grid;
   place-items: center;
-  overflow: hidden;
+  background: #f8fafc;
+  color: #111827;
 }
 
 .category-icon img {
@@ -2329,256 +2639,270 @@ export default {
 
 .category-info strong {
   overflow: hidden;
+  font-size: 9px;
+  font-weight: 850;
   text-overflow: ellipsis;
   white-space: nowrap;
-  font-size: 13px;
 }
 
 .category-info small {
   margin-top: 4px;
-  color: #6b7280;
-  font-size: 10px;
+  color: #8a93a3;
+  font-size: 7px;
 }
 
-.category-card.active .category-info small {
-  color: #d1d5db;
+.category-card.active
+.category-info small {
+  color: #b7becb;
 }
 
 .card-arrow {
   color: #9ca3af;
-  font-size: 11px;
+  font-size: 8px;
 }
 
-.filters-row {
-  margin: 16px 0;
+.category-card.active
+.card-arrow {
+  color: #fff;
 }
 
-.status-tabs {
+/* =========================
+   STATUS SUMMARY
+========================= */
+.status-section {
+  margin: 11px 0;
   display: flex;
-  gap: 8px;
+  gap: 7px;
   overflow-x: auto;
+  scrollbar-width: thin;
 }
 
-.status-tabs button {
-  min-width: 120px;
-  height: 42px;
-  padding: 0 13px;
-  border: 1px solid #e2e5ea;
-  border-radius: 11px;
-  background: #ffffff;
-  color: #4b5563;
-  cursor: pointer;
+.status-summary {
+  min-width: 105px;
+  height: 36px;
+  padding: 0 10px;
+  border: 1px solid #e0e4ea;
+  border-radius: 9px;
   display: flex;
   align-items: center;
   gap: 7px;
+  background: #fff;
+  color: #667085;
+  cursor: pointer;
+  font-size: 9px;
+  white-space: nowrap;
 }
 
-.status-tabs button.active {
-  border-color: #111827;
-  color: #111827;
-  box-shadow: 0 0 0 2px rgba(17, 24, 39, .06);
-}
-
-.status-tabs strong {
+.status-summary strong {
   margin-left: auto;
   color: #111827;
-  font-size: 11px;
+  font-size: 8px;
 }
 
-.status-dot {
-  width: 8px;
-  height: 8px;
+.status-summary.active {
+  border-color: #111827;
+  box-shadow:
+    inset 0 0 0 1px #111827;
+  color: #111827;
+}
+
+.summary-dot,
+.option-dot,
+.status-trigger-dot {
+  width: 7px;
+  height: 7px;
+  flex-shrink: 0;
   border-radius: 50%;
-  background: #9ca3af;
+  background: #94a3b8;
 }
 
-.dot-new {
-  background: #8b5cf6;
-}
+.dot-new { background: #8b5cf6; }
+.dot-confirmed { background: #4f7df3; }
+.dot-production { background: #f59e0b; }
+.dot-shipped { background: #38a6e6; }
+.dot-delivered { background: #34b98b; }
+.dot-cancelled { background: #ef5350; }
 
-.dot-confirmed {
-  background: #3b82f6;
-}
-
-.dot-production {
-  background: #f59e0b;
-}
-
-.dot-shipped {
-  background: #0ea5e9;
-}
-
-.dot-delivered {
-  background: #10b981;
-}
-
-.dot-cancelled {
-  background: #ef4444;
+/* =========================
+   TABLE
+========================= */
+.orders-panel {
+  overflow: visible;
 }
 
 .panel-header {
-  padding: 17px 20px;
-  border-bottom: 1px solid #e5e7eb;
+  padding: 14px 15px;
+  border-bottom: 1px solid #e8ebef;
 }
 
 .bulk-actions {
   display: flex;
   align-items: center;
-  gap: 9px;
-  flex-wrap: wrap;
+  gap: 7px;
 }
 
-.bulk-actions > span {
-  color: #4b5563;
-  font-size: 10px;
+.selected-label {
+  color: #667085;
+  font-size: 8px;
   font-weight: 800;
 }
 
-.select-visible-button,
-.print-selected-button {
-  height: 36px;
-  padding: 0 12px;
-  border-radius: 9px;
-  font-size: 10px;
-  font-weight: 800;
-  cursor: pointer;
+.secondary-button,
+.primary-button {
+  height: 32px;
+  padding: 0 11px;
+  border-radius: 8px;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 8px;
 }
 
-.select-visible-button {
-  border: 1px solid #d9dde5;
-  background: #ffffff;
+.secondary-button {
+  border: 1px solid #dfe3e8;
+  background: #fff;
   color: #111827;
 }
 
-.print-selected-button {
-  border: 1px solid #111827;
+.primary-button {
   background: #111827;
-  color: #ffffff;
+  color: #fff;
 }
 
-.print-selected-button:disabled {
-  cursor: not-allowed;
+.primary-button:disabled {
   opacity: .45;
-}
-
-.check-column {
-  width: 42px;
-  text-align: center !important;
-}
-
-.check-column input {
-  width: 16px;
-  height: 16px;
-  cursor: pointer;
-  accent-color: #111827;
+  cursor: not-allowed;
 }
 
 .table-wrap {
+  width: 100%;
   overflow-x: auto;
+  overflow-y: visible;
 }
 
 .orders-table {
   width: 100%;
-  min-width: 1320px;
+  min-width: 1450px;
   border-collapse: collapse;
 }
 
-.orders-table th,
-.orders-table td {
-  padding: 13px 14px;
-  border-bottom: 1px solid #e5e7eb;
-  text-align: left;
-  vertical-align: middle;
-}
-
 .orders-table th {
-  background: #f8fafc;
-  color: #6b7280;
-  font-size: 9px;
+  padding: 10px 9px;
+  background: #f8f9fb;
+  color: #7c8492;
+  text-align: left;
+  font-size: 7px;
   font-weight: 900;
   letter-spacing: .05em;
   text-transform: uppercase;
+  white-space: nowrap;
 }
 
 .orders-table td {
-  font-size: 11px;
+  padding: 10px 9px;
+  border-top: 1px solid #edf0f3;
+  color: #111827;
+  font-size: 9px;
+  vertical-align: middle;
+}
+
+.orders-table tbody tr {
+  background: #fff;
+  transition: background .15s ease;
 }
 
 .orders-table tbody tr:hover {
-  background: #fafafa;
+  background: #fafbfc;
 }
 
 .orders-table tbody tr.unread {
-  background: #f2f7ff;
+  background: #f4f7ff;
+}
+
+.check-column {
+  width: 36px;
+  text-align: center !important;
 }
 
 .order-number-cell {
+  min-width: 120px;
   display: flex;
   align-items: center;
-  gap: 9px;
-}
-
-.unread-dot {
-  width: 8px;
-  height: 8px;
-  flex-shrink: 0;
-  border-radius: 50%;
-  background: #2563eb;
+  gap: 7px;
 }
 
 .order-number-cell strong,
 .customer-cell strong,
-.shipping-cell strong,
-.tracking-cell strong {
+.shipping-cell strong {
   display: block;
-  font-size: 11px;
+  font-size: 9px;
+  font-weight: 850;
 }
 
 .order-number-cell small,
 .customer-cell small,
-.shipping-cell small,
-.tracking-cell small {
+.shipping-cell small {
   display: block;
   margin-top: 3px;
-  color: #9ca3af;
-  font-size: 9px;
+  color: #98a1b0;
+  font-size: 7px;
+}
+
+.unread-dot {
+  width: 6px;
+  height: 6px;
+  flex-shrink: 0;
+  border-radius: 50%;
+  background: #4f7df3;
 }
 
 .category-tags {
+  min-width: 115px;
   display: flex;
   align-items: center;
-  gap: 5px;
-  flex-wrap: wrap;
+  gap: 4px;
 }
 
-.category-tags span,
-.category-tags em {
+.category-tags span {
+  max-width: 105px;
   padding: 4px 7px;
+  overflow: hidden;
   border-radius: 999px;
   background: #eef2ff;
-  color: #3730a3;
-  font-size: 9px;
+  color: #4056c9;
+  font-size: 7px;
+  font-weight: 850;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.category-tags em {
+  color: #667085;
+  font-size: 7px;
   font-style: normal;
-  font-weight: 800;
 }
 
 .item-thumbnails {
+  min-width: 115px;
   display: flex;
   align-items: center;
 }
 
-.item-thumb,
-.more-items {
-  width: 36px;
-  height: 36px;
-  margin-right: -6px;
-  border: 2px solid #ffffff;
-  border-radius: 9px;
-  background: #f3f4f6;
-  color: #6b7280;
+.item-thumb {
+  width: 30px;
+  height: 30px;
+  margin-left: -4px;
+  overflow: hidden;
+  border: 2px solid #fff;
+  border-radius: 7px;
   display: grid;
   place-items: center;
-  overflow: hidden;
+  background: #f4f5f7;
+  color: #777;
+}
+
+.item-thumb:first-child {
+  margin-left: 0;
 }
 
 .item-thumb img {
@@ -2588,256 +2912,642 @@ export default {
 }
 
 .more-items {
+  width: 28px;
+  height: 28px;
+  margin-left: 2px;
   border-radius: 50%;
+  display: grid;
+  place-items: center;
   background: #111827;
-  color: #ffffff;
-  font-size: 9px;
+  color: #fff;
+  font-size: 7px;
   font-weight: 900;
 }
 
-.status-badge {
-  display: inline-flex;
-  padding: 6px 10px;
-  border-radius: 999px;
-  font-size: 9px;
-  font-weight: 900;
-}
-
-.status-badge.large {
-  padding: 8px 12px;
-  font-size: 10px;
-}
-
-.status-new {
-  background: #ede9fe;
-  color: #6d28d9;
-}
-
-.status-confirmed {
-  background: #dbeafe;
-  color: #1d4ed8;
-}
-
-.status-production {
-  background: #fef3c7;
-  color: #92400e;
-}
-
-.status-shipped {
-  background: #e0f2fe;
-  color: #0369a1;
-}
-
-.status-delivered {
-  background: #dcfce7;
-  color: #166534;
-}
-
-.status-cancelled,
-.status-canceled {
-  background: #fee2e2;
-  color: #991b1b;
+.customer-cell {
+  min-width: 150px;
 }
 
 .plain-text,
 .date-cell {
-  color: #4b5563;
+  color: #475467;
+  font-size: 8px;
+}
+
+/* =========================
+   PROFESSIONAL STATUS MENU
+========================= */
+.status-column {
+  position: relative;
+}
+
+.status-control {
+  position: relative;
+  width: 145px;
+}
+
+.status-trigger {
+  width: 145px;
+  height: 32px;
+  padding: 0 10px;
+  border: 1px solid transparent;
+  border-radius: 9px;
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  background: #f3f4f6;
+  color: #344054;
+  cursor: pointer;
+  font-size: 8px;
+  font-weight: 850;
+}
+
+.status-trigger-label {
+  min-width: 0;
+  flex: 1;
+  overflow: hidden;
+  text-align: left;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.status-trigger i {
+  font-size: 7px;
+}
+
+.status-new {
+  background: #f4edff;
+  color: #7e22ce;
+}
+
+.status-confirmed {
+  background: #e7efff;
+  color: #315ed4;
+}
+
+.status-production {
+  background: #fff4da;
+  color: #a26406;
+}
+
+.status-shipped {
+  background: #e4f5fd;
+  color: #0877a8;
+}
+
+.status-delivered {
+  background: #e3f8ef;
+  color: #14795a;
+}
+
+.status-cancelled {
+  background: #feeceb;
+  color: #b42318;
+}
+
+.status-new
+.status-trigger-dot { background: #8b5cf6; }
+
+.status-confirmed
+.status-trigger-dot { background: #4f7df3; }
+
+.status-production
+.status-trigger-dot { background: #f59e0b; }
+
+.status-shipped
+.status-trigger-dot { background: #38a6e6; }
+
+.status-delivered
+.status-trigger-dot { background: #34b98b; }
+
+.status-cancelled
+.status-trigger-dot { background: #ef5350; }
+
+.status-menu {
+  width: 220px;
+  padding: 7px;
+  position: absolute;
+  top: calc(100% + 6px);
+  left: 0;
+  z-index: 1000;
+  border: 1px solid #e0e4ea;
+  border-radius: 11px;
+  background: #fff;
+  box-shadow:
+    0 16px 38px
+    rgba(16, 24, 40, .14);
+}
+
+.status-menu-title {
+  padding: 5px 7px 7px;
+  color: #8a93a3;
+  font-size: 7px;
+  font-weight: 900;
+  letter-spacing: .08em;
+  text-transform: uppercase;
+}
+
+.status-option,
+.custom-status-toggle {
+  width: 100%;
+  min-height: 31px;
+  padding: 0 8px;
+  border: 0;
+  border-radius: 7px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  background: transparent;
+  color: #344054;
+  cursor: pointer;
+  font-size: 9px;
+  font-weight: 700;
+  text-align: left;
+}
+
+.status-option:hover,
+.custom-status-toggle:hover {
+  background: #f7f8fa;
+}
+
+.status-option.selected {
+  background: #f2f4f7;
+  color: #101828;
+}
+
+.status-option i {
+  margin-left: auto;
+  color: #111827;
+  font-size: 8px;
+}
+
+.custom-divider {
+  height: 1px;
+  margin: 6px 3px;
+  background: #eef0f3;
+}
+
+.custom-status-toggle {
+  color: #111827;
+  font-weight: 800;
+}
+
+.custom-status-box {
+  margin-top: 6px;
+  padding: 7px;
+  border-radius: 8px;
+  background: #f7f8fa;
+}
+
+.custom-status-box input {
+  width: 100%;
+  height: 32px;
+  padding: 0 9px;
+  border: 1px solid #d8dde5;
+  border-radius: 7px;
+  outline: 0;
+  background: #fff;
+  color: #111827;
+  font-size: 9px;
+}
+
+.custom-status-box button {
+  width: 100%;
+  height: 30px;
+  margin-top: 6px;
+  border: 0;
+  border-radius: 7px;
+  background: #111827;
+  color: #fff;
+  cursor: pointer;
+  font-size: 8px;
+  font-weight: 900;
+}
+
+.custom-status-box button:disabled {
+  opacity: .45;
+}
+
+.saving-text {
+  display: block;
+  margin-top: 3px;
+  color: #98a1b0;
+  font-size: 7px;
+}
+
+/* =========================
+   REMARK + TRACKING
+========================= */
+.remark-column {
+  width: 180px;
+}
+
+.line-editor {
+  width: 170px;
+  position: relative;
+  padding-bottom: 9px;
+}
+
+.line-input {
+  width: 100%;
+  height: 31px;
+  padding: 0 3px;
+  border: 0;
+  border-bottom: 1px solid #ccd2da;
+  outline: 0;
+  background: transparent;
+  color: #111827;
+  font-size: 9px;
+}
+
+.line-input:focus {
+  border-bottom-color: #111827;
+}
+
+.line-input::placeholder {
+  color: #a2a9b4;
+}
+
+.autosave-state {
+  position: absolute;
+  right: 2px;
+  bottom: -1px;
+  color: #98a1b0;
+  font-size: 6px;
+}
+
+.autosave-state.saved {
+  color: #15956b;
+}
+
+.tracking-column {
+  width: 200px;
+}
+
+.tracking-editor {
+  width: 185px;
+}
+
+.tracking-input-wrap {
+  height: 34px;
+  padding: 0 9px;
+  border: 1px solid #d9dee6;
+  border-radius: 8px;
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  background: #fff;
+}
+
+.tracking-input-wrap:focus-within {
+  border-color: #111827;
+}
+
+.tracking-input-wrap i {
+  color: #7f8898;
+  font-size: 9px;
+}
+
+.tracking-input-wrap input {
+  width: 100%;
+  border: 0;
+  outline: 0;
+  background: transparent;
+  color: #111827;
+  font-size: 9px;
+}
+
+.tracking-input-wrap input::placeholder {
+  color: #a0a8b5;
+}
+
+.tracking-meta {
+  min-height: 12px;
+  margin-top: 3px;
+  display: flex;
+  justify-content: space-between;
+}
+
+.tracking-meta small {
+  color: #9aa2af;
+  font-size: 6px;
+}
+
+.tracking-meta span {
+  color: #15956b;
+  font-size: 6px;
+  font-weight: 800;
 }
 
 .view-button {
-  height: 34px;
-  padding: 0 12px;
-  border: 1px solid #d9dde5;
-  border-radius: 9px;
-  background: #ffffff;
+  height: 30px;
+  padding: 0 10px;
+  border: 1px solid #dfe3e8;
+  border-radius: 8px;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  background: #fff;
   color: #111827;
-  font-weight: 800;
-  cursor: pointer;
+  font-size: 8px;
 }
 
 .view-button:hover {
-  background: #111827;
-  color: #ffffff;
+  border-color: #111827;
 }
 
+/* =========================
+   EMPTY
+========================= */
 .empty-state {
-  min-height: 300px;
-  padding: 30px;
-  color: #6b7280;
-  text-align: center;
+  min-height: 280px;
   display: grid;
   place-items: center;
   align-content: center;
-  gap: 8px;
+  color: #8a93a3;
+  text-align: center;
 }
 
-.empty-state > i {
-  font-size: 28px;
+.empty-state i {
+  margin-bottom: 10px;
+  font-size: 24px;
 }
 
-.empty-state h3,
-.empty-state p {
+.empty-state h3 {
   margin: 0;
+  color: #344054;
+  font-size: 13px;
 }
 
+.empty-state p {
+  margin: 5px 0 0;
+  font-size: 9px;
+}
+
+/* =========================
+   MODAL
+========================= */
 .modal-overlay {
+  padding: 30px;
   position: fixed;
   inset: 0;
-  z-index: 99999;
-  padding: 22px;
-  background: rgba(15, 23, 42, .72);
-  backdrop-filter: blur(4px);
+  z-index: 3000;
+  overflow-y: auto;
   display: flex;
-  align-items: center;
+  align-items: flex-start;
   justify-content: center;
+  background: rgba(15, 23, 42, .55);
+  backdrop-filter: blur(3px);
 }
 
 .order-modal {
-  width: min(1180px, 100%);
-  max-height: calc(100vh - 44px);
-  border-radius: 20px;
-  background: #f8fafc;
-  overflow: hidden;
-  box-shadow: 0 30px 90px rgba(0, 0, 0, .35);
+  width: min(1040px, 100%);
+  overflow: visible;
+  border-radius: 16px;
+  background: #fff;
+  box-shadow:
+    0 24px 60px
+    rgba(15, 23, 42, .22);
 }
 
 .modal-header {
-  padding: 19px 22px;
-  background: #111827;
-  color: #ffffff;
+  min-height: 88px;
+  padding: 18px 20px;
+  border-radius: 16px 16px 0 0;
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 15px;
+  background: #111827;
+  color: #fff;
 }
 
 .modal-header p {
-  margin: 0;
-  color: #9ca3af;
-  font-size: 9px;
+  margin: 0 0 3px;
+  color: #9ba4b4;
+  font-size: 7px;
   font-weight: 900;
-  letter-spacing: .12em;
+  letter-spacing: .1em;
   text-transform: uppercase;
 }
 
 .modal-header h2 {
-  margin: 4px 0;
-  font-size: 22px;
+  margin: 0;
+  font-size: 17px;
 }
 
 .modal-header span {
-  color: #d1d5db;
-  font-size: 11px;
+  display: block;
+  margin-top: 4px;
+  color: #c6ccd6;
+  font-size: 8px;
 }
 
 .modal-header-actions {
   display: flex;
   align-items: center;
-  gap: 9px;
+  gap: 8px;
+}
+
+.status-badge.large {
+  padding: 7px 10px;
+  border-radius: 999px;
+  font-size: 8px;
+  font-weight: 900;
 }
 
 .modal-close {
-  width: 38px;
-  height: 38px;
-  border: 1px solid rgba(255, 255, 255, .18);
-  border-radius: 10px;
-  background: rgba(255, 255, 255, .08);
-  color: #ffffff;
+  width: 34px;
+  height: 34px;
+  border: 0;
+  border-radius: 9px;
+  display: grid;
+  place-items: center;
+  background: #222938;
+  color: #fff;
   cursor: pointer;
 }
 
 .modal-body {
-  max-height: calc(100vh - 140px);
   padding: 18px;
-  overflow-y: auto;
 }
 
 .detail-grid {
   display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 13px;
+  grid-template-columns:
+    repeat(2, minmax(0, 1fr));
+  gap: 12px;
 }
 
 .detail-card,
 .items-section,
 .notes-card {
-  border: 1px solid #e2e5ea;
-  border-radius: 15px;
-  background: #ffffff;
+  border: 1px solid #e5e8ed;
+  border-radius: 12px;
+  background: #fff;
 }
 
 .detail-card {
-  padding: 16px;
+  padding: 14px;
+}
+
+.detail-card.full-card {
+  grid-column: 1 / -1;
 }
 
 .detail-card h3,
+.items-section h3,
 .notes-card h3 {
-  margin: 0 0 14px;
-  font-size: 13px;
+  margin: 0 0 12px;
   display: flex;
   align-items: center;
-  gap: 7px;
+  gap: 6px;
+  color: #101828;
+  font-size: 10px;
 }
 
 .detail-card dl {
   margin: 0;
   display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 12px;
+  grid-template-columns:
+    repeat(2, minmax(0, 1fr));
+  gap: 10px 14px;
 }
 
-.detail-card .full-row {
+.detail-card dl .full-row {
   grid-column: 1 / -1;
 }
 
 .detail-card dt {
-  margin-bottom: 4px;
-  color: #6b7280;
-  font-size: 9px;
-  font-weight: 900;
+  margin-bottom: 3px;
+  color: #8b94a3;
+  font-size: 7px;
+  font-weight: 850;
   text-transform: uppercase;
 }
 
 .detail-card dd {
   margin: 0;
-  overflow-wrap: anywhere;
+  color: #344054;
+  font-size: 9px;
+  font-weight: 650;
+}
+
+.modal-control-grid {
+  display: grid;
+  grid-template-columns:
+    repeat(2, minmax(0, 1fr));
+  gap: 14px;
+}
+
+.modal-control.full-row {
+  grid-column: 1 / -1;
+}
+
+.modal-control > label {
+  display: block;
+  margin-bottom: 6px;
+  color: #7f8898;
+  font-size: 7px;
+  font-weight: 900;
+  text-transform: uppercase;
+}
+
+.modal-status-control {
+  width: 100%;
+}
+
+.modal-status-trigger {
+  width: 100%;
+}
+
+.modal-status-menu {
+  width: 260px;
+}
+
+.always-open {
+  display: block;
+}
+
+.modal-field-input {
+  height: 38px;
+  padding: 0 10px;
+  border: 1px solid #d9dee6;
+  border-radius: 8px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.modal-field-input i {
+  color: #7f8898;
+  font-size: 10px;
+}
+
+.modal-field-input input {
+  width: 100%;
+  border: 0;
+  outline: 0;
+  font-size: 10px;
+}
+
+.modal-line-editor {
+  position: relative;
+  padding-bottom: 13px;
+}
+
+.modal-line-editor input {
+  width: 100%;
+  height: 38px;
+  padding: 0 3px;
+  border: 0;
+  border-bottom: 1px solid #ccd2da;
+  outline: 0;
   color: #111827;
-  font-size: 11px;
-  font-weight: 700;
+  font-size: 10px;
+}
+
+.modal-line-editor input:focus {
+  border-bottom-color: #111827;
+}
+
+.modal-line-editor small {
+  position: absolute;
+  right: 0;
+  bottom: 0;
+  color: #98a1b0;
+  font-size: 7px;
 }
 
 .items-section {
-  margin-top: 13px;
-  padding: 16px;
+  margin-top: 12px;
+  padding: 14px;
 }
 
 .modal-items-grid {
-  margin-top: 14px;
+  margin-top: 10px;
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
-  gap: 11px;
+  grid-template-columns:
+    repeat(2, minmax(0, 1fr));
+  gap: 9px;
 }
 
 .modal-item-card {
-  min-width: 0;
-  padding: 10px;
-  border: 1px solid #e5e7eb;
-  border-radius: 12px;
+  padding: 9px;
+  border: 1px solid #e5e8ed;
+  border-radius: 9px;
   display: flex;
-  align-items: center;
-  gap: 11px;
+  gap: 9px;
 }
 
 .modal-item-image {
-  width: 70px;
-  height: 70px;
+  width: 58px;
+  height: 58px;
   flex-shrink: 0;
-  border-radius: 11px;
-  background: #f3f4f6;
-  color: #9ca3af;
+  overflow: hidden;
+  border-radius: 8px;
   display: grid;
   place-items: center;
-  overflow: hidden;
+  background: #f5f6f8;
 }
 
 .modal-item-image img {
@@ -2851,115 +3561,150 @@ export default {
 }
 
 .modal-item-info > span {
-  color: #2563eb;
-  font-size: 8px;
-  font-weight: 900;
-  text-transform: uppercase;
+  color: #5871db;
+  font-size: 7px;
+  font-weight: 850;
 }
 
 .modal-item-info h4 {
-  margin: 4px 0 7px;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-  font-size: 12px;
+  margin: 3px 0 6px;
+  font-size: 10px;
 }
 
 .item-meta {
   display: flex;
-  gap: 8px;
   flex-wrap: wrap;
+  gap: 6px 10px;
 }
 
 .item-meta em {
-  color: #6b7280;
-  font-size: 9px;
+  color: #8a93a3;
+  font-size: 7px;
   font-style: normal;
 }
 
 .item-meta strong {
-  color: #111827;
+  color: #344054;
+}
+
+.no-items {
+  padding: 30px;
+  color: #8a93a3;
+  text-align: center;
+  font-size: 9px;
 }
 
 .notes-card {
-  margin-top: 13px;
-  padding: 16px;
+  margin-top: 12px;
+  padding: 14px;
 }
 
 .notes-card p {
   margin: 0;
-  color: #4b5563;
-  font-size: 11px;
-  line-height: 1.7;
-  white-space: pre-wrap;
+  color: #475467;
+  font-size: 9px;
+  line-height: 1.6;
 }
 
-.no-items {
-  margin-top: 12px;
-  padding: 24px;
-  border-radius: 12px;
-  background: #f8fafc;
-  color: #6b7280;
-  text-align: center;
-  font-size: 11px;
+/* =========================
+   RESPONSIVE
+========================= */
+.sidebar-backdrop {
+  display: none;
+}
+
+@media (max-width: 1100px) {
+  .sidebar {
+    width: 215px;
+    min-width: 215px;
+  }
+
+  .search-box {
+    width: 230px;
+  }
 }
 
 @media (max-width: 900px) {
-  .page-header {
-    align-items: flex-start;
-    flex-direction: column;
+  .sidebar {
+    width: 240px;
+    min-width: 240px;
+    position: fixed;
+    left: -260px;
+    transition: left .2s ease;
   }
 
-  .header-actions,
+  .sidebar.open {
+    left: 0;
+  }
+
+  .sidebar-close {
+    display: grid;
+    place-items: center;
+  }
+
+  .sidebar-backdrop {
+    position: fixed;
+    inset: 0;
+    z-index: 40;
+    display: block;
+    background: rgba(15, 23, 42, .45);
+  }
+
+  .mobile-menu {
+    display: grid;
+  }
+
+  .topbar {
+    padding: 14px;
+  }
+
+  .workspace {
+    padding: 14px;
+  }
+
   .search-box {
-    width: 100%;
-  }
-
-  .detail-grid {
-    grid-template-columns: 1fr;
+    width: 200px;
   }
 }
 
-@media (max-width: 600px) {
-  .page-header,
-  .page-content {
-    padding-left: 15px;
-    padding-right: 15px;
-  }
-
-  .header-actions {
-    align-items: stretch;
+@media (max-width: 680px) {
+  .topbar {
+    align-items: flex-start;
     flex-direction: column;
   }
 
+  .topbar-actions {
+    width: 100%;
+  }
+
+  .search-box {
+    width: 100%;
+    flex: 1;
+  }
+
   .category-grid {
+    grid-template-columns:
+      repeat(2, minmax(0, 1fr));
+  }
+
+  .panel-header {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+
+  .detail-grid,
+  .modal-control-grid,
+  .modal-items-grid {
     grid-template-columns: 1fr;
+  }
+
+  .modal-control.full-row,
+  .detail-card.full-card {
+    grid-column: auto;
   }
 
   .modal-overlay {
-    padding: 0;
-  }
-
-  .order-modal {
-    max-height: 100vh;
-    border-radius: 0;
-  }
-
-  .modal-header {
-    align-items: flex-start;
-  }
-
-  .modal-header-actions {
-    align-items: flex-end;
-    flex-direction: column-reverse;
-  }
-
-  .detail-card dl {
-    grid-template-columns: 1fr;
-  }
-
-  .detail-card .full-row {
-    grid-column: auto;
+    padding: 10px;
   }
 }
 </style>
