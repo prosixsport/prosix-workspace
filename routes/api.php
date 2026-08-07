@@ -137,6 +137,11 @@ Route::middleware('auth:sanctum')->group(function () {
         'markRead'
     ]);
 
+    Route::put('/teamstore-orders/{id}', [
+        TeamStoreOrderController::class,
+        'update'
+    ]);
+
     /*
     |--------------------------------------------------------------------------
     | Artwork Requests

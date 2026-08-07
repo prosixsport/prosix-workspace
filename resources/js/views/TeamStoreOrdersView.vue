@@ -298,10 +298,11 @@
                 </td>
 
                 <td>
-                  <div class="status-editor">
+                  <div class="clean-status-wrap">
                     <select
                       :value="rowStatusSelection(order)"
-                      class="status-select"
+                      class="clean-status-select"
+                      :class="statusClass(order.status)"
                       :disabled="isSaving(order.id)"
                       @change="onRowStatusSelect(order, $event.target.value)"
                     >
@@ -314,56 +315,55 @@
                       </option>
 
                       <option value="__custom__">
-                        Custom Status...
+                        Custom...
                       </option>
                     </select>
 
-                    <div
+                    <input
                       v-if="rowUsesCustomStatus(order)"
-                      class="custom-status-row"
-                    >
-                      <input
-                        v-model="order._custom_status"
-                        type="text"
-                        placeholder="Type custom status"
-                        :disabled="isSaving(order.id)"
-                        @keyup.enter="saveRowCustomStatus(order)"
-                      />
+                      v-model="order._custom_status"
+                      type="text"
+                      class="clean-custom-status"
+                      placeholder="Custom status"
+                      :disabled="isSaving(order.id)"
+                      @keyup.enter="saveRowCustomStatus(order)"
+                      @blur="saveRowCustomStatus(order)"
+                    />
 
-                      <button
-                        type="button"
-                        :disabled="isSaving(order.id)"
-                        @click="saveRowCustomStatus(order)"
-                      >
-                        Save
-                      </button>
-                    </div>
+                    <span
+                      v-if="isSaving(order.id)"
+                      class="inline-saving"
+                    >
+                      Saving...
+                    </span>
                   </div>
                 </td>
 
                 <td>
-                  <div class="remark-editor">
-                    <textarea
+                  <div class="line-editor">
+                    <input
                       v-model="order._remark"
-                      rows="2"
-                      placeholder="Write remark..."
+                      type="text"
+                      class="line-input"
+                      placeholder="Add remark..."
                       :disabled="isSaving(order.id)"
-                    ></textarea>
+                      @input="queueRemarkSave(order)"
+                      @blur="saveRemarkNow(order)"
+                      @keyup.enter="$event.target.blur()"
+                    />
 
-                    <button
-                      type="button"
-                      :disabled="
-                        isSaving(order.id) ||
-                        String(order._remark ?? '') === String(order.remark ?? '')
-                      "
-                      @click="saveRemark(order)"
+                    <span
+                      class="line-state"
+                      :class="{ saved: order._remark_saved }"
                     >
                       {{
                         isSaving(order.id)
                           ? 'Saving...'
-                          : 'Save'
+                          : order._remark_saved
+                            ? 'Saved'
+                            : ''
                       }}
-                    </button>
+                    </span>
                   </div>
                 </td>
 
@@ -380,14 +380,28 @@
                 </td>
 
                 <td>
-                  <div class="tracking-cell">
-                    <strong>
-                      {{ order.courier_name || '—' }}
-                    </strong>
+                  <div class="tracking-inline-editor">
+                    <input
+                      v-model="order._tracking_number"
+                      type="text"
+                      class="tracking-line-input"
+                      placeholder="Tracking #"
+                      :disabled="isSaving(order.id)"
+                      @input="queueTrackingSave(order)"
+                      @blur="saveTrackingNow(order)"
+                      @keyup.enter="$event.target.blur()"
+                    />
 
                     <small>
-                      {{ order.tracking_number || 'No tracking' }}
+                      {{ order.courier_name || 'No courier' }}
                     </small>
+
+                    <span
+                      v-if="order._tracking_saved && !isSaving(order.id)"
+                      class="tracking-saved"
+                    >
+                      Saved
+                    </span>
                   </div>
                 </td>
 
@@ -533,7 +547,18 @@
 
                 <div>
                   <dt>Tracking Number</dt>
-                  <dd>{{ selectedOrder.tracking_number || '—' }}</dd>
+                  <dd>
+                    <input
+                      v-model="selectedOrder._tracking_number"
+                      type="text"
+                      class="modal-line-input"
+                      placeholder="Enter tracking number"
+                      :disabled="isSaving(selectedOrder.id)"
+                      @input="queueTrackingSave(selectedOrder)"
+                      @blur="saveTrackingNow(selectedOrder)"
+                      @keyup.enter="$event.target.blur()"
+                    />
+                  </dd>
                 </div>
 
                 <div>
@@ -625,34 +650,28 @@
                 <div class="modal-field full-row">
                   <label>Remark</label>
 
-                  <textarea
-                    v-model="selectedOrder._remark"
-                    rows="4"
-                    class="modal-remark-input"
-                    placeholder="Write internal remark..."
-                    :disabled="isSaving(selectedOrder.id)"
-                  ></textarea>
+                  <div class="modal-line-editor">
+                    <input
+                      v-model="selectedOrder._remark"
+                      type="text"
+                      class="modal-line-input"
+                      placeholder="Type remark..."
+                      :disabled="isSaving(selectedOrder.id)"
+                      @input="queueRemarkSave(selectedOrder)"
+                      @blur="saveRemarkNow(selectedOrder)"
+                      @keyup.enter="$event.target.blur()"
+                    />
 
-                  <button
-                    type="button"
-                    class="modal-save-remark"
-                    :disabled="
-                      isSaving(selectedOrder.id) ||
-                      String(selectedOrder._remark ?? '') ===
-                        String(selectedOrder.remark ?? '')
-                    "
-                    @click="saveRemark(selectedOrder)"
-                  >
-                    {{
-                      isSaving(selectedOrder.id)
-                        ? 'Saving...'
-                        : 'Save Remark'
-                    }}
-                  </button>
-
-                  <small class="internal-note">
-                    Remark is internal and is not emailed to the customer.
-                  </small>
+                    <span class="modal-auto-save-note">
+                      {{
+                        isSaving(selectedOrder.id)
+                          ? 'Saving...'
+                          : selectedOrder._remark_saved
+                            ? 'Saved'
+                            : 'Auto save'
+                      }}
+                    </span>
+                  </div>
                 </div>
               </div>
             </article>
@@ -760,6 +779,8 @@ export default {
       activeCategory: 'all',
       activeStatus: 'all',
       savingOrderIds: [],
+      remarkSaveTimers: {},
+      trackingSaveTimers: {},
 
       standardStatusOptions: [
         { value: 'new', label: 'New' },
@@ -972,6 +993,9 @@ export default {
       const prepared = {
         ...order,
         _remark: order?.remark ?? '',
+        _remark_saved: false,
+        _tracking_number: order?.tracking_number ?? '',
+        _tracking_saved: false,
         _custom_status: ''
       }
 
@@ -1025,16 +1049,15 @@ export default {
 
     async onRowStatusSelect(order, value) {
       if (value === '__custom__') {
-        if (this.isStandardStatus(order.status)) {
-          order.status = order._custom_status || ''
-        }
-
-        if (!order._custom_status) {
-          order._custom_status = ''
-        }
+        order._custom_status =
+          this.isStandardStatus(order.status)
+            ? ''
+            : (order.status || '')
 
         return
       }
+
+      order._custom_status = ''
 
       await this.updateRemoteOrder(order, {
         status: value
@@ -1055,10 +1078,87 @@ export default {
       })
     },
 
-    async saveRemark(order) {
-      await this.updateRemoteOrder(order, {
-        remark: order._remark ?? ''
+    queueRemarkSave(order) {
+      const id = Number(order.id)
+
+      order._remark_saved = false
+
+      if (this.remarkSaveTimers[id]) {
+        clearTimeout(this.remarkSaveTimers[id])
+      }
+
+      this.remarkSaveTimers[id] = setTimeout(() => {
+        this.saveRemarkNow(order)
+      }, 700)
+    },
+
+    async saveRemarkNow(order) {
+      const id = Number(order.id)
+
+      if (this.remarkSaveTimers[id]) {
+        clearTimeout(this.remarkSaveTimers[id])
+        delete this.remarkSaveTimers[id]
+      }
+
+      const nextValue = String(order._remark ?? '')
+
+      if (nextValue === String(order.remark ?? '')) {
+        return
+      }
+
+      const success = await this.updateRemoteOrder(order, {
+        remark: nextValue
       })
+
+      if (success) {
+        order._remark_saved = true
+
+        setTimeout(() => {
+          order._remark_saved = false
+        }, 1300)
+      }
+    },
+
+    queueTrackingSave(order) {
+      const id = Number(order.id)
+
+      order._tracking_saved = false
+
+      if (this.trackingSaveTimers[id]) {
+        clearTimeout(this.trackingSaveTimers[id])
+      }
+
+      this.trackingSaveTimers[id] = setTimeout(() => {
+        this.saveTrackingNow(order)
+      }, 700)
+    },
+
+    async saveTrackingNow(order) {
+      const id = Number(order.id)
+
+      if (this.trackingSaveTimers[id]) {
+        clearTimeout(this.trackingSaveTimers[id])
+        delete this.trackingSaveTimers[id]
+      }
+
+      const nextValue =
+        String(order._tracking_number ?? '').trim()
+
+      if (nextValue === String(order.tracking_number ?? '')) {
+        return
+      }
+
+      const success = await this.updateRemoteOrder(order, {
+        tracking_number: nextValue
+      })
+
+      if (success) {
+        order._tracking_saved = true
+
+        setTimeout(() => {
+          order._tracking_saved = false
+        }, 1300)
+      }
     },
 
     async updateRemoteOrder(order, payload) {
@@ -1095,6 +1195,11 @@ export default {
           order._remark = updated.remark ?? ''
         }
 
+        if (Object.prototype.hasOwnProperty.call(updated, 'tracking_number')) {
+          order.tracking_number = updated.tracking_number ?? ''
+          order._tracking_number = updated.tracking_number ?? ''
+        }
+
         /*
          * selectedOrder same object reference ho sakta hai,
          * phir bhi explicit sync safe hai.
@@ -1108,7 +1213,11 @@ export default {
           this.selectedOrder._remark = order._remark
           this.selectedOrder._custom_status =
             order._custom_status
+          this.selectedOrder._tracking_number =
+            order._tracking_number
         }
+
+        return true
       } catch (error) {
         console.error(
           'TeamStore order update error:',
@@ -1124,6 +1233,9 @@ export default {
          * Failed remark ko stored value par wapas lao.
          */
         order._remark = order.remark ?? ''
+        order._tracking_number = order.tracking_number ?? ''
+
+        return false
       } finally {
         this.setSaving(order.id, false)
       }
@@ -1500,6 +1612,226 @@ export default {
   font-size: 8px;
 }
 
+
+/* =========================================================
+   CLEAN TEAMSTORE TABLE — COMPACT EDITORS
+   ========================================================= */
+
+.teamstore-page {
+  width: 100%;
+  min-width: 0;
+  min-height: 100%;
+  background: #f6f7f9;
+}
+
+/* Keep page inside AppLayout/sidebar content area */
+.page-header {
+  min-height: 82px;
+  padding: 17px 22px;
+}
+
+.page-content {
+  padding: 18px 22px 30px;
+}
+
+.category-section,
+.orders-panel {
+  border-radius: 13px;
+}
+
+.category-section {
+  padding: 15px;
+}
+
+.category-grid {
+  margin-top: 13px;
+  grid-template-columns: repeat(auto-fill, minmax(165px, 1fr));
+  gap: 9px;
+}
+
+.category-card {
+  min-height: 68px;
+  padding: 9px 10px;
+  border-radius: 11px;
+}
+
+.category-icon {
+  width: 40px;
+  height: 40px;
+  border-radius: 9px;
+}
+
+.filters-row {
+  margin: 11px 0;
+}
+
+.status-tabs {
+  gap: 6px;
+}
+
+.status-tabs button {
+  min-width: 100px;
+  height: 36px;
+  padding: 0 10px;
+  border-radius: 9px;
+  font-size: 10px;
+}
+
+.orders-table th,
+.orders-table td {
+  padding-top: 9px;
+  padding-bottom: 9px;
+}
+
+.clean-status-wrap {
+  min-width: 125px;
+  position: relative;
+}
+
+.clean-status-select {
+  width: 125px;
+  height: 31px;
+  padding: 0 26px 0 9px;
+  border: 1px solid transparent;
+  border-radius: 999px;
+  outline: 0;
+  font-size: 9px;
+  font-weight: 900;
+  cursor: pointer;
+  appearance: auto;
+}
+
+.clean-status-select.status-new {
+  background: #f3e8ff;
+  color: #7e22ce;
+}
+
+.clean-status-select.status-confirmed {
+  background: #dbeafe;
+  color: #1d4ed8;
+}
+
+.clean-status-select.status-production {
+  background: #fef3c7;
+  color: #a16207;
+}
+
+.clean-status-select.status-shipped {
+  background: #e0f2fe;
+  color: #0369a1;
+}
+
+.clean-status-select.status-delivered {
+  background: #dcfce7;
+  color: #15803d;
+}
+
+.clean-status-select.status-cancelled {
+  background: #fee2e2;
+  color: #b91c1c;
+}
+
+.clean-custom-status {
+  width: 125px;
+  margin-top: 4px;
+  padding: 5px 3px;
+  border: 0;
+  border-bottom: 1px solid #111827;
+  outline: 0;
+  background: transparent;
+  font-size: 9px;
+}
+
+.inline-saving {
+  display: block;
+  margin-top: 3px;
+  color: #94a3b8;
+  font-size: 7px;
+}
+
+.line-editor {
+  min-width: 155px;
+  position: relative;
+}
+
+.line-input,
+.tracking-line-input,
+.modal-line-input {
+  width: 100%;
+  padding: 6px 3px;
+  border: 0;
+  border-bottom: 1px solid #cbd5e1;
+  border-radius: 0;
+  outline: 0;
+  background: transparent;
+  color: #111827;
+  font-size: 10px;
+  transition: border-color .18s ease;
+}
+
+.line-input:focus,
+.tracking-line-input:focus,
+.modal-line-input:focus {
+  border-bottom-color: #111827;
+}
+
+.line-input::placeholder,
+.tracking-line-input::placeholder,
+.modal-line-input::placeholder {
+  color: #a8b0bd;
+}
+
+.line-state,
+.tracking-saved {
+  position: absolute;
+  right: 2px;
+  bottom: -10px;
+  color: #94a3b8;
+  font-size: 7px;
+}
+
+.line-state.saved,
+.tracking-saved {
+  color: #16a34a;
+}
+
+.tracking-inline-editor {
+  min-width: 135px;
+  position: relative;
+}
+
+.tracking-inline-editor small {
+  display: block;
+  margin-top: 3px;
+  color: #94a3b8;
+  font-size: 7px;
+}
+
+.modal-line-editor {
+  position: relative;
+  padding-bottom: 14px;
+}
+
+.modal-auto-save-note {
+  position: absolute;
+  right: 0;
+  bottom: 0;
+  color: #94a3b8;
+  font-size: 8px;
+}
+
+.modal-line-input {
+  font-size: 11px;
+}
+
+@media (max-width: 1200px) {
+  .page-header,
+  .page-content {
+    padding-left: 14px;
+    padding-right: 14px;
+  }
+}
+
 </style>
           </head>
           <body>
@@ -1530,6 +1862,10 @@ export default {
           this.isStandardStatus(order.status)
             ? ''
             : (order.status || '')
+      }
+
+      if (typeof order._tracking_number === 'undefined') {
+        order._tracking_number = order.tracking_number ?? ''
       }
 
       this.selectedOrder = order
@@ -1781,6 +2117,14 @@ export default {
 
   beforeUnmount() {
     document.body.style.overflow = ''
+
+    Object.values(this.remarkSaveTimers).forEach(timer => {
+      clearTimeout(timer)
+    })
+
+    Object.values(this.trackingSaveTimers).forEach(timer => {
+      clearTimeout(timer)
+    })
   }
 }
 </script>
