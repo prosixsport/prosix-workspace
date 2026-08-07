@@ -1,22 +1,38 @@
 <template>
   <div class="place-orders-page">
-    <aside class="orders-sidebar">
-      <div class="sidebar-head">
-        <button type="button" class="back-btn" @click="$router.push('/dashboard')">
-          <i class="fa-solid fa-arrow-left"></i>
-        </button>
-        <div class="sidebar-title">
-          <h2>Place Orders</h2>
-          <p>Orders received from Prosix.com</p>
+    <header class="page-head">
+      <div>
+        <p class="eyebrow">Prosix CRM</p>
+        <h1>Place Orders</h1>
+        <span>Manage customer orders and production files.</span>
+      </div>
+
+      <div class="top-actions">
+        <div class="search-box">
+          <i class="fa-solid fa-magnifying-glass"></i>
+          <input
+            v-model="search"
+            type="text"
+            placeholder="Search orders..."
+          />
         </div>
-        <span v-if="unreadCount" class="count-badge">{{ unreadCount }} new</span>
-      </div>
 
-      <div class="search-box">
-        <i class="fa-solid fa-magnifying-glass"></i>
-        <input v-model="search" type="text" placeholder="Search place orders..." />
+        <button
+          type="button"
+          class="print-selected-btn"
+          :disabled="selectedIds.length === 0"
+          @click="printSelected"
+        >
+          <i class="fa-solid fa-print"></i>
+          Print Selected
+          <span v-if="selectedIds.length">
+            {{ selectedIds.length }}
+          </span>
+        </button>
       </div>
+    </header>
 
+    <section class="filters-bar">
       <div class="tabs">
         <button
           v-for="tab in tabs"
@@ -29,66 +45,181 @@
         </button>
       </div>
 
-      <div v-if="loading" class="sidebar-state">
+      <span
+        v-if="unreadCount"
+        class="new-badge"
+      >
+        {{ unreadCount }} new
+      </span>
+    </section>
+
+    <main class="orders-card">
+      <div
+        v-if="loading"
+        class="table-state"
+      >
         <i class="fa-solid fa-spinner fa-spin"></i>
         Loading orders...
       </div>
 
-      <div v-else-if="filteredOrders.length === 0" class="sidebar-state">
+      <div
+        v-else-if="filteredOrders.length === 0"
+        class="table-state"
+      >
         <i class="fa-solid fa-inbox"></i>
         No place orders found
       </div>
 
-      <div v-else class="order-list">
-        <button
-          v-for="order in filteredOrders"
-          :key="order.id"
-          type="button"
-          class="order-row"
-          :class="{
-            active: Number(selectedOrder?.id) === Number(order.id),
-            unread: !order.is_read
-          }"
-          @click="selectOrder(order)"
-        >
-          <span v-if="!order.is_read" class="unread-dot"></span>
+      <div
+        v-else
+        class="table-wrap"
+      >
+        <table class="orders-table">
+          <thead>
+            <tr>
+              <th class="check-col">
+                <input
+                  type="checkbox"
+                  :checked="allVisibleSelected"
+                  @change="toggleSelectAll"
+                />
+              </th>
 
-          <span class="sidebar-thumb">
-            <img
-              v-if="orderThumbnail(order)"
-              :src="orderThumbnail(order)"
-              :alt="orderDisplayName(order)"
-              @error="hideBrokenImage"
-            />
-            <i v-else class="fa-regular fa-image"></i>
-          </span>
+              <th>#</th>
+              <th>Thumbnail</th>
+              <th>Customer</th>
+              <th>Email</th>
+              <th>Order #</th>
+              <th>Status</th>
+              <th>Files</th>
+              <th>Action</th>
+            </tr>
+          </thead>
 
-          <div class="order-row-body">
-            <strong>{{ order.order_number || `Order #${order.id}` }}</strong>
-            <span>{{ orderDisplayName(order) }}</span>
-            <small>{{ order.full_name || 'Unknown customer' }}</small>
-            <small class="order-row-meta">
-              {{ formatDate(order.created_at) }}
-              <em :class="statusClass(order.status)">{{ capitalize(order.status || 'pending') }}</em>
-            </small>
-          </div>
+          <tbody>
+            <tr
+              v-for="order in filteredOrders"
+              :key="order.id"
+              :class="{ unread: !order.is_read }"
+            >
+              <td class="check-col">
+                <input
+                  type="checkbox"
+                  :checked="isSelected(order.id)"
+                  @change="toggleOrder(order.id)"
+                />
+              </td>
 
-          <i class="fa-solid fa-chevron-right"></i>
-        </button>
+              <td class="id-cell">
+                {{ order.id }}
+              </td>
+
+              <td>
+                <div class="table-thumb">
+                  <img
+                    v-if="orderThumbnail(order)"
+                    :src="orderThumbnail(order)"
+                    :alt="orderDisplayName(order)"
+                    @error="hideBrokenImage"
+                  />
+
+                  <span v-else>
+                    <i class="fa-regular fa-image"></i>
+                    No Image
+                  </span>
+                </div>
+              </td>
+
+              <td>
+                <div class="customer-cell">
+                  <strong>
+                    {{ order.full_name || '—' }}
+                  </strong>
+
+                  <small>
+                    {{ orderDisplayName(order) }}
+                  </small>
+                </div>
+              </td>
+
+              <td>
+                <span class="email-cell">
+                  {{ order.email || '—' }}
+                </span>
+              </td>
+
+              <!-- Phone / user number intentionally removed -->
+
+              <td>
+                <strong class="order-no">
+                  {{
+                    order.order_number ||
+                    `#${order.id}`
+                  }}
+                </strong>
+              </td>
+
+              <td>
+                <span
+                  class="status-pill"
+                  :class="statusClass(order.status)"
+                >
+                  {{
+                    capitalize(
+                      order.status || 'pending'
+                    )
+                  }}
+                </span>
+              </td>
+
+              <td>
+                <span
+                  v-if="fileCount(order)"
+                  class="file-count"
+                >
+                  {{ fileCount(order) }}
+                  {{
+                    fileCount(order) === 1
+                      ? 'file'
+                      : 'files'
+                  }}
+                </span>
+
+                <span
+                  v-else
+                  class="no-files"
+                >
+                  No files
+                </span>
+              </td>
+
+              <td>
+                <button
+                  type="button"
+                  class="view-btn"
+                  @click="selectOrder(order)"
+                >
+                  <i class="fa-regular fa-eye"></i>
+                  View
+                </button>
+              </td>
+            </tr>
+          </tbody>
+        </table>
       </div>
-    </aside>
+    </main>
 
-    <main class="orders-content">
-      <div v-if="!selectedOrder" class="empty-detail">
-        <span class="empty-icon"><i class="fa-solid fa-cart-shopping"></i></span>
-        <h3>Select a Place Order</h3>
-        <p>Choose an order from the left side.</p>
-      </div>
-
-      <section v-else class="order-view-shell">
+    <!-- VIEW MODAL -->
+    <div
+      v-if="selectedOrder"
+      class="modal-overlay"
+      @click.self="closeOrder"
+    >
+      <section class="order-modal">
         <header class="view-black-header">
           <div class="view-brand">
             <span class="prosix-mark">P</span>
+
             <div>
               <strong>PROSIX SPORTS</strong>
               <small>PLACE ORDER DETAILS</small>
@@ -96,18 +227,32 @@
           </div>
 
           <div class="view-header-actions">
-            <span class="header-status" :class="statusClass(selectedOrder.status)">
-              {{ capitalize(selectedOrder.status || 'pending') }}
+            <span
+              class="header-status"
+              :class="statusClass(selectedOrder.status)"
+            >
+              {{
+                capitalize(
+                  selectedOrder.status || 'pending'
+                )
+              }}
             </span>
-            <button type="button" class="header-icon-btn" title="Print order" @click="printOrder">
-              <i class="fa-solid fa-print"></i>
+
+            <button
+              type="button"
+              class="modal-close"
+              @click="closeOrder"
+            >
+              <i class="fa-solid fa-xmark"></i>
             </button>
           </div>
         </header>
 
         <div class="thank-you-strip">
           <h4>THANKS FOR CHOOSING US!</h4>
-          <p>WE REALLY APPRECIATE &amp; VALUE YOUR BUSINESS</p>
+          <p>
+            WE REALLY APPRECIATE &amp; VALUE YOUR BUSINESS
+          </p>
         </div>
 
         <div class="order-view-body">
@@ -119,74 +264,177 @@
                 :alt="orderDisplayName(selectedOrder)"
                 @error="hideBrokenImage"
               />
-              <div v-else class="hero-thumbnail-empty">
+
+              <div
+                v-else
+                class="hero-thumbnail-empty"
+              >
                 <i class="fa-regular fa-image"></i>
                 <span>No Image</span>
               </div>
             </div>
 
             <div class="hero-order-info">
-              <span class="small-label">Order Name</span>
-              <h1>{{ orderDisplayName(selectedOrder) }}</h1>
-              <p>Order # {{ selectedOrder.order_number || selectedOrder.id }}</p>
+              <span class="small-label">
+                Order Name
+              </span>
+
+              <h1>
+                {{ orderDisplayName(selectedOrder) }}
+              </h1>
+
+              <p>
+                Order #
+                {{
+                  selectedOrder.order_number ||
+                  selectedOrder.id
+                }}
+              </p>
             </div>
 
             <div class="hero-side-info">
               <span>Submitted</span>
-              <strong>{{ formatDate(selectedOrder.created_at) }}</strong>
+              <strong>
+                {{ formatDate(selectedOrder.created_at) }}
+              </strong>
             </div>
           </section>
 
           <section class="order-details-grid">
-            <article class="detail-field"><span>Full Name</span><strong>{{ selectedOrder.full_name || '—' }}</strong></article>
-            <article class="detail-field"><span>Email</span><strong>{{ selectedOrder.email || '—' }}</strong></article>
-            <article class="detail-field"><span>Phone</span><strong>{{ selectedOrder.phone || '—' }}</strong></article>
-            <article class="detail-field"><span>Order Place Date</span><strong>{{ dateValue(selectedOrder.order_date) }}</strong></article>
-            <article class="detail-field"><span>Delivery Date</span><strong>{{ dateValue(selectedOrder.delivery_date) }}</strong></article>
-            <article class="detail-field"><span>Sales Rep</span><strong>{{ selectedOrder.sales_rep || '—' }}</strong></article>
-            <article class="detail-field"><span>Order #</span><strong class="order-number-value">{{ selectedOrder.order_number || `#${selectedOrder.id}` }}</strong></article>
+            <article class="detail-field">
+              <span>Full Name</span>
+              <strong>
+                {{ selectedOrder.full_name || '—' }}
+              </strong>
+            </article>
+
+            <article class="detail-field">
+              <span>Email</span>
+              <strong>
+                {{ selectedOrder.email || '—' }}
+              </strong>
+            </article>
+
+            <!-- Phone field intentionally removed -->
+
+            <article class="detail-field">
+              <span>Order Place Date</span>
+              <strong>
+                {{ dateValue(selectedOrder.order_date) }}
+              </strong>
+            </article>
+
+            <article class="detail-field">
+              <span>Delivery Date</span>
+              <strong>
+                {{ dateValue(selectedOrder.delivery_date) }}
+              </strong>
+            </article>
+
+            <article class="detail-field">
+              <span>Sales Rep</span>
+              <strong>
+                {{ selectedOrder.sales_rep || '—' }}
+              </strong>
+            </article>
+
+            <article class="detail-field">
+              <span>Order #</span>
+              <strong>
+                {{
+                  selectedOrder.order_number ||
+                  `#${selectedOrder.id}`
+                }}
+              </strong>
+            </article>
           </section>
 
           <section class="team-colors-box">
             <span>Team Colors</span>
-            <strong>{{ selectedOrder.team_colors || '—' }}</strong>
+            <strong>
+              {{ selectedOrder.team_colors || '—' }}
+            </strong>
           </section>
 
           <div class="section-divider"></div>
 
           <section class="file-notes-grid">
-            <article v-for="group in fileGroups" :key="group.key" class="document-card">
+            <article
+              v-for="group in fileGroups"
+              :key="group.key"
+              class="document-card"
+            >
               <header class="document-card-title">
-                <span><i :class="group.icon"></i>{{ group.title }}</span>
+                <span>
+                  <i :class="group.icon"></i>
+                  {{ group.title }}
+                </span>
+
                 <em>{{ group.files.length }}</em>
               </header>
 
-              <div v-if="group.files.length" class="document-list">
-                <div v-for="(file, index) in group.files" :key="index" class="document-file">
-                  <a :href="fileUrl(file, group.folder)" target="_blank" rel="noopener noreferrer" class="document-preview">
+              <div
+                v-if="group.files.length"
+                class="document-list"
+              >
+                <div
+                  v-for="(file, index) in group.files"
+                  :key="index"
+                  class="document-file"
+                >
+                  <a
+                    :href="fileUrl(file, group.folder)"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    class="document-preview"
+                  >
                     <img
                       v-if="isImage(file)"
                       :src="fileUrl(file, group.folder)"
                       :alt="fileName(file)"
                       @error="hideBrokenImage"
                     />
-                    <span v-else class="document-file-icon">
+
+                    <span
+                      v-else
+                      class="document-file-icon"
+                    >
                       <i class="fa-solid fa-file"></i>
-                      <strong>{{ extension(file) }}</strong>
+                      <strong>
+                        {{ extension(file) }}
+                      </strong>
                     </span>
                   </a>
 
                   <div class="document-file-info">
-                    <strong>{{ fileName(file) }}</strong>
+                    <strong>
+                      {{ fileName(file) }}
+                    </strong>
+
                     <div>
-                      <a :href="fileUrl(file, group.folder)" target="_blank" rel="noopener noreferrer">View</a>
-                      <a :href="fileUrl(file, group.folder)" download>Download</a>
+                      <a
+                        :href="fileUrl(file, group.folder)"
+                        target="_blank"
+                        rel="noopener noreferrer"
+                      >
+                        View
+                      </a>
+
+                      <a
+                        :href="fileUrl(file, group.folder)"
+                        download
+                      >
+                        Download
+                      </a>
                     </div>
                   </div>
                 </div>
               </div>
 
-              <div v-else class="document-empty">
+              <div
+                v-else
+                class="document-empty"
+              >
                 <i class="fa-regular fa-folder-open"></i>
                 <span>No files uploaded</span>
               </div>
@@ -194,10 +442,22 @@
 
             <article class="document-card notes-document-card">
               <header class="document-card-title">
-                <span><i class="fa-solid fa-note-sticky"></i>Notes</span>
+                <span>
+                  <i class="fa-solid fa-note-sticky"></i>
+                  Notes
+                </span>
               </header>
-              <div v-if="selectedOrder.notes" class="notes-box" v-html="selectedOrder.notes"></div>
-              <div v-else class="document-empty">
+
+              <div
+                v-if="selectedOrder.notes"
+                class="notes-box"
+                v-html="selectedOrder.notes"
+              ></div>
+
+              <div
+                v-else
+                class="document-empty"
+              >
                 <i class="fa-regular fa-note-sticky"></i>
                 <span>No notes added</span>
               </div>
@@ -207,15 +467,29 @@
           <footer class="order-actions-footer">
             <div class="footer-order-id">
               <span>Selected Order</span>
-              <strong>{{ selectedOrder.order_number || `#${selectedOrder.id}` }}</strong>
+              <strong>
+                {{
+                  selectedOrder.order_number ||
+                  `#${selectedOrder.id}`
+                }}
+              </strong>
             </div>
 
             <div class="footer-buttons">
-              <button type="button" class="download-pdf-btn" @click="downloadPdf">
+              <button
+                type="button"
+                class="download-pdf-btn"
+                @click="downloadPdf"
+              >
                 <i class="fa-regular fa-file-pdf"></i>
                 Download PDF
               </button>
-              <button type="button" class="print-order-btn" @click="printOrder">
+
+              <button
+                type="button"
+                class="print-order-btn"
+                @click="printOrder"
+              >
                 <i class="fa-solid fa-print"></i>
                 Print
               </button>
@@ -223,7 +497,7 @@
           </footer>
         </div>
       </section>
-    </main>
+    </div>
   </div>
 </template>
 
@@ -238,6 +512,7 @@ export default {
       loading: false,
       orders: [],
       selectedOrder: null,
+      selectedIds: [],
       search: '',
       activeStatus: 'all',
       prosixBaseUrl: import.meta.env.VITE_PROSIX_URL || 'https://prosix.com',
@@ -252,6 +527,15 @@ export default {
   },
 
   computed: {
+    allVisibleSelected() {
+      return (
+        this.filteredOrders.length > 0 &&
+        this.filteredOrders.every(order =>
+          this.selectedIds.includes(Number(order.id))
+        )
+      )
+    },
+
     filteredOrders() {
       const query = String(this.search || '').trim().toLowerCase()
 
@@ -608,10 +892,781 @@ export default {
       printWindow.focus()
       setTimeout(() => printWindow.print(), 100)
     }
+  },
+
+  beforeUnmount() {
+    document.body.style.overflow = ''
   }
 }
 </script>
 
 <style scoped>
-*{box-sizing:border-box}.place-orders-page{min-height:100vh;display:grid;grid-template-columns:330px minmax(0,1fr);background:#eceef1;color:#111827}.orders-sidebar{height:100vh;overflow-y:auto;background:#111827;color:#fff;border-right:1px solid #202938}.sidebar-head{min-height:88px;padding:17px 15px;border-bottom:1px solid rgba(255,255,255,.1);display:flex;align-items:center;gap:11px}.sidebar-title{min-width:0;flex:1}.sidebar-head h2{margin:0;font-size:17px;font-weight:900}.sidebar-head p{margin:3px 0 0;color:#9ca3af;font-size:10px}.back-btn{width:35px;height:35px;flex-shrink:0;border:1px solid rgba(255,255,255,.15);border-radius:9px;background:rgba(255,255,255,.08);color:#fff;cursor:pointer}.count-badge{padding:5px 8px;border-radius:999px;background:#fff;color:#111827;font-size:9px;font-weight:900}.search-box{margin:13px;height:40px;padding:0 11px;border:1px solid rgba(255,255,255,.12);border-radius:9px;background:rgba(255,255,255,.07);display:flex;align-items:center;gap:8px}.search-box input{width:100%;border:0;outline:0;background:transparent;color:#fff;font-size:11px}.tabs{padding:0 13px 11px;display:flex;gap:5px;overflow-x:auto}.tabs button{flex-shrink:0;padding:6px 9px;border:1px solid rgba(255,255,255,.12);border-radius:999px;background:transparent;color:#9ca3af;font-size:9px;font-weight:800;cursor:pointer}.tabs button.active{background:#fff;color:#111827}.sidebar-state{min-height:180px;color:#9ca3af;font-size:11px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:8px}.order-list{padding:0 8px 18px}.order-row{position:relative;width:100%;margin-bottom:5px;padding:9px;border:1px solid transparent;border-radius:10px;background:transparent;color:#fff;text-align:left;cursor:pointer;display:flex;align-items:center;gap:8px}.order-row:hover,.order-row.active{border-color:rgba(255,255,255,.13);background:rgba(255,255,255,.08)}.order-row.unread{background:rgba(255,255,255,.11)}.unread-dot{position:absolute;top:8px;left:5px;width:6px;height:6px;border-radius:50%;background:#22c55e}.sidebar-thumb{width:43px;height:43px;flex-shrink:0;border-radius:8px;overflow:hidden;background:rgba(255,255,255,.08);color:#9ca3af;display:grid;place-items:center}.sidebar-thumb img{width:100%;height:100%;object-fit:cover}.order-row-body{min-width:0;flex:1}.order-row-body strong,.order-row-body span,.order-row-body small{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.order-row-body strong{display:block;font-size:11px}.order-row-body>span{display:block;margin-top:2px;color:#d1d5db;font-size:9px}.order-row-body>small{display:block;margin-top:2px;color:#9ca3af;font-size:8px}.order-row-meta{display:flex!important;align-items:center;gap:5px}.order-row-meta em{padding:2px 5px;border-radius:999px;font-size:7px;font-style:normal;font-weight:900}.orders-content{min-width:0;height:100vh;padding:20px;overflow-y:auto}.empty-detail{min-height:calc(100vh - 40px);color:#6b7280;text-align:center;display:flex;flex-direction:column;align-items:center;justify-content:center}.empty-icon{width:70px;height:70px;margin-bottom:13px;border-radius:20px;background:#111827;color:#fff;font-size:25px;display:grid;place-items:center}.empty-detail h3{margin:0;color:#111827;font-size:22px}.empty-detail p{margin:5px 0 0;font-size:11px}.order-view-shell{width:min(1250px,100%);margin:0 auto;overflow:hidden;border:1px solid #dfe2e6;border-radius:14px;background:#fff;box-shadow:0 16px 45px rgba(15,23,42,.08)}.view-black-header{min-height:65px;padding:13px 19px;background:#050505;color:#fff;display:flex;align-items:center;justify-content:space-between;gap:15px}.view-brand{display:flex;align-items:center;gap:10px}.prosix-mark{width:35px;height:35px;border-radius:8px;background:#fff;color:#050505;font-size:17px;font-weight:1000;font-style:italic;display:grid;place-items:center}.view-brand strong,.view-brand small{display:block}.view-brand strong{font-size:12px;letter-spacing:.1em}.view-brand small{margin-top:3px;color:#9ca3af;font-size:7px;letter-spacing:.17em}.view-header-actions{display:flex;align-items:center;gap:8px}.header-status{padding:7px 11px;border-radius:999px;font-size:9px;font-weight:900}.header-icon-btn{width:35px;height:35px;border:1px solid rgba(255,255,255,.2);border-radius:8px;background:rgba(255,255,255,.08);color:#fff;cursor:pointer}.thank-you-strip{padding:13px 20px;border-bottom:1px solid #e5e7eb;background:#f7f7f7;text-align:center}.thank-you-strip h4{margin:0;font-size:12px;font-style:italic;letter-spacing:.08em}.thank-you-strip p{margin:4px 0 0;color:#a0a0a0;font-size:6px;letter-spacing:.35em}.order-view-body{padding:20px}.order-hero-card{min-height:125px;padding:13px;border:1px solid #dfe2e6;border-radius:11px;background:#fafafa;display:flex;align-items:center;gap:16px}.hero-thumbnail{width:145px;height:105px;flex-shrink:0;overflow:hidden;border:1px solid #d7dbe0;border-radius:9px;background:#fff}.hero-thumbnail img{width:100%;height:100%;object-fit:contain}.hero-thumbnail-empty{width:100%;height:100%;color:#9ca3af;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:5px;font-size:9px}.hero-thumbnail-empty i{font-size:20px}.hero-order-info{min-width:0;flex:1}.small-label,.hero-side-info span{color:#8a8f98;font-size:7px;font-weight:900;letter-spacing:.1em;text-transform:uppercase}.hero-order-info h1{margin:5px 0;overflow-wrap:anywhere;font-size:21px}.hero-order-info p{margin:0;color:#6b7280;font-size:9px}.hero-side-info{min-width:110px;padding-left:14px;border-left:1px solid #e0e2e5;text-align:right}.hero-side-info strong{display:block;margin-top:5px;font-size:11px}.order-details-grid{margin-top:16px;display:grid;grid-template-columns:repeat(7,minmax(0,1fr));gap:9px}.detail-field{min-width:0}.detail-field span,.team-colors-box span{display:block;margin-bottom:5px;color:#7c828c;font-size:7px;font-weight:900;letter-spacing:.06em;text-transform:uppercase}.detail-field strong,.team-colors-box strong{min-height:38px;padding:8px 9px;border:1px solid #d8dce1;border-radius:6px;background:#f7f7f7;color:#20242a;overflow-wrap:anywhere;font-size:9px;display:flex;align-items:center}.order-number-value{font-weight:1000!important}.team-colors-box{margin-top:13px}.section-divider{height:1px;margin:18px 0;background:#e5e7eb}.file-notes-grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px}.document-card{min-width:0;min-height:235px;padding:12px;border:1px solid #dcdfe4;border-radius:10px;background:#fff}.document-card-title{margin-bottom:10px;padding-bottom:9px;border-bottom:1px solid #eceef1;color:#111827;font-size:9px;font-weight:900;display:flex;align-items:center;justify-content:space-between}.document-card-title span{display:flex;align-items:center;gap:6px}.document-card-title em{min-width:20px;height:20px;padding:0 5px;border-radius:999px;background:#111827;color:#fff;font-size:8px;font-style:normal;display:grid;place-items:center}.document-list{max-height:190px;overflow-y:auto;display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:7px}.document-file{min-width:0;overflow:hidden;border:1px solid #e1e4e8;border-radius:7px;background:#fff}.document-preview{height:75px;background:#f5f6f8;text-decoration:none;display:block}.document-preview img{width:100%;height:100%;object-fit:contain}.document-file-icon{width:100%;height:100%;color:#6b7280;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:4px}.document-file-icon i{font-size:18px}.document-file-icon strong{font-size:7px}.document-file-info{padding:5px}.document-file-info>strong{display:block;overflow:hidden;color:#374151;font-size:7px;text-overflow:ellipsis;white-space:nowrap}.document-file-info div{margin-top:5px;display:flex;gap:4px}.document-file-info a{flex:1;padding:4px 3px;border-radius:4px;background:#f1f2f4;color:#111827;font-size:6px;font-weight:900;text-align:center;text-decoration:none}.document-file-info a:last-child{background:#111827;color:#fff}.document-empty{min-height:150px;color:#9ca3af;font-size:9px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:7px}.document-empty i{font-size:20px}.notes-document-card{display:flex;flex-direction:column}.notes-box{flex:1;min-height:150px;max-height:190px;overflow-y:auto;padding:10px;border:1px dashed #d0d3d8;border-radius:6px;background:#fafafa;color:#4b5563;font-size:9px;line-height:1.7;overflow-wrap:anywhere}.order-actions-footer{margin-top:18px;padding-top:14px;border-top:1px solid #e5e7eb;display:flex;align-items:center;justify-content:space-between;gap:12px}.footer-order-id span,.footer-order-id strong{display:block}.footer-order-id span{color:#9ca3af;font-size:7px;font-weight:900;text-transform:uppercase}.footer-order-id strong{margin-top:3px;font-size:10px}.footer-buttons{display:flex;gap:8px}.download-pdf-btn,.print-order-btn{height:38px;padding:0 14px;border-radius:7px;font-size:9px;font-weight:900;cursor:pointer;display:flex;align-items:center;gap:6px}.download-pdf-btn{border:1px solid #111827;background:#fff;color:#111827}.print-order-btn{border:1px solid #111827;background:#111827;color:#fff}.status-pending{background:#fef3c7;color:#92400e}.status-processing{background:#dbeafe;color:#1d4ed8}.status-completed{background:#dcfce7;color:#166534}.status-cancelled,.status-canceled{background:#fee2e2;color:#991b1b}@media(max-width:1200px){.place-orders-page{grid-template-columns:300px minmax(0,1fr)}.order-details-grid{grid-template-columns:repeat(4,minmax(0,1fr))}.file-notes-grid{grid-template-columns:repeat(2,minmax(0,1fr))}}@media(max-width:800px){.place-orders-page{display:block}.orders-sidebar{width:100%;height:auto;max-height:45vh}.orders-content{height:auto;padding:12px}.order-hero-card{align-items:flex-start}.hero-side-info{display:none}.order-details-grid{grid-template-columns:repeat(2,minmax(0,1fr))}.file-notes-grid{grid-template-columns:1fr}}@media(max-width:520px){.order-view-body{padding:12px}.order-hero-card{flex-direction:column}.hero-thumbnail{width:100%;height:180px}.order-details-grid{grid-template-columns:1fr}.order-actions-footer{align-items:stretch;flex-direction:column}.footer-buttons{display:grid;grid-template-columns:1fr 1fr}.download-pdf-btn,.print-order-btn{justify-content:center}}
+* { box-sizing: border-box; }
+
+.place-orders-page {
+  min-height: 100vh;
+  padding: 28px 32px;
+  background: #f4f5f7;
+  color: #111827;
+}
+
+.page-head {
+  margin-bottom: 18px;
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 20px;
+}
+
+.eyebrow {
+  margin: 0 0 4px;
+  color: #6b7280;
+  font-size: 9px;
+  font-weight: 900;
+  letter-spacing: .14em;
+  text-transform: uppercase;
+}
+
+.page-head h1 {
+  margin: 0;
+  font-size: 24px;
+}
+
+.page-head > div > span {
+  display: block;
+  margin-top: 5px;
+  color: #6b7280;
+  font-size: 11px;
+}
+
+.top-actions {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+}
+
+.search-box {
+  width: 310px;
+  height: 40px;
+  padding: 0 12px;
+  border: 1px solid #d9dde3;
+  border-radius: 9px;
+  background: white;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.search-box input {
+  width: 100%;
+  border: 0;
+  outline: 0;
+  background: transparent;
+  font-size: 11px;
+}
+
+.print-selected-btn {
+  height: 40px;
+  padding: 0 13px;
+  border: 1px solid #111827;
+  border-radius: 8px;
+  background: #111827;
+  color: white;
+  font-size: 10px;
+  font-weight: 900;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 7px;
+}
+
+.print-selected-btn:disabled {
+  opacity: .45;
+  cursor: not-allowed;
+}
+
+.print-selected-btn span {
+  min-width: 20px;
+  height: 20px;
+  padding: 0 5px;
+  border-radius: 999px;
+  background: white;
+  color: #111827;
+  display: grid;
+  place-items: center;
+  font-size: 8px;
+}
+
+.filters-bar {
+  margin-bottom: 12px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.tabs {
+  display: flex;
+  gap: 6px;
+  overflow-x: auto;
+}
+
+.tabs button {
+  padding: 7px 11px;
+  border: 1px solid #d9dde3;
+  border-radius: 999px;
+  background: white;
+  color: #6b7280;
+  font-size: 9px;
+  font-weight: 800;
+  cursor: pointer;
+}
+
+.tabs button.active {
+  border-color: #111827;
+  background: #111827;
+  color: white;
+}
+
+.new-badge {
+  padding: 6px 9px;
+  border-radius: 999px;
+  background: #111827;
+  color: white;
+  font-size: 9px;
+  font-weight: 900;
+}
+
+.orders-card {
+  overflow: hidden;
+  border: 1px solid #dfe3e8;
+  border-radius: 12px;
+  background: white;
+  box-shadow: 0 8px 28px rgba(15,23,42,.04);
+}
+
+.table-wrap { overflow-x: auto; }
+
+.orders-table {
+  width: 100%;
+  min-width: 1050px;
+  border-collapse: collapse;
+}
+
+.orders-table th,
+.orders-table td {
+  padding: 11px 13px;
+  border-bottom: 1px solid #e5e7eb;
+  text-align: left;
+  vertical-align: middle;
+}
+
+.orders-table th {
+  background: #202328;
+  color: white;
+  font-size: 8px;
+  font-weight: 900;
+  letter-spacing: .04em;
+  text-transform: uppercase;
+}
+
+.orders-table td { font-size: 10px; }
+
+.orders-table tbody tr:hover { background: #fafafa; }
+.orders-table tbody tr.unread { background: #f7fbff; }
+
+.check-col {
+  width: 42px;
+  text-align: center !important;
+}
+
+.check-col input {
+  width: 16px;
+  height: 16px;
+  accent-color: #2563eb;
+  cursor: pointer;
+}
+
+.id-cell {
+  width: 48px;
+  color: #4b5563;
+  font-weight: 800;
+}
+
+.table-thumb {
+  width: 62px;
+  height: 52px;
+  overflow: hidden;
+  border: 1px solid #dfe3e8;
+  border-radius: 8px;
+  background: #f6f7f8;
+}
+
+.table-thumb img {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+}
+
+.table-thumb span {
+  width: 100%;
+  height: 100%;
+  color: #9ca3af;
+  font-size: 7px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 3px;
+}
+
+.customer-cell strong,
+.customer-cell small {
+  display: block;
+}
+
+.customer-cell strong { font-size: 10px; }
+
+.customer-cell small {
+  margin-top: 3px;
+  color: #8a9099;
+  font-size: 8px;
+}
+
+.email-cell {
+  display: inline-block;
+  max-width: 220px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.order-no {
+  font-size: 9px;
+  white-space: nowrap;
+}
+
+.status-pill {
+  display: inline-flex;
+  padding: 5px 8px;
+  border-radius: 999px;
+  font-size: 8px;
+  font-weight: 900;
+}
+
+.file-count {
+  padding: 5px 7px;
+  border-radius: 999px;
+  background: #111827;
+  color: white;
+  font-size: 7px;
+  font-weight: 900;
+}
+
+.no-files {
+  color: #9ca3af;
+  font-size: 8px;
+}
+
+.view-btn {
+  height: 32px;
+  padding: 0 10px;
+  border: 1px solid #111827;
+  border-radius: 7px;
+  background: #111827;
+  color: white;
+  font-size: 8px;
+  font-weight: 900;
+  cursor: pointer;
+}
+
+.table-state {
+  min-height: 320px;
+  color: #6b7280;
+  font-size: 11px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+}
+
+/* MODAL */
+.modal-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 99999;
+  padding: 28px;
+  background: rgba(0,0,0,.68);
+  backdrop-filter: blur(3px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.order-modal {
+  width: min(1180px, 100%);
+  max-height: calc(100vh - 56px);
+  overflow: hidden;
+  border-radius: 14px;
+  background: white;
+  box-shadow: 0 30px 90px rgba(0,0,0,.32);
+}
+
+.view-black-header {
+  min-height: 62px;
+  padding: 12px 18px;
+  background: #050505;
+  color: white;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 15px;
+}
+
+.view-brand {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+}
+
+.prosix-mark {
+  width: 34px;
+  height: 34px;
+  border-radius: 7px;
+  background: white;
+  color: #050505;
+  font-size: 17px;
+  font-weight: 1000;
+  font-style: italic;
+  display: grid;
+  place-items: center;
+}
+
+.view-brand strong,
+.view-brand small { display: block; }
+
+.view-brand strong {
+  font-size: 11px;
+  letter-spacing: .1em;
+}
+
+.view-brand small {
+  margin-top: 3px;
+  color: #9ca3af;
+  font-size: 6px;
+  letter-spacing: .16em;
+}
+
+.view-header-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.header-status {
+  padding: 6px 10px;
+  border-radius: 999px;
+  font-size: 8px;
+  font-weight: 900;
+}
+
+.modal-close {
+  width: 34px;
+  height: 34px;
+  border: 1px solid rgba(255,255,255,.2);
+  border-radius: 8px;
+  background: rgba(255,255,255,.08);
+  color: white;
+  cursor: pointer;
+}
+
+.thank-you-strip {
+  padding: 11px 18px;
+  border-bottom: 1px solid #e5e7eb;
+  background: #f7f7f7;
+  text-align: center;
+}
+
+.thank-you-strip h4 {
+  margin: 0;
+  font-size: 11px;
+  font-style: italic;
+  letter-spacing: .08em;
+}
+
+.thank-you-strip p {
+  margin: 3px 0 0;
+  color: #a0a0a0;
+  font-size: 5.5px;
+  letter-spacing: .32em;
+}
+
+.order-view-body {
+  max-height: calc(100vh - 145px);
+  padding: 18px;
+  overflow-y: auto;
+}
+
+.order-hero-card {
+  min-height: 115px;
+  padding: 12px;
+  border: 1px solid #dfe2e6;
+  border-radius: 10px;
+  background: #fafafa;
+  display: flex;
+  align-items: center;
+  gap: 14px;
+}
+
+.hero-thumbnail {
+  width: 135px;
+  height: 95px;
+  flex-shrink: 0;
+  overflow: hidden;
+  border: 1px solid #d7dbe0;
+  border-radius: 8px;
+  background: white;
+}
+
+.hero-thumbnail img {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+}
+
+.hero-thumbnail-empty {
+  width: 100%;
+  height: 100%;
+  color: #9ca3af;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
+  font-size: 8px;
+}
+
+.hero-order-info {
+  min-width: 0;
+  flex: 1;
+}
+
+.small-label,
+.hero-side-info span {
+  color: #8a8f98;
+  font-size: 6px;
+  font-weight: 900;
+  letter-spacing: .1em;
+  text-transform: uppercase;
+}
+
+.hero-order-info h1 {
+  margin: 5px 0;
+  font-size: 19px;
+}
+
+.hero-order-info p {
+  margin: 0;
+  color: #6b7280;
+  font-size: 8px;
+}
+
+.hero-side-info {
+  min-width: 105px;
+  padding-left: 13px;
+  border-left: 1px solid #e0e2e5;
+  text-align: right;
+}
+
+.hero-side-info strong {
+  display: block;
+  margin-top: 5px;
+  font-size: 10px;
+}
+
+.order-details-grid {
+  margin-top: 14px;
+  display: grid;
+  grid-template-columns: repeat(6, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.detail-field span,
+.team-colors-box span {
+  display: block;
+  margin-bottom: 4px;
+  color: #7c828c;
+  font-size: 6px;
+  font-weight: 900;
+  text-transform: uppercase;
+}
+
+.detail-field strong,
+.team-colors-box strong {
+  min-height: 36px;
+  padding: 8px;
+  border: 1px solid #d8dce1;
+  border-radius: 6px;
+  background: #f7f7f7;
+  overflow-wrap: anywhere;
+  font-size: 8px;
+  display: flex;
+  align-items: center;
+}
+
+.team-colors-box { margin-top: 12px; }
+
+.section-divider {
+  height: 1px;
+  margin: 16px 0;
+  background: #e5e7eb;
+}
+
+.file-notes-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.document-card {
+  min-width: 0;
+  min-height: 220px;
+  padding: 11px;
+  border: 1px solid #dcdfe4;
+  border-radius: 9px;
+  background: white;
+}
+
+.document-card-title {
+  margin-bottom: 9px;
+  padding-bottom: 8px;
+  border-bottom: 1px solid #eceef1;
+  font-size: 8px;
+  font-weight: 900;
+  display: flex;
+  justify-content: space-between;
+}
+
+.document-card-title span {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+}
+
+.document-card-title em {
+  min-width: 19px;
+  height: 19px;
+  padding: 0 5px;
+  border-radius: 999px;
+  background: #111827;
+  color: white;
+  font-size: 7px;
+  font-style: normal;
+  display: grid;
+  place-items: center;
+}
+
+.document-list {
+  max-height: 175px;
+  overflow-y: auto;
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 6px;
+}
+
+.document-file {
+  min-width: 0;
+  overflow: hidden;
+  border: 1px solid #e1e4e8;
+  border-radius: 6px;
+}
+
+.document-preview {
+  height: 70px;
+  background: #f5f6f8;
+  display: block;
+}
+
+.document-preview img {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+}
+
+.document-file-icon {
+  width: 100%;
+  height: 100%;
+  color: #6b7280;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+}
+
+.document-file-info { padding: 5px; }
+
+.document-file-info > strong {
+  display: block;
+  overflow: hidden;
+  font-size: 6.5px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.document-file-info div {
+  margin-top: 4px;
+  display: flex;
+  gap: 3px;
+}
+
+.document-file-info a {
+  flex: 1;
+  padding: 3px;
+  border-radius: 4px;
+  background: #f1f2f4;
+  color: #111827;
+  font-size: 5.5px;
+  font-weight: 900;
+  text-align: center;
+  text-decoration: none;
+}
+
+.document-file-info a:last-child {
+  background: #111827;
+  color: white;
+}
+
+.document-empty {
+  min-height: 140px;
+  color: #9ca3af;
+  font-size: 8px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+}
+
+.notes-box {
+  min-height: 140px;
+  max-height: 175px;
+  overflow-y: auto;
+  padding: 9px;
+  border: 1px dashed #d0d3d8;
+  border-radius: 6px;
+  background: #fafafa;
+  color: #4b5563;
+  font-size: 8px;
+  line-height: 1.6;
+}
+
+.order-actions-footer {
+  margin-top: 16px;
+  padding-top: 13px;
+  border-top: 1px solid #e5e7eb;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.footer-order-id span,
+.footer-order-id strong { display: block; }
+
+.footer-order-id span {
+  color: #9ca3af;
+  font-size: 6px;
+  font-weight: 900;
+  text-transform: uppercase;
+}
+
+.footer-order-id strong {
+  margin-top: 3px;
+  font-size: 9px;
+}
+
+.footer-buttons {
+  display: flex;
+  gap: 7px;
+}
+
+.download-pdf-btn,
+.print-order-btn {
+  height: 36px;
+  padding: 0 12px;
+  border-radius: 7px;
+  font-size: 8px;
+  font-weight: 900;
+  cursor: pointer;
+}
+
+.download-pdf-btn {
+  border: 1px solid #111827;
+  background: white;
+  color: #111827;
+}
+
+.print-order-btn {
+  border: 1px solid #111827;
+  background: #111827;
+  color: white;
+}
+
+.status-pending { background: #fef3c7; color: #92400e; }
+.status-processing { background: #dbeafe; color: #1d4ed8; }
+.status-completed { background: #dcfce7; color: #166534; }
+.status-cancelled,
+.status-canceled { background: #fee2e2; color: #991b1b; }
+
+@media (max-width: 1050px) {
+  .page-head {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .top-actions,
+  .search-box {
+    width: 100%;
+  }
+
+  .order-details-grid {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+
+  .file-notes-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 650px) {
+  .place-orders-page { padding: 15px; }
+  .top-actions { flex-direction: column; }
+  .print-selected-btn { width: 100%; justify-content: center; }
+
+  .modal-overlay { padding: 0; }
+  .order-modal {
+    max-height: 100vh;
+    border-radius: 0;
+  }
+
+  .hero-side-info { display: none; }
+  .order-hero-card { align-items: flex-start; }
+
+  .order-details-grid {
+    grid-template-columns: 1fr 1fr;
+  }
+
+  .file-notes-grid { grid-template-columns: 1fr; }
+
+  .order-actions-footer {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .footer-buttons {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+  }
+}
 </style>
