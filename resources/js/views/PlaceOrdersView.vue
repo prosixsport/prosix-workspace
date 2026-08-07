@@ -608,9 +608,7 @@ export default {
         const data = response.data?.data ?? response.data ?? []
         this.orders = Array.isArray(data) ? data : []
 
-        if (this.orders.length) {
-          await this.selectOrder(this.orders[0])
-        }
+        this.selectedOrder = null
       } catch (error) {
         console.error('Place orders fetch error:', error)
         this.orders = []
@@ -621,6 +619,7 @@ export default {
 
     async selectOrder(order) {
       this.selectedOrder = order
+      document.body.style.overflow = 'hidden'
 
       if (order.is_read) return
 
@@ -632,10 +631,313 @@ export default {
         )
 
         order.is_read = true
-        window.dispatchEvent(new CustomEvent('place-orders-read-updated'))
+
+        window.dispatchEvent(
+          new CustomEvent('place-orders-read-updated')
+        )
       } catch (error) {
-        console.error('Place order mark-read error:', error)
+        console.error(
+          'Place order mark-read error:',
+          error
+        )
       }
+    },
+
+    closeOrder() {
+      this.selectedOrder = null
+      document.body.style.overflow = ''
+    },
+
+    isSelected(orderId) {
+      return this.selectedIds.includes(
+        Number(orderId)
+      )
+    },
+
+    toggleOrder(orderId) {
+      const id = Number(orderId)
+
+      if (this.selectedIds.includes(id)) {
+        this.selectedIds =
+          this.selectedIds.filter(
+            selectedId => selectedId !== id
+          )
+      } else {
+        this.selectedIds = [
+          ...this.selectedIds,
+          id
+        ]
+      }
+    },
+
+    toggleSelectAll() {
+      const visibleIds =
+        this.filteredOrders.map(
+          order => Number(order.id)
+        )
+
+      if (this.allVisibleSelected) {
+        this.selectedIds =
+          this.selectedIds.filter(
+            id => !visibleIds.includes(id)
+          )
+      } else {
+        this.selectedIds = [
+          ...new Set([
+            ...this.selectedIds,
+            ...visibleIds
+          ])
+        ]
+      }
+    },
+
+    fileCount(order) {
+      return (
+        (Array.isArray(order?.mockup_files)
+          ? order.mockup_files.length
+          : 0) +
+        (Array.isArray(order?.roster_files)
+          ? order.roster_files.length
+          : 0) +
+        (Array.isArray(order?.quote_files)
+          ? order.quote_files.length
+          : 0)
+      )
+    },
+
+    printSelected() {
+      const orders = this.orders.filter(
+        order =>
+          this.selectedIds.includes(
+            Number(order.id)
+          )
+      )
+
+      if (!orders.length) {
+        alert('Select at least one order.')
+        return
+      }
+
+      const printWindow = window.open(
+        '',
+        '_blank',
+        'width=1200,height=850'
+      )
+
+      if (!printWindow) {
+        alert(
+          'Please allow popups for printing.'
+        )
+        return
+      }
+
+      const rows = orders.map(order => {
+        const thumbnail =
+          this.orderThumbnail(order)
+
+        return `
+          <tr>
+            <td>
+              ${
+                thumbnail
+                  ? `
+                    <img
+                      class="p-thumb"
+                      src="${this.escapeHtml(thumbnail)}"
+                      alt=""
+                    />
+                  `
+                  : `
+                    <div class="p-empty">
+                      No Image
+                    </div>
+                  `
+              }
+            </td>
+
+            <td>
+              <strong>
+                ${this.escapeHtml(
+                  order.full_name || '—'
+                )}
+              </strong>
+
+              <small>
+                ${this.escapeHtml(
+                  this.orderDisplayName(order)
+                )}
+              </small>
+            </td>
+
+            <td>
+              ${this.escapeHtml(
+                order.email || '—'
+              )}
+            </td>
+
+            <td>
+              <strong>
+                ${this.escapeHtml(
+                  order.order_number ||
+                  `#${order.id}`
+                )}
+              </strong>
+            </td>
+
+            <td>
+              ${this.escapeHtml(
+                this.capitalize(
+                  order.status || 'pending'
+                )
+              )}
+            </td>
+
+            <td>
+              ${this.fileCount(order)}
+            </td>
+          </tr>
+        `
+      }).join('')
+
+      printWindow.document.write(`
+        <!doctype html>
+        <html>
+          <head>
+            <meta charset="UTF-8">
+
+            <title>
+              Prosix Selected Place Orders
+            </title>
+
+            <style>
+              @page {
+                size: A4 landscape;
+                margin: 9mm;
+              }
+
+              * {
+                box-sizing: border-box;
+              }
+
+              body {
+                margin: 0;
+                font-family: Arial, sans-serif;
+                color: #111;
+                background: white;
+                -webkit-print-color-adjust: exact;
+                print-color-adjust: exact;
+              }
+
+              header {
+                padding: 14px 18px;
+                background: #050505;
+                color: white;
+                display: flex;
+                align-items: center;
+                justify-content: space-between;
+              }
+
+              header strong {
+                font-size: 18px;
+                letter-spacing: .08em;
+              }
+
+              header span {
+                color: #ccc;
+                font-size: 10px;
+              }
+
+              table {
+                width: 100%;
+                margin-top: 12px;
+                border-collapse: collapse;
+              }
+
+              th,
+              td {
+                padding: 9px;
+                border: 1px solid #ddd;
+                text-align: left;
+                vertical-align: middle;
+                font-size: 10px;
+              }
+
+              th {
+                background: #202328;
+                color: white;
+                font-size: 9px;
+                text-transform: uppercase;
+              }
+
+              td small {
+                display: block;
+                margin-top: 3px;
+                color: #777;
+              }
+
+              .p-thumb,
+              .p-empty {
+                width: 58px;
+                height: 48px;
+                border-radius: 6px;
+                background: #f3f4f6;
+              }
+
+              .p-thumb {
+                object-fit: contain;
+              }
+
+              .p-empty {
+                color: #999;
+                font-size: 7px;
+                display: grid;
+                place-items: center;
+              }
+            </style>
+          </head>
+
+          <body>
+            <header>
+              <strong>PROSIX SPORTS</strong>
+
+              <span>
+                ${orders.length}
+                Selected Place Orders
+              </span>
+            </header>
+
+            <table>
+              <thead>
+                <tr>
+                  <th>Thumbnail</th>
+                  <th>Customer / Order</th>
+                  <th>Email</th>
+                  <th>Order #</th>
+                  <th>Status</th>
+                  <th>Files</th>
+                </tr>
+              </thead>
+
+              <tbody>
+                ${rows}
+              </tbody>
+            </table>
+          </body>
+        </html>
+      `)
+
+      printWindow.document.close()
+
+      this.waitForImages(
+        printWindow,
+        1800
+      ).then(() => {
+        printWindow.focus()
+
+        setTimeout(() => {
+          printWindow.print()
+        }, 100)
+      })
     },
 
     orderDisplayName(order) {
@@ -837,7 +1139,7 @@ export default {
               .hero-info small { color:#888; font-size:6px; font-weight:800; text-transform:uppercase; }
               .hero-info h1 { margin:5px 0; font-size:19px; }
               .hero-info p { margin:0; color:#666; font-size:8px; }
-              .details-grid { margin-top:12px; display:grid; grid-template-columns:repeat(7,minmax(0,1fr)); gap:7px; }
+              .details-grid { margin-top:12px; display:grid; grid-template-columns:repeat(6,minmax(0,1fr)); gap:7px; }
               .field span,.team-colors span { display:block; margin-bottom:4px; color:#888; font-size:6px; font-weight:800; text-transform:uppercase; }
               .field strong,.team-colors strong { min-height:29px; padding:7px; border:1px solid #d8d8d8; border-radius:5px; background:#f8f8f8; display:flex; align-items:center; overflow-wrap:anywhere; font-size:8px; }
               .team-colors { margin-top:10px; }
@@ -871,7 +1173,6 @@ export default {
               <div class="details-grid">
                 <div class="field"><span>Full Name</span><strong>${this.escapeHtml(order.full_name || '—')}</strong></div>
                 <div class="field"><span>Email</span><strong>${this.escapeHtml(order.email || '—')}</strong></div>
-                <div class="field"><span>Phone</span><strong>${this.escapeHtml(order.phone || '—')}</strong></div>
                 <div class="field"><span>Order Place Date</span><strong>${this.escapeHtml(this.dateValue(order.order_date))}</strong></div>
                 <div class="field"><span>Delivery Date</span><strong>${this.escapeHtml(this.dateValue(order.delivery_date))}</strong></div>
                 <div class="field"><span>Sales Rep</span><strong>${this.escapeHtml(order.sales_rep || '—')}</strong></div>
