@@ -79,7 +79,7 @@
                     </span>
 
                     <span class="nav-text">
-                        Home
+                        Dashboard
                     </span>
                 </router-link>
 

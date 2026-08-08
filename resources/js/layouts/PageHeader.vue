@@ -1,10 +1,7 @@
 <template>
   <header class="page-header">
-    <!-- LEFT -->
-    <div class="page-header__content">
-      <div class="page-header__eyebrow">
-        PROSIX WORK MANAGEMENT
-      </div>
+    <div class="page-header__copy">
+      <span class="page-header__eyebrow">{{ eyebrow }}</span>
 
       <div class="page-header__title-row">
         <div class="page-header__mark">
@@ -13,20 +10,16 @@
 
         <div class="page-header__titles">
           <h1>{{ title }}</h1>
-
-          <p v-if="subtitle">
-            {{ subtitle }}
-          </p>
+          <p v-if="subtitle">{{ subtitle }}</p>
         </div>
       </div>
     </div>
 
-    <!-- RIGHT PROFILE -->
     <button
       type="button"
       class="page-header__profile"
       title="Open profile"
-      @click="$emit('profile')"
+      @click="goToProfile"
     >
       <span class="page-header__avatar">
         <img
@@ -35,7 +28,7 @@
           alt="Profile"
         />
 
-        <span v-else class="avatar-fallback">
+        <span v-else>
           {{ initial || fallbackInitial }}
         </span>
 
@@ -58,17 +51,20 @@
 export default {
   name: 'PageHeader',
 
-  emits: ['profile'],
-
   props: {
+    eyebrow: {
+      type: String,
+      default: 'WORK MANAGEMENT'
+    },
+
     title: {
       type: String,
-      default: 'Factory Order Management'
+      default: 'Workspace'
     },
 
     subtitle: {
       type: String,
-      default: 'Track production, manage orders and keep your workflow organized.'
+      default: ''
     },
 
     user: {
@@ -87,400 +83,255 @@ export default {
     }
   },
 
+  methods: {
+    goToProfile() {
+      if (this.$route?.path === '/profile') return
+
+      this.$router.push('/profile')
+    }
+  },
+
   computed: {
     fallbackInitial() {
-      return (
-        this.user?.name?.trim()?.charAt(0)?.toUpperCase() || 'U'
-      )
+      return String(this.user?.name || 'U')
+        .trim()
+        .charAt(0)
+        .toUpperCase()
     },
 
     roleLabel() {
-      const role = this.user?.role || ''
+      const role = String(this.user?.role || 'User')
+        .replace(/_/g, ' ')
+        .trim()
 
-      const roles = {
-        super_admin: 'Super Admin',
-        admin: 'Admin',
-        member: 'Member',
-        client: 'Client'
-      }
-
-      return roles[role] || 'User'
+      return role.replace(/\b\w/g, char => char.toUpperCase())
     }
   }
 }
 </script>
 
 <style scoped>
-/* ==========================================
-   PAGE HEADER
-========================================== */
-
 .page-header {
   width: 100%;
-  height: 165px;
+  min-height: 104px;
+  padding: 20px 28px;
 
   display: flex;
   align-items: center;
   justify-content: space-between;
+  gap: 24px;
 
-  gap: 25px;
-
-  padding: 18px 28px;
-
-  background: #f4f5f8;
-
-
-  box-shadow: none;
-
-  font-family: inherit;
+  background: #ffffff;
+  border: 1px solid #e2e5eb;
+  border-radius: 14px;
+  box-shadow: 0 4px 18px rgba(15, 23, 42, .045);
 }
 
-
-/* ==========================================
-   LEFT CONTENT
-========================================== */
-
-.page-header__content {
+.page-header__copy {
   min-width: 0;
-
-  display: flex;
-  flex-direction: column;
-
-  justify-content: center;
 }
-
-
-/* small top heading */
 
 .page-header__eyebrow {
+  display: block;
   margin-bottom: 8px;
 
-  color: #8a94a6;
-
-  font-size: 11px;
-  line-height: 1;
-
-  font-weight: 900;
-
-  letter-spacing: 2px;
-
+  color: #8a919d;
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: .16em;
   text-transform: uppercase;
 }
-
-
-/* title row */
 
 .page-header__title-row {
   display: flex;
   align-items: center;
-
   gap: 13px;
-
-  min-width: 0;
 }
-
-
-/* black icon */
 
 .page-header__mark {
   width: 42px;
   height: 42px;
-
   flex: 0 0 42px;
 
-  display: flex;
-  align-items: center;
-  justify-content: center;
+  display: grid;
+  place-items: center;
 
-  border-radius: 10px;
-
-  background: #0d1729;
-
+  background: #111827;
   color: #ffffff;
-
-  font-size: 16px;
+  border-radius: 10px;
+  font-size: 15px;
 }
-
-
-/* title content */
 
 .page-header__titles {
   min-width: 0;
 }
 
-
 .page-header__titles h1 {
   margin: 0;
-
-  color: #0c1528;
-
-  font-size: 24px;
+  color: #111827;
+  font-size: 22px;
   line-height: 1.15;
-
-  font-weight: 900;
-
-  letter-spacing: -0.4px;
+  font-weight: 800;
+  letter-spacing: -.025em;
 }
-
 
 .page-header__titles p {
   margin: 5px 0 0;
-
-  color: #778196;
-
-  font-size: 12px;
-  line-height: 1.3;
-
-  font-weight: 500;
+  color: #7a8491;
+  font-size: 11px;
+  line-height: 1.45;
 }
-
-
-/* ==========================================
-   PROFILE CARD
-========================================== */
 
 .page-header__profile {
-  width: 220px;
-  height: 60px;
+  min-width: 220px;
+  max-width: 280px;
+  height: 58px;
+  padding: 6px 10px 6px 7px;
 
-  flex: 0 0 220px;
-
-  display: flex;
+  display: grid;
+  grid-template-columns: 44px minmax(0, 1fr) 28px;
   align-items: center;
-
   gap: 10px;
 
-  padding: 7px 12px;
-
-  border: 1px solid #d8dde6;
-
-  border-radius: 13px;
-
-  background: #f4f5f8;
-
-  color: #0b1426;
-
-  cursor: pointer;
+  background: #f8f9fb;
+  border: 1px solid #e1e5ea;
+  border-radius: 12px;
 
   text-align: left;
-
+  cursor: pointer;
   transition:
-    border-color 0.18s ease,
-    background 0.18s ease;
+    background .16s ease,
+    border-color .16s ease,
+    box-shadow .16s ease,
+    transform .16s ease;
 }
-
 
 .page-header__profile:hover {
-  border-color: #aeb7c5;
   background: #ffffff;
+  border-color: #cbd2db;
+  box-shadow: 0 8px 22px rgba(15, 23, 42, .08);
+  transform: translateY(-1px);
 }
-
-
-/* ==========================================
-   AVATAR
-========================================== */
 
 .page-header__avatar {
   position: relative;
-
   width: 44px;
   height: 44px;
 
-  flex: 0 0 44px;
-
-  display: flex;
-  align-items: center;
-  justify-content: center;
-
-  border-radius: 50%;
-
-  background: #e7eaf0;
+  display: grid;
+  place-items: center;
 
   overflow: visible;
-}
+  border-radius: 50%;
+  background: #111827;
+  color: #ffffff;
 
+  font-size: 13px;
+  font-weight: 800;
+}
 
 .page-header__avatar img {
   width: 44px;
   height: 44px;
-
   display: block;
 
-  border-radius: 50%;
-
   object-fit: cover;
-
-  border: 1px solid #d6dae2;
-}
-
-
-.avatar-fallback {
-  width: 44px;
-  height: 44px;
-
-  display: flex;
-  align-items: center;
-  justify-content: center;
-
+  object-position: center;
   border-radius: 50%;
-
-  background: #111827;
-
-  color: #ffffff;
-
-  font-size: 15px;
-
-  font-weight: 900;
+  border: 2px solid #ffffff;
+  box-shadow: 0 0 0 1px #d8dde5;
 }
-
-
-/* online */
 
 .page-header__online-dot {
   position: absolute;
+  right: 0;
+  bottom: 1px;
 
-  right: -1px;
-  bottom: 2px;
-
-  width: 9px;
-  height: 9px;
-
-  border: 2px solid #f4f5f8;
-
-  border-radius: 50%;
+  width: 10px;
+  height: 10px;
 
   background: #22c55e;
+  border: 2px solid #ffffff;
+  border-radius: 50%;
 }
-
-
-/* ==========================================
-   USER TEXT
-========================================== */
 
 .page-header__user-copy {
   min-width: 0;
-
-  flex: 1;
-
-  display: flex;
-  flex-direction: column;
-
-  gap: 3px;
-}
-
-
-.page-header__user-copy strong {
   display: block;
-
-  overflow: hidden;
-
-  color: #0b1426;
-
-  font-size: 13px;
-
-  font-weight: 900;
-
-  white-space: nowrap;
-  text-overflow: ellipsis;
 }
 
-
+.page-header__user-copy strong,
 .page-header__user-copy small {
   display: block;
-
   overflow: hidden;
-
-  color: #7a8496;
-
-  font-size: 10px;
-
-  font-weight: 500;
-
   white-space: nowrap;
   text-overflow: ellipsis;
 }
 
+.page-header__user-copy strong {
+  color: #111827;
+  font-size: 12px;
+  font-weight: 800;
+}
 
-/* arrow */
+.page-header__user-copy small {
+  margin-top: 3px;
+  color: #8a919d;
+  font-size: 9px;
+  font-weight: 600;
+}
 
 .page-header__profile-action {
-  width: 22px;
-  height: 22px;
+  width: 28px;
+  height: 28px;
 
-  flex: 0 0 22px;
+  display: grid;
+  place-items: center;
 
-  display: flex;
-  align-items: center;
-  justify-content: center;
-
-  color: #647084;
-
-  font-size: 10px;
+  color: #667085;
+  border-radius: 8px;
 }
 
+.page-header__profile-action i {
+  font-size: 9px;
+}
 
-/* ==========================================
-   TABLET
-========================================== */
+/* Dark mode when parent page uses .theme-dark */
+:global(.theme-dark) .page-header {
+  background: #111827;
+  border-color: #2f3b4d;
+}
 
-@media (max-width: 900px) {
+:global(.theme-dark) .page-header__mark {
+  background: #ffffff;
+  color: #111827;
+}
 
+:global(.theme-dark) .page-header__titles h1,
+:global(.theme-dark) .page-header__user-copy strong {
+  color: #ffffff;
+}
+
+:global(.theme-dark) .page-header__eyebrow,
+:global(.theme-dark) .page-header__titles p,
+:global(.theme-dark) .page-header__user-copy small,
+:global(.theme-dark) .page-header__profile-action {
+  color: #aeb8c7;
+}
+
+:global(.theme-dark) .page-header__profile {
+  background: #182132;
+  border-color: #334155;
+}
+
+@media (max-width: 780px) {
   .page-header {
-    height: 95px;
-
-    padding: 15px 18px;
-  }
-
-  .page-header__eyebrow {
-    font-size: 9px;
+    padding: 16px;
+    min-height: auto;
   }
 
   .page-header__titles h1 {
-    font-size: 20px;
-  }
-
-  .page-header__titles p {
-    font-size: 11px;
-  }
-
-  .page-header__profile {
-    width: 190px;
-    flex-basis: 190px;
-  }
-}
-
-
-/* ==========================================
-   MOBILE
-========================================== */
-
-@media (max-width: 650px) {
-
-  .page-header {
-    height: auto;
-
-    min-height: 90px;
-
-    padding: 14px;
-
-    gap: 12px;
-
-    border-radius: 10px;
-  }
-
-  .page-header__eyebrow {
-    display: none;
-  }
-
-  .page-header__mark {
-    width: 38px;
-    height: 38px;
-
-    flex-basis: 38px;
-  }
-
-  .page-header__titles h1 {
-    font-size: 17px;
+    font-size: 18px;
   }
 
   .page-header__titles p {
@@ -488,18 +339,10 @@ export default {
   }
 
   .page-header__profile {
-    width: 52px;
-    height: 52px;
-
-    flex: 0 0 52px;
-
-    padding: 4px;
-
-    justify-content: center;
-
-    border: none;
-
-    background: transparent;
+    min-width: 54px;
+    width: 54px;
+    grid-template-columns: 44px;
+    padding: 5px;
   }
 
   .page-header__user-copy,
