@@ -3690,4 +3690,268 @@ export default {
   }
 }
 
+
+
+/* =========================================================
+   FIX: MANAGE STATUSES MUST OPEN AS A CENTER MODAL
+   ========================================================= */
+.status-manager-overlay {
+  position: fixed !important;
+  inset: 0 !important;
+  z-index: 99999 !important;
+  width: 100vw !important;
+  height: 100vh !important;
+  padding: 24px !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  overflow-y: auto !important;
+  background: rgba(15, 23, 42, 0.62) !important;
+  backdrop-filter: blur(3px);
+}
+
+.status-manager-modal {
+  width: min(760px, calc(100vw - 48px)) !important;
+  max-height: calc(100vh - 48px) !important;
+  overflow: hidden !important;
+  border: 1px solid #e4e7ec !important;
+  border-radius: 16px !important;
+  background: #fff !important;
+  box-shadow: 0 30px 80px rgba(15, 23, 42, .30) !important;
+}
+
+.status-manager-head {
+  padding: 18px 20px !important;
+  display: flex !important;
+  align-items: flex-start !important;
+  justify-content: space-between !important;
+  gap: 18px !important;
+  background: #111827 !important;
+  color: #fff !important;
+}
+
+.status-manager-head > div {
+  min-width: 0;
+}
+
+.status-manager-head span {
+  display: block !important;
+  margin-bottom: 4px !important;
+  color: #98a2b3 !important;
+  font-size: 9px !important;
+  font-weight: 900 !important;
+  letter-spacing: .11em !important;
+}
+
+.status-manager-head h2 {
+  margin: 0 !important;
+  color: #fff !important;
+  font-size: 20px !important;
+  font-weight: 850 !important;
+}
+
+.status-manager-head p {
+  margin: 5px 0 0 !important;
+  color: #c5cbd5 !important;
+  font-size: 10px !important;
+}
+
+.status-manager-head > button {
+  width: 36px !important;
+  height: 36px !important;
+  flex: 0 0 36px !important;
+  border: 0 !important;
+  border-radius: 9px !important;
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  background: rgba(255,255,255,.08) !important;
+  color: #fff !important;
+  cursor: pointer !important;
+}
+
+.status-manager-body {
+  max-height: calc(100vh - 145px) !important;
+  padding: 14px !important;
+  overflow-y: auto !important;
+  background: #f7f8fa !important;
+}
+
+.new-status-row {
+  padding: 10px !important;
+  border: 1px solid #e4e7ec !important;
+  border-radius: 11px !important;
+  display: grid !important;
+  grid-template-columns: minmax(0,1fr) 52px 110px !important;
+  align-items: end !important;
+  gap: 8px !important;
+  background: #fff !important;
+}
+
+.status-form-field {
+  min-width: 0 !important;
+}
+
+.status-form-field label,
+.status-edit-name label,
+.status-edit-color label,
+.status-definition-preview label {
+  display: block !important;
+  margin-bottom: 5px !important;
+  color: #667085 !important;
+  font-size: 9px !important;
+  font-weight: 800 !important;
+}
+
+.status-form-field input[type="text"],
+.status-edit-name input {
+  width: 100% !important;
+  height: 38px !important;
+  padding: 0 10px !important;
+  border: 1px solid #d0d5dd !important;
+  border-radius: 8px !important;
+  outline: 0 !important;
+  background: #fff !important;
+  color: #101828 !important;
+  font-size: 11px !important;
+}
+
+.status-form-field.color-field {
+  max-width: none !important;
+}
+
+.status-form-field input[type="color"],
+.status-edit-color input[type="color"] {
+  width: 42px !important;
+  height: 38px !important;
+  padding: 2px !important;
+  border: 1px solid #d0d5dd !important;
+  border-radius: 8px !important;
+  background: #fff !important;
+  cursor: pointer !important;
+}
+
+.create-status-btn {
+  height: 38px !important;
+  padding: 0 13px !important;
+  border: 0 !important;
+  border-radius: 8px !important;
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  gap: 6px !important;
+  background: #111827 !important;
+  color: #fff !important;
+  cursor: pointer !important;
+  font-size: 10px !important;
+  font-weight: 850 !important;
+}
+
+.status-definition-list {
+  margin-top: 10px !important;
+  display: flex !important;
+  flex-direction: column !important;
+  gap: 7px !important;
+}
+
+.status-definition-row {
+  padding: 9px !important;
+  border: 1px solid #e4e7ec !important;
+  border-radius: 10px !important;
+  display: grid !important;
+  grid-template-columns: 7px minmax(170px,1fr) 52px 145px 90px !important;
+  align-items: end !important;
+  gap: 8px !important;
+  background: #fff !important;
+}
+
+.status-color-preview {
+  width: 7px !important;
+  height: 38px !important;
+  align-self: center !important;
+  border-radius: 999px !important;
+}
+
+.status-edit-name small {
+  display: block !important;
+  margin-top: 3px !important;
+  color: #98a2b3 !important;
+  font-size: 8px !important;
+}
+
+.status-definition-preview > span {
+  min-height: 34px !important;
+  padding: 0 9px !important;
+  border: 1px solid transparent !important;
+  border-radius: 8px !important;
+  display: inline-flex !important;
+  align-items: center !important;
+  gap: 6px !important;
+  font-size: 9px !important;
+  font-weight: 800 !important;
+}
+
+.status-definition-preview i {
+  width: 7px !important;
+  height: 7px !important;
+  border-radius: 50% !important;
+}
+
+.status-definition-actions {
+  display: flex !important;
+  align-items: center !important;
+  gap: 5px !important;
+}
+
+.status-save-btn,
+.status-delete-btn {
+  height: 34px !important;
+  border: 0 !important;
+  border-radius: 8px !important;
+  cursor: pointer !important;
+  font-size: 9px !important;
+  font-weight: 850 !important;
+}
+
+.status-save-btn {
+  padding: 0 11px !important;
+  background: #111827 !important;
+  color: #fff !important;
+}
+
+.status-delete-btn {
+  width: 34px !important;
+  background: #fee4e2 !important;
+  color: #b42318 !important;
+}
+
+@media (max-width: 760px) {
+  .status-manager-overlay {
+    padding: 12px !important;
+    align-items: flex-start !important;
+  }
+
+  .status-manager-modal {
+    width: calc(100vw - 24px) !important;
+    max-height: calc(100vh - 24px) !important;
+  }
+
+  .new-status-row {
+    grid-template-columns: 1fr 52px !important;
+  }
+
+  .create-status-btn {
+    grid-column: 1 / -1 !important;
+  }
+
+  .status-definition-row {
+    grid-template-columns: 7px 1fr 52px !important;
+  }
+
+  .status-definition-preview,
+  .status-definition-actions {
+    grid-column: 2 / -1 !important;
+  }
+}
+
 </style>
