@@ -162,161 +162,71 @@
               </td>
 
               <td class="status-cell">
-                <div class="status-control">
-                  <button
-                    type="button"
-                    class="status-trigger"
-                    :style="statusPillStyle(order.status)"
+                <div class="status-select-shell">
+                  <span
+                    class="status-select-dot"
+                    :style="{ backgroundColor: statusColor(order.status) }"
+                  ></span>
+
+                  <select
+                    class="status-select-pro"
+                    :value="normalizeStatus(order.status)"
                     :disabled="!canEditStatus || savingOrderId === order.id"
-                    @click.stop="toggleStatusMenu(order)"
+                    :style="statusSelectStyle(order.status)"
+                    @change="changeOrderStatus(order, $event.target.value)"
                   >
-                    <span
-                      class="status-trigger-dot"
-                      :style="{ backgroundColor: statusColor(order.status) }"
-                    ></span>
-
-                    <span class="status-trigger-label">
-                      {{ statusLabel(order.status || 'pending') }}
-                    </span>
-
-                    <i
-                      v-if="canEditStatus"
-                      class="fa-solid fa-chevron-down"
-                    ></i>
-                  </button>
-
-                  <div
-                    v-if="order._statusMenu && canEditStatus"
-                    class="status-menu"
-                    @click.stop
-                  >
-                    <div class="status-menu-title">
-                      Change Status
-                    </div>
-
-                    <button
+                    <option
                       v-for="status in statusDefinitions"
                       :key="status.id || status.value"
-                      type="button"
-                      class="status-option"
-                      :class="{
-                        selected:
-                          normalizeStatus(order.status) === status.value
-                      }"
-                      @click="changeOrderStatus(order, status.value)"
+                      :value="status.value"
                     >
-                      <span
-                        class="option-dot"
-                        :style="{ backgroundColor: status.color }"
-                      ></span>
+                      {{ status.name }}
+                    </option>
+                  </select>
 
-                      <span>{{ status.name }}</span>
-
-                      <i
-                        v-if="normalizeStatus(order.status) === status.value"
-                        class="fa-solid fa-check"
-                      ></i>
-                    </button>
-
-                    <div class="custom-divider"></div>
-
-                    <button
-                      type="button"
-                      class="custom-status-toggle"
-                      @click="order._customOpen = !order._customOpen"
-                    >
-                      <i class="fa-solid fa-pen"></i>
-                      Custom Status
-                    </button>
-
-                    <div
-                      v-if="order._customOpen"
-                      class="custom-status-box"
-                    >
-                      <input
-                        v-model="order._customStatus"
-                        type="text"
-                        placeholder="e.g. Printing, Hold, Packing"
-                        @keyup.enter="saveInlineCustomStatus(order)"
-                      />
-
-                      <input
-                        v-model="order._customColor"
-                        type="color"
-                        class="custom-status-color"
-                        title="Status color"
-                      />
-
-                      <button
-                        type="button"
-                        :disabled="
-                          savingOrderId === order.id ||
-                          !String(order._customStatus || '').trim()
-                        "
-                        @click="saveInlineCustomStatus(order)"
-                      >
-                        Save
-                      </button>
-                    </div>
-
-                    <button
-                      type="button"
-                      class="manage-status-link"
-                      @click="openStatusManager(order)"
-                    >
-                      <i class="fa-solid fa-sliders"></i>
-                      Manage Saved Statuses
-                    </button>
-                  </div>
-
-                  <small
-                    v-if="savingOrderId === order.id"
-                    class="saving-text"
+                  <button
+                    v-if="canEditStatus"
+                    type="button"
+                    class="manage-status-mini"
+                    title="Add / Edit statuses"
+                    @click.stop="openStatusManager(order)"
                   >
-                    Saving...
-                  </small>
+                    <i class="fa-solid fa-pen"></i>
+                  </button>
                 </div>
+
+                <small
+                  v-if="savingOrderId === order.id"
+                  class="saving-text"
+                >
+                  Saving...
+                </small>
               </td>
 
               <td class="remark-cell">
-                <div
-                  v-if="canEditRemark"
-                  class="remark-editor"
-                >
-                  <div class="remark-input-wrap">
-                    <i class="fa-regular fa-note-sticky"></i>
+                <div v-if="canEditRemark" class="remark-field-pro">
+                  <i class="fa-regular fa-note-sticky"></i>
 
-                    <input
-                      v-model="order._remark"
-                      type="text"
-                      class="remark-input"
-                      placeholder="Write internal remark..."
-                      :disabled="savingOrderId === order.id"
-                      @input="queueRemarkSave(order)"
-                      @blur="saveRemark(order)"
-                      @keyup.enter="$event.target.blur()"
-                    />
-                  </div>
+                  <input
+                    v-model="order._remark"
+                    type="text"
+                    placeholder="Write internal remark..."
+                    :disabled="savingOrderId === order.id"
+                    @input="queueRemarkSave(order)"
+                    @blur="saveRemark(order)"
+                    @keyup.enter="$event.target.blur()"
+                  />
 
                   <span
-                    class="remark-save-state"
-                    :class="{ saved: order._remarkSaved }"
+                    v-if="order._remarkSaved"
+                    class="remark-check"
+                    title="Saved"
                   >
-                    {{
-                      savingOrderId === order.id
-                        ? 'Saving...'
-                        : order._remarkSaved
-                          ? 'Saved'
-                          : ''
-                    }}
+                    <i class="fa-solid fa-check"></i>
                   </span>
                 </div>
 
-                <div
-                  v-else
-                  class="remark-readonly-box"
-                  :title="order.remark || ''"
-                >
+                <div v-else class="remark-readonly-pro">
                   <i class="fa-regular fa-note-sticky"></i>
                   <span>{{ order.remark || 'No remark' }}</span>
                 </div>
@@ -506,56 +416,37 @@
             <div class="placeorder-control">
               <label>Status</label>
 
-              <div class="po-status-wrap modal-status-wrap" @click.stop>
-                <button
-                  type="button"
-                  class="po-status-trigger modal-status-trigger"
-                  :style="statusPillStyle(selectedOrder.status)"
+              <div class="modal-status-select-shell">
+                <span
+                  class="status-select-dot"
+                  :style="{ backgroundColor: statusColor(selectedOrder.status) }"
+                ></span>
+
+                <select
+                  class="status-select-pro modal-status-select"
+                  :value="normalizeStatus(selectedOrder.status)"
                   :disabled="!canEditStatus || savingOrderId === selectedOrder.id"
-                  @click="toggleStatusMenu(selectedOrder)"
+                  :style="statusSelectStyle(selectedOrder.status)"
+                  @change="changeOrderStatus(selectedOrder, $event.target.value)"
                 >
-                  <span
-                    class="po-status-dot"
-                    :style="{ backgroundColor: statusColor(selectedOrder.status) }"
-                  ></span>
-
-                  <span>{{ statusLabel(selectedOrder.status) }}</span>
-
-                  <i
-                    v-if="canEditStatus"
-                    class="fa-solid fa-chevron-down"
-                  ></i>
-                </button>
-
-                <div
-                  v-if="selectedOrder._statusMenu && canEditStatus"
-                  class="po-status-menu modal-po-status-menu"
-                >
-                  <button
+                  <option
                     v-for="status in statusDefinitions"
                     :key="status.id || status.value"
-                    type="button"
-                    class="po-status-menu-item"
-                    @click="changeOrderStatus(selectedOrder, status.value)"
+                    :value="status.value"
                   >
-                    <span
-                      class="po-status-dot"
-                      :style="{ backgroundColor: status.color }"
-                    ></span>
-                    <span>{{ status.name }}</span>
-                  </button>
+                    {{ status.name }}
+                  </option>
+                </select>
 
-                  <div class="po-status-divider"></div>
-
-                  <button
-                    type="button"
-                    class="po-custom-status-open"
-                    @click="openStatusManager(selectedOrder)"
-                  >
-                    <i class="fa-solid fa-plus"></i>
-                    Add / Edit Custom Status
-                  </button>
-                </div>
+                <button
+                  v-if="canEditStatus"
+                  type="button"
+                  class="manage-status-mini modal-manage-status"
+                  @click="openStatusManager(selectedOrder)"
+                >
+                  <i class="fa-solid fa-pen"></i>
+                  Manage
+                </button>
               </div>
             </div>
 
@@ -844,7 +735,7 @@
       </section>
     </div>
 
-</div>
+    </div>
   </AppLayout>
 </template>
 
@@ -1119,6 +1010,16 @@ export default {
         color,
         borderColor: this.hexToRgba(color, 0.28),
         backgroundColor: this.hexToRgba(color, 0.12)
+      }
+    },
+
+    statusSelectStyle(value) {
+      const color = this.statusColor(value)
+
+      return {
+        color,
+        borderColor: this.hexToRgba(color, 0.35),
+        backgroundColor: this.hexToRgba(color, 0.08)
       }
     },
 
@@ -3581,4 +3482,212 @@ export default {
     grid-template-columns: 1fr 1fr;
   }
 }
+
+
+/* =========================================================
+   FINAL ROBUST STATUS + REMARK CONTROLS
+   ========================================================= */
+.status-cell {
+  min-width: 240px !important;
+}
+
+.status-select-shell,
+.modal-status-select-shell {
+  width: 220px;
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.status-select-dot {
+  width: 9px;
+  height: 9px;
+  position: absolute;
+  left: 12px;
+  z-index: 2;
+  flex: 0 0 9px;
+  border-radius: 50%;
+  pointer-events: none;
+}
+
+.status-select-pro {
+  width: 178px;
+  height: 42px;
+  padding: 0 34px 0 31px;
+  border: 1px solid #d0d5dd;
+  border-radius: 10px;
+  outline: none;
+  appearance: auto;
+  background-color: #fff;
+  color: #101828;
+  cursor: pointer;
+  font-family: inherit;
+  font-size: 12px;
+  font-weight: 800;
+  line-height: 42px;
+  transition: border-color .18s ease, box-shadow .18s ease;
+}
+
+.status-select-pro:hover:not(:disabled) {
+  border-color: #98a2b3;
+}
+
+.status-select-pro:focus {
+  border-color: #344054;
+  box-shadow: 0 0 0 3px rgba(52, 64, 84, .08);
+}
+
+.status-select-pro:disabled {
+  cursor: default;
+  opacity: .75;
+}
+
+.status-select-pro option {
+  background: #fff;
+  color: #101828;
+  font-weight: 600;
+}
+
+.manage-status-mini {
+  width: 38px;
+  height: 38px;
+  flex: 0 0 38px;
+  border: 1px solid #d0d5dd;
+  border-radius: 9px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: #fff;
+  color: #344054;
+  cursor: pointer;
+  font-size: 11px;
+  transition: .18s ease;
+}
+
+.manage-status-mini:hover {
+  border-color: #111827;
+  background: #111827;
+  color: #fff;
+}
+
+.saving-text {
+  display: block;
+  margin-top: 4px;
+  color: #98a2b3;
+  font-size: 9px;
+}
+
+.remark-cell {
+  min-width: 330px !important;
+}
+
+.remark-field-pro,
+.remark-readonly-pro {
+  width: 310px;
+  height: 42px;
+  padding: 0 11px;
+  border: 1px solid #d0d5dd;
+  border-radius: 10px;
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  background: #fff;
+  color: #344054;
+  transition: border-color .18s ease, box-shadow .18s ease;
+}
+
+.remark-field-pro:focus-within {
+  border-color: #344054;
+  box-shadow: 0 0 0 3px rgba(52, 64, 84, .08);
+}
+
+.remark-field-pro > i,
+.remark-readonly-pro > i {
+  flex: 0 0 auto;
+  color: #98a2b3;
+  font-size: 13px;
+}
+
+.remark-field-pro input {
+  width: 100%;
+  min-width: 0;
+  height: 38px;
+  padding: 0;
+  border: 0 !important;
+  outline: 0 !important;
+  background: transparent !important;
+  color: #101828;
+  font-family: inherit;
+  font-size: 12px;
+  font-weight: 500;
+}
+
+.remark-field-pro input::placeholder {
+  color: #98a2b3;
+}
+
+.remark-check {
+  width: 22px;
+  height: 22px;
+  flex: 0 0 22px;
+  border-radius: 50%;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: #ecfdf3;
+  color: #079455;
+  font-size: 9px;
+}
+
+.remark-readonly-pro {
+  overflow: hidden;
+  background: #f9fafb;
+  color: #667085;
+}
+
+.remark-readonly-pro span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.modal-status-select-shell {
+  width: 100%;
+}
+
+.modal-status-select {
+  width: 220px;
+}
+
+.modal-manage-status {
+  width: auto;
+  padding: 0 12px;
+  gap: 7px;
+  flex-basis: auto;
+  font-weight: 800;
+}
+
+.placeorder-controls-card .modal-remark-wrap input {
+  width: 100%;
+  height: 42px !important;
+  padding: 0 12px !important;
+  border: 1px solid #d0d5dd !important;
+  border-radius: 10px !important;
+  background: #fff !important;
+  color: #101828 !important;
+  font-size: 12px !important;
+}
+
+@media (max-width: 900px) {
+  .remark-cell {
+    min-width: 280px !important;
+  }
+
+  .remark-field-pro,
+  .remark-readonly-pro {
+    width: 260px;
+  }
+}
+
 </style>
