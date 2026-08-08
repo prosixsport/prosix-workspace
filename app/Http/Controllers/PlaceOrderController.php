@@ -4,182 +4,314 @@ namespace App\Http\Controllers;
 
 use Illuminate\Http\Client\ConnectionException;
 use Illuminate\Http\JsonResponse;
+use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
 
 class PlaceOrderController extends Controller
 {
-    /**
-     * Prosix.com se tamam Place Orders hasil karo.
-     */
-    public function index(): JsonResponse
+    public function index(Request $request): JsonResponse
     {
         try {
-            $response = $this->prosixRequest()
+            $response = $this->prosixRequest($request)
                 ->get('/api/crm/place-orders');
 
             if ($response->failed()) {
                 Log::error('Prosix Place Orders fetch failed', [
                     'status' => $response->status(),
-                    'body'   => $response->body(),
+                    'body' => $response->body(),
                 ]);
 
                 return response()->json([
                     'success' => false,
                     'message' => 'Place Orders load nahi ho sake.',
-                    'data'    => [],
+                    'data' => [],
                 ], $this->safeStatus($response->status()));
             }
 
-            $responseData = $response->json();
+            $data = $response->json();
 
             return response()->json([
                 'success' => true,
-                'data'    => $responseData['data']
-                    ?? $responseData
-                    ?? [],
+                'data' => $data['data'] ?? $data ?? [],
             ]);
         } catch (ConnectionException $exception) {
-            Log::error('Prosix Place Orders connection error', [
-                'message' => $exception->getMessage(),
-            ]);
-
             return response()->json([
                 'success' => false,
-                'message' => 'Prosix.com ke sath connection nahi ho saka.',
-                'data'    => [],
+                'message' => 'Prosix.com connection nahi ho saka.',
+                'data' => [],
             ], 503);
         } catch (\Throwable $exception) {
-            Log::error('Place Orders controller error', [
+            Log::error('CRM Place Orders fetch error', [
                 'message' => $exception->getMessage(),
             ]);
 
             return response()->json([
                 'success' => false,
                 'message' => 'Place Orders load karte waqt error aa gaya.',
-                'data'    => [],
+                'data' => [],
             ], 500);
         }
     }
 
-    /**
-     * Current CRM member ka unread count.
-     */
-    public function unreadCount(): JsonResponse
+    public function unreadCount(Request $request): JsonResponse
     {
         try {
-            $response = $this->prosixRequest()
+            $response = $this->prosixRequest($request)
                 ->get('/api/crm/place-orders/unread-count');
 
-            if ($response->failed()) {
-                Log::error('Place Orders unread count failed', [
-                    'status' => $response->status(),
-                    'body'   => $response->body(),
-                ]);
-
-                return response()->json([
-                    'count' => 0,
-                ]);
-            }
-
             return response()->json([
-                'count' => (int) (
-                    $response->json('count') ?? 0
-                ),
+                'count' => $response->successful()
+                    ? (int) ($response->json('count') ?? 0)
+                    : 0,
             ]);
         } catch (\Throwable $exception) {
-            Log::error('Place Orders unread count error', [
+            return response()->json(['count' => 0]);
+        }
+    }
+
+    public function markRead(Request $request, int $id): JsonResponse
+    {
+        try {
+            $response = $this->prosixRequest($request)
+                ->post("/api/crm/place-orders/{$id}/mark-read");
+
+            return response()->json(
+                $response->json(),
+                $this->safeStatus($response->status())
+            );
+        } catch (\Throwable $exception) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Place Order read mark nahi hua.',
+            ], 500);
+        }
+    }
+
+    public function update(Request $request, int $id): JsonResponse
+    {
+        $user = $request->user();
+        $role = strtolower((string) ($user?->role ?? ''));
+
+        $canEditStatus = in_array(
+            $role,
+            ['super_admin', 'admin', 'member', 'designer'],
+            true
+        );
+
+        $canEditRemark = in_array(
+            $role,
+            ['super_admin', 'admin'],
+            true
+        );
+
+        $validated = $request->validate([
+            'status' => 'sometimes|required|string|max:100',
+            'remark' => 'sometimes|nullable|string|max:5000',
+        ]);
+
+        if (array_key_exists('status', $validated) && !$canEditStatus) {
+            return response()->json([
+                'success' => false,
+                'message' => 'You do not have permission to change status.',
+            ], 403);
+        }
+
+        if (array_key_exists('remark', $validated) && !$canEditRemark) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Only admin can edit remarks.',
+            ], 403);
+        }
+
+        if (!$validated) {
+            return response()->json([
+                'success' => false,
+                'message' => 'No update data received.',
+            ], 422);
+        }
+
+        try {
+            $response = $this->prosixRequest($request)
+                ->put(
+                    "/api/crm/place-orders/{$id}",
+                    $validated
+                );
+
+            return response()->json(
+                $response->json(),
+                $this->safeStatus($response->status())
+            );
+        } catch (ConnectionException $exception) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Prosix.com connection nahi ho saka.',
+            ], 503);
+        } catch (\Throwable $exception) {
+            Log::error('CRM Place Order update error', [
+                'order_id' => $id,
                 'message' => $exception->getMessage(),
             ]);
 
             return response()->json([
-                'count' => 0,
-            ]);
-        }
-    }
-
-    /**
-     * Current CRM member ke liye exact order read mark karo.
-     */
-    public function markRead(int $id): JsonResponse
-    {
-        try {
-            $response = $this->prosixRequest()
-                ->post(
-                    "/api/crm/place-orders/{$id}/mark-read"
-                );
-
-            if ($response->failed()) {
-                Log::error('Place Order mark-read failed', [
-                    'order_id' => $id,
-                    'status'   => $response->status(),
-                    'body'     => $response->body(),
-                ]);
-
-                return response()->json([
-                    'success' => false,
-                    'message' => 'Place Order read mark nahi hua.',
-                ], $this->safeStatus($response->status()));
-            }
-
-            return response()->json([
-                'success' => true,
-                'message' => 'Place Order read mark ho gaya.',
-            ]);
-        } catch (\Throwable $exception) {
-            Log::error('Place Order mark-read error', [
-                'order_id' => $id,
-                'message'  => $exception->getMessage(),
-            ]);
-
-            return response()->json([
                 'success' => false,
-                'message' => 'Place Order read mark karte waqt error aa gaya.',
+                'message' => 'Place Order update failed.',
             ], 500);
         }
     }
 
-    /**
-     * Prosix API request client.
-     *
-     * Har request ke sath current CRM member ki identity jati hai.
-     */
-    private function prosixRequest()
+    public function statuses(Request $request): JsonResponse
     {
-        $user = auth()->user();
+        try {
+            $response = $this->prosixRequest($request)
+                ->get('/api/crm/place-orders/statuses');
+
+            return response()->json(
+                $response->json(),
+                $this->safeStatus($response->status())
+            );
+        } catch (\Throwable $exception) {
+            return response()->json([
+                'success' => false,
+                'data' => [],
+            ], 500);
+        }
+    }
+
+    public function storeStatus(Request $request): JsonResponse
+    {
+        $this->ensureStatusPermission($request);
+
+        $validated = $request->validate([
+            'name' => 'required|string|max:100',
+            'color' => [
+                'required',
+                'regex:/^#[0-9A-Fa-f]{6}$/',
+            ],
+        ]);
+
+        return $this->forwardStatusWrite(
+            $request,
+            'post',
+            '/api/crm/place-orders/statuses',
+            $validated
+        );
+    }
+
+    public function updateStatusDefinition(
+        Request $request,
+        int $id
+    ): JsonResponse {
+        $this->ensureStatusPermission($request);
+
+        $validated = $request->validate([
+            'name' => 'required|string|max:100',
+            'color' => [
+                'required',
+                'regex:/^#[0-9A-Fa-f]{6}$/',
+            ],
+        ]);
+
+        return $this->forwardStatusWrite(
+            $request,
+            'put',
+            "/api/crm/place-orders/statuses/{$id}",
+            $validated
+        );
+    }
+
+    public function destroyStatus(
+        Request $request,
+        int $id
+    ): JsonResponse {
+        $this->ensureStatusPermission($request);
+
+        try {
+            $response = $this->prosixRequest($request)
+                ->delete(
+                    "/api/crm/place-orders/statuses/{$id}"
+                );
+
+            return response()->json(
+                $response->json(),
+                $this->safeStatus($response->status())
+            );
+        } catch (\Throwable $exception) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Status delete failed.',
+            ], 500);
+        }
+    }
+
+    private function ensureStatusPermission(Request $request): void
+    {
+        $role = strtolower(
+            (string) ($request->user()?->role ?? '')
+        );
+
+        abort_unless(
+            in_array(
+                $role,
+                ['super_admin', 'admin', 'member', 'designer'],
+                true
+            ),
+            403,
+            'You do not have permission to manage statuses.'
+        );
+    }
+
+    private function forwardStatusWrite(
+        Request $request,
+        string $method,
+        string $uri,
+        array $payload
+    ): JsonResponse {
+        try {
+            $client = $this->prosixRequest($request);
+
+            $response = $method === 'post'
+                ? $client->post($uri, $payload)
+                : $client->put($uri, $payload);
+
+            return response()->json(
+                $response->json(),
+                $this->safeStatus($response->status())
+            );
+        } catch (\Throwable $exception) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Status save failed.',
+            ], 500);
+        }
+    }
+
+    private function prosixRequest(Request $request)
+    {
+        $user = $request->user();
 
         return Http::baseUrl(
-            rtrim(
-                (string) config('services.prosix.url'),
-                '/'
-            )
+            rtrim(config('services.prosix.url'), '/')
         )
-            ->withToken(
-                (string) config(
-                    'services.prosix.crm_token'
-                )
-            )
+            ->withToken(config('services.prosix.crm_token'))
             ->withHeaders([
                 'X-CRM-User-ID' =>
-                    (string) $user->id,
-
+                    (string) ($user?->id ?? ''),
                 'X-CRM-User-Name' =>
-                    (string) $user->name,
-
+                    (string) ($user?->name ?? ''),
                 'X-CRM-User-Email' =>
-                    (string) $user->email,
+                    (string) ($user?->email ?? ''),
+                'X-CRM-User-Role' =>
+                    (string) ($user?->role ?? ''),
             ])
             ->acceptJson()
             ->timeout(30)
             ->retry(2, 500);
     }
 
-    /**
-     * Invalid upstream status ko safe response status mein convert karo.
-     */
     private function safeStatus(int $status): int
     {
-        return $status >= 400 && $status <= 599
+        return $status >= 200 && $status <= 599
             ? $status
             : 500;
     }

@@ -35,7 +35,7 @@
     <section class="filters-bar">
       <div class="tabs">
         <button
-          v-for="tab in tabs"
+          v-for="tab in dynamicStatusTabs"
           :key="tab.key"
           type="button"
           :class="{ active: activeStatus === tab.key }"
@@ -91,6 +91,7 @@
               <th>Email</th>
               <th>Order #</th>
               <th>Status</th>
+              <th>Remark</th>
               <th>Files</th>
               <th>Action</th>
             </tr>
@@ -159,16 +160,93 @@
                 </strong>
               </td>
 
-              <td>
+              <td class="status-cell">
+                <div class="po-status-wrap" @click.stop>
+                  <button
+                    type="button"
+                    class="po-status-trigger"
+                    :style="statusPillStyle(order.status)"
+                    :disabled="!canEditStatus || savingOrderId === order.id"
+                    @click="toggleStatusMenu(order)"
+                  >
+                    <span
+                      class="po-status-dot"
+                      :style="{ backgroundColor: statusColor(order.status) }"
+                    ></span>
+
+                    <span>{{ statusLabel(order.status) }}</span>
+
+                    <i
+                      v-if="canEditStatus"
+                      class="fa-solid fa-chevron-down"
+                    ></i>
+                  </button>
+
+                  <div
+                    v-if="order._statusMenu && canEditStatus"
+                    class="po-status-menu"
+                  >
+                    <button
+                      v-for="status in statusDefinitions"
+                      :key="status.id || status.value"
+                      type="button"
+                      class="po-status-menu-item"
+                      @click="changeOrderStatus(order, status.value)"
+                    >
+                      <span
+                        class="po-status-dot"
+                        :style="{ backgroundColor: status.color }"
+                      ></span>
+
+                      <span>{{ status.name }}</span>
+
+                      <i
+                        v-if="normalizeStatus(order.status) === status.value"
+                        class="fa-solid fa-check"
+                      ></i>
+                    </button>
+
+                    <div class="po-status-divider"></div>
+
+                    <button
+                      type="button"
+                      class="po-custom-status-open"
+                      @click="openStatusManager(order)"
+                    >
+                      <i class="fa-solid fa-plus"></i>
+                      Add / Edit Custom Status
+                    </button>
+                  </div>
+                </div>
+              </td>
+
+              <td class="remark-cell">
+                <div v-if="canEditRemark" class="remark-line-wrap">
+                  <input
+                    v-model="order._remark"
+                    type="text"
+                    class="remark-line-input"
+                    placeholder="Write remark..."
+                    :disabled="savingOrderId === order.id"
+                    @input="queueRemarkSave(order)"
+                    @blur="saveRemark(order)"
+                    @keyup.enter="$event.target.blur()"
+                  />
+
+                  <small
+                    v-if="order._remarkSaved"
+                    class="remark-saved"
+                  >
+                    Saved
+                  </small>
+                </div>
+
                 <span
-                  class="status-pill"
-                  :class="statusClass(order.status)"
+                  v-else
+                  class="remark-readonly"
+                  :title="order.remark || ''"
                 >
-                  {{
-                    capitalize(
-                      order.status || 'pending'
-                    )
-                  }}
+                  {{ order.remark || '—' }}
                 </span>
               </td>
 
@@ -229,13 +307,9 @@
           <div class="view-header-actions">
             <span
               class="header-status"
-              :class="statusClass(selectedOrder.status)"
+              :style="statusPillStyle(selectedOrder.status)"
             >
-              {{
-                capitalize(
-                  selectedOrder.status || 'pending'
-                )
-              }}
+              {{ statusLabel(selectedOrder.status) }}
             </span>
 
             <button
@@ -354,6 +428,92 @@
             <strong>
               {{ selectedOrder.team_colors || '—' }}
             </strong>
+          </section>
+
+          <section class="placeorder-controls-card">
+            <div class="placeorder-control">
+              <label>Status</label>
+
+              <div class="po-status-wrap modal-status-wrap" @click.stop>
+                <button
+                  type="button"
+                  class="po-status-trigger modal-status-trigger"
+                  :style="statusPillStyle(selectedOrder.status)"
+                  :disabled="!canEditStatus || savingOrderId === selectedOrder.id"
+                  @click="toggleStatusMenu(selectedOrder)"
+                >
+                  <span
+                    class="po-status-dot"
+                    :style="{ backgroundColor: statusColor(selectedOrder.status) }"
+                  ></span>
+
+                  <span>{{ statusLabel(selectedOrder.status) }}</span>
+
+                  <i
+                    v-if="canEditStatus"
+                    class="fa-solid fa-chevron-down"
+                  ></i>
+                </button>
+
+                <div
+                  v-if="selectedOrder._statusMenu && canEditStatus"
+                  class="po-status-menu modal-po-status-menu"
+                >
+                  <button
+                    v-for="status in statusDefinitions"
+                    :key="status.id || status.value"
+                    type="button"
+                    class="po-status-menu-item"
+                    @click="changeOrderStatus(selectedOrder, status.value)"
+                  >
+                    <span
+                      class="po-status-dot"
+                      :style="{ backgroundColor: status.color }"
+                    ></span>
+                    <span>{{ status.name }}</span>
+                  </button>
+
+                  <div class="po-status-divider"></div>
+
+                  <button
+                    type="button"
+                    class="po-custom-status-open"
+                    @click="openStatusManager(selectedOrder)"
+                  >
+                    <i class="fa-solid fa-plus"></i>
+                    Add / Edit Custom Status
+                  </button>
+                </div>
+              </div>
+            </div>
+
+            <div class="placeorder-control remark-control">
+              <label>Remark</label>
+
+              <div v-if="canEditRemark" class="modal-remark-wrap">
+                <input
+                  v-model="selectedOrder._remark"
+                  type="text"
+                  placeholder="Write internal remark..."
+                  :disabled="savingOrderId === selectedOrder.id"
+                  @input="queueRemarkSave(selectedOrder)"
+                  @blur="saveRemark(selectedOrder)"
+                  @keyup.enter="$event.target.blur()"
+                />
+
+                <small>
+                  {{
+                    selectedOrder._remarkSaved
+                      ? 'Saved'
+                      : 'Auto-save'
+                  }}
+                </small>
+              </div>
+
+              <div v-else class="modal-remark-readonly">
+                {{ selectedOrder.remark || 'No remark added.' }}
+              </div>
+            </div>
           </section>
 
           <div class="section-divider"></div>
@@ -498,7 +658,121 @@
         </div>
       </section>
     </div>
-  </div>
+
+    <!-- STATUS MANAGER -->
+    <div
+      v-if="statusManagerOpen"
+      class="status-manager-overlay"
+      @click.self="closeStatusManager"
+    >
+      <section class="status-manager-modal">
+        <header class="status-manager-head">
+          <div>
+            <span>PLACE ORDER SETTINGS</span>
+            <h2>Manage Statuses</h2>
+            <p>
+              Add a custom status, edit its name or change its color.
+            </p>
+          </div>
+
+          <button type="button" @click="closeStatusManager">
+            <i class="fa-solid fa-xmark"></i>
+          </button>
+        </header>
+
+        <div class="status-manager-body">
+          <div class="new-status-row">
+            <div class="status-form-field">
+              <label>New Status</label>
+              <input
+                v-model="newStatusName"
+                type="text"
+                placeholder="e.g. Artwork Pending"
+                @keyup.enter="createStatusDefinition"
+              />
+            </div>
+
+            <div class="status-form-field color-field">
+              <label>Color</label>
+              <input
+                v-model="newStatusColor"
+                type="color"
+              />
+            </div>
+
+            <button
+              type="button"
+              class="create-status-btn"
+              :disabled="!String(newStatusName || '').trim()"
+              @click="createStatusDefinition"
+            >
+              <i class="fa-solid fa-plus"></i>
+              Add
+            </button>
+          </div>
+
+          <div class="status-definition-list">
+            <article
+              v-for="status in statusDefinitions"
+              :key="status.id || status.value"
+              class="status-definition-row"
+            >
+              <span
+                class="status-color-preview"
+                :style="{ backgroundColor: status.color }"
+              ></span>
+
+              <div class="status-edit-name">
+                <label>Name</label>
+                <input
+                  v-model="status.name"
+                  type="text"
+                  :disabled="!status.custom"
+                />
+                <small>{{ status.value }}</small>
+              </div>
+
+              <div class="status-edit-color">
+                <label>Color</label>
+                <input
+                  v-model="status.color"
+                  type="color"
+                />
+              </div>
+
+              <div class="status-definition-preview">
+                <label>Preview</label>
+                <span :style="statusPillStyleFromDefinition(status)">
+                  <i :style="{ backgroundColor: status.color }"></i>
+                  {{ status.name }}
+                </span>
+              </div>
+
+              <div class="status-definition-actions">
+                <button
+                  type="button"
+                  class="status-save-btn"
+                  @click="saveStatusDefinition(status)"
+                >
+                  Save
+                </button>
+
+                <button
+                  v-if="status.custom"
+                  type="button"
+                  class="status-delete-btn"
+                  @click="deleteStatusDefinition(status)"
+                >
+                  <i class="fa-solid fa-trash"></i>
+                </button>
+              </div>
+            </article>
+          </div>
+        </div>
+      </section>
+    </div>
+
+</div>
 </template>
 
 <script>
@@ -515,6 +789,14 @@ export default {
       selectedIds: [],
       search: '',
       activeStatus: 'all',
+      statusDefinitions: [],
+      statusManagerOpen: false,
+      statusManagerTargetOrder: null,
+      newStatusName: '',
+      newStatusColor: '#7c3aed',
+      savingOrderId: null,
+      remarkTimers: {},
+      syncTimer: null,
       prosixBaseUrl: import.meta.env.VITE_PROSIX_URL || 'https://prosix.com',
       tabs: [
         { key: 'all', label: 'All' },
@@ -527,6 +809,26 @@ export default {
   },
 
   computed: {
+    currentUser() {
+      try {
+        return JSON.parse(localStorage.getItem('user')) || {}
+      } catch {
+        return {}
+      }
+    },
+
+    userRole() {
+      return String(this.currentUser?.role || '').toLowerCase()
+    },
+
+    canEditRemark() {
+      return ['super_admin', 'admin'].includes(this.userRole)
+    },
+
+    canEditStatus() {
+      return ['super_admin', 'admin', 'member', 'designer'].includes(this.userRole)
+    },
+
     allVisibleSelected() {
       return (
         this.filteredOrders.length > 0 &&
@@ -558,6 +860,33 @@ export default {
       return this.orders.filter(order => !order.is_read).length
     },
 
+    dynamicStatusTabs() {
+      const tabs = [
+        { key: 'all', label: 'All' },
+        ...this.statusDefinitions.map(status => ({
+          key: status.value,
+          label: status.name
+        }))
+      ]
+
+      const known = new Set(tabs.map(tab => tab.key))
+
+      this.orders.forEach(order => {
+        const value = this.normalizeStatus(order.status)
+
+        if (value && !known.has(value)) {
+          tabs.push({
+            key: value,
+            label: this.capitalize(order.status)
+          })
+
+          known.add(value)
+        }
+      })
+
+      return tabs
+    },
+
     fileGroups() {
       return [
         {
@@ -586,7 +915,31 @@ export default {
   },
 
   async mounted() {
-    await this.fetchOrders()
+    document.addEventListener('click', this.closeStatusMenus)
+
+    await Promise.all([
+      this.fetchStatusDefinitions(),
+      this.fetchOrders()
+    ])
+
+    this.syncTimer = window.setInterval(() => {
+      this.fetchOrders(true)
+      this.fetchStatusDefinitions(true)
+    }, 5000)
+  },
+
+  beforeUnmount() {
+    document.removeEventListener('click', this.closeStatusMenus)
+
+    if (this.syncTimer) {
+      window.clearInterval(this.syncTimer)
+    }
+
+    Object.values(this.remarkTimers).forEach(timer => {
+      window.clearTimeout(timer)
+    })
+
+    document.body.style.overflow = ''
   },
 
   methods: {
@@ -597,8 +950,337 @@ export default {
       }
     },
 
-    async fetchOrders() {
-      this.loading = true
+    prepareOrder(order) {
+      return {
+        ...order,
+        _remark: order?.remark ?? '',
+        _remarkSaved: false,
+        _statusMenu: false
+      }
+    },
+
+    normalizeStatus(value) {
+      return String(value || 'pending')
+        .trim()
+        .toLowerCase()
+        .replace(/\s+/g, '-')
+    },
+
+    async fetchStatusDefinitions(silent = false) {
+      try {
+        const response = await axios.get(
+          '/api/place-orders/statuses',
+          { headers: this.headers() }
+        )
+
+        const data = response.data?.data ?? []
+
+        if (Array.isArray(data)) {
+          this.statusDefinitions = data.map(status => ({
+            ...status,
+            value: String(status.value || '').toLowerCase(),
+            name: status.name || this.capitalize(status.value),
+            color: status.color || '#667085',
+            custom: Boolean(status.custom)
+          }))
+        }
+      } catch (error) {
+        if (!silent) {
+          console.error(
+            'Place order statuses fetch error:',
+            error
+          )
+        }
+      }
+    },
+
+    statusDefinition(value) {
+      const normalized = this.normalizeStatus(value)
+
+      return this.statusDefinitions.find(
+        status => status.value === normalized
+      ) || null
+    },
+
+    statusLabel(value) {
+      return (
+        this.statusDefinition(value)?.name ||
+        this.capitalize(value || 'pending')
+      )
+    },
+
+    statusColor(value) {
+      return (
+        this.statusDefinition(value)?.color ||
+        '#667085'
+      )
+    },
+
+    hexToRgba(hex, alpha = 0.12) {
+      let clean = String(hex || '#667085').replace('#', '')
+
+      if (clean.length === 3) {
+        clean = clean.split('').map(char => char + char).join('')
+      }
+
+      const num = parseInt(clean.slice(0, 6), 16)
+      const r = (num >> 16) & 255
+      const g = (num >> 8) & 255
+      const b = num & 255
+
+      return `rgba(${r}, ${g}, ${b}, ${alpha})`
+    },
+
+    statusPillStyle(value) {
+      const color = this.statusColor(value)
+
+      return {
+        color,
+        borderColor: this.hexToRgba(color, 0.28),
+        backgroundColor: this.hexToRgba(color, 0.12)
+      }
+    },
+
+    statusPillStyleFromDefinition(status) {
+      const color = status?.color || '#667085'
+
+      return {
+        color,
+        borderColor: this.hexToRgba(color, 0.28),
+        backgroundColor: this.hexToRgba(color, 0.12)
+      }
+    },
+
+    toggleStatusMenu(order) {
+      if (!this.canEditStatus) return
+
+      const next = !order._statusMenu
+
+      this.orders.forEach(item => {
+        item._statusMenu = false
+      })
+
+      if (this.selectedOrder && this.selectedOrder !== order) {
+        this.selectedOrder._statusMenu = false
+      }
+
+      order._statusMenu = next
+    },
+
+    closeStatusMenus() {
+      this.orders.forEach(order => {
+        order._statusMenu = false
+      })
+
+      if (this.selectedOrder) {
+        this.selectedOrder._statusMenu = false
+      }
+    },
+
+    async changeOrderStatus(order, value) {
+      if (!this.canEditStatus || !order?.id) return
+
+      this.savingOrderId = Number(order.id)
+
+      try {
+        const response = await axios.put(
+          `/api/place-orders/${order.id}`,
+          { status: value },
+          { headers: this.headers() }
+        )
+
+        const updated = response.data?.data || {}
+
+        order.status = updated.status ?? value
+        order.remark = updated.remark ?? order.remark
+        order._remark = order.remark ?? ''
+        order._statusMenu = false
+
+        await this.fetchStatusDefinitions(true)
+      } catch (error) {
+        console.error('Place order status update error:', error)
+        alert(
+          error?.response?.data?.message ||
+          'Status update failed.'
+        )
+      } finally {
+        this.savingOrderId = null
+      }
+    },
+
+    queueRemarkSave(order) {
+      if (!this.canEditRemark) return
+
+      const id = Number(order.id)
+      order._remarkSaved = false
+
+      if (this.remarkTimers[id]) {
+        clearTimeout(this.remarkTimers[id])
+      }
+
+      this.remarkTimers[id] = setTimeout(() => {
+        this.saveRemark(order)
+      }, 800)
+    },
+
+    async saveRemark(order) {
+      if (!this.canEditRemark || !order?.id) return
+
+      const id = Number(order.id)
+
+      if (this.remarkTimers[id]) {
+        clearTimeout(this.remarkTimers[id])
+        delete this.remarkTimers[id]
+      }
+
+      const value = String(order._remark ?? '')
+
+      if (value === String(order.remark ?? '')) {
+        return
+      }
+
+      this.savingOrderId = id
+
+      try {
+        const response = await axios.put(
+          `/api/place-orders/${order.id}`,
+          { remark: value },
+          { headers: this.headers() }
+        )
+
+        const updated = response.data?.data || {}
+
+        order.remark = updated.remark ?? value
+        order._remark = order.remark
+        order._remarkSaved = true
+
+        setTimeout(() => {
+          order._remarkSaved = false
+        }, 1400)
+      } catch (error) {
+        order._remark = order.remark ?? ''
+
+        console.error('Place order remark update error:', error)
+
+        alert(
+          error?.response?.data?.message ||
+          'Remark update failed.'
+        )
+      } finally {
+        this.savingOrderId = null
+      }
+    },
+
+    openStatusManager(order = null) {
+      if (!this.canEditStatus) return
+
+      this.statusManagerTargetOrder = order || null
+
+      if (order) {
+        order._statusMenu = false
+      }
+
+      this.statusManagerOpen = true
+    },
+
+    closeStatusManager() {
+      this.statusManagerOpen = false
+      this.statusManagerTargetOrder = null
+      this.newStatusName = ''
+      this.newStatusColor = '#7c3aed'
+    },
+
+    async createStatusDefinition() {
+      if (!this.canEditStatus) return
+
+      const name = String(this.newStatusName || '').trim()
+
+      if (!name) return
+
+      try {
+        const response = await axios.post(
+          '/api/place-orders/statuses',
+          {
+            name,
+            color: this.newStatusColor
+          },
+          { headers: this.headers() }
+        )
+
+        const created = response.data?.data
+
+        await this.fetchStatusDefinitions(true)
+
+        this.newStatusName = ''
+        this.newStatusColor = '#7c3aed'
+
+        if (
+          created?.value &&
+          this.statusManagerTargetOrder
+        ) {
+          await this.changeOrderStatus(
+            this.statusManagerTargetOrder,
+            created.value
+          )
+        }
+      } catch (error) {
+        alert(
+          error?.response?.data?.message ||
+          'Could not create status.'
+        )
+      }
+    },
+
+    async saveStatusDefinition(status) {
+      if (!this.canEditStatus || !status?.id) return
+
+      try {
+        await axios.put(
+          `/api/place-orders/statuses/${status.id}`,
+          {
+            name: status.name,
+            color: status.color
+          },
+          { headers: this.headers() }
+        )
+
+        await this.fetchStatusDefinitions(true)
+      } catch (error) {
+        alert(
+          error?.response?.data?.message ||
+          'Could not update status.'
+        )
+      }
+    },
+
+    async deleteStatusDefinition(status) {
+      if (!this.canEditStatus || !status?.id || !status.custom) {
+        return
+      }
+
+      if (!window.confirm(`Delete "${status.name}" from the status list?`)) {
+        return
+      }
+
+      try {
+        await axios.delete(
+          `/api/place-orders/statuses/${status.id}`,
+          { headers: this.headers() }
+        )
+
+        await this.fetchStatusDefinitions(true)
+      } catch (error) {
+        alert(
+          error?.response?.data?.message ||
+          'Could not delete status.'
+        )
+      }
+    },
+
+    async fetchOrders(silent = false) {
+      if (!silent) {
+        this.loading = true
+      }
 
       try {
         const response = await axios.get('/api/place-orders', {
@@ -606,18 +1288,51 @@ export default {
         })
 
         const data = response.data?.data ?? response.data ?? []
-        this.orders = Array.isArray(data) ? data : []
+        const incoming = Array.isArray(data) ? data : []
 
-        this.selectedOrder = null
+        const currentById = new Map(
+          this.orders.map(order => [Number(order.id), order])
+        )
+
+        this.orders = incoming.map(raw => {
+          const existing = currentById.get(Number(raw.id))
+          const prepared = this.prepareOrder(raw)
+
+          if (existing) {
+            prepared._statusMenu = existing._statusMenu || false
+          }
+
+          return prepared
+        })
+
+        if (this.selectedOrder) {
+          const refreshed = this.orders.find(
+            order => Number(order.id) === Number(this.selectedOrder.id)
+          )
+
+          if (refreshed) {
+            this.selectedOrder = refreshed
+          }
+        }
       } catch (error) {
         console.error('Place orders fetch error:', error)
         this.orders = []
       } finally {
-        this.loading = false
+        if (!silent) {
+          this.loading = false
+        }
       }
     },
 
     async selectOrder(order) {
+      if (typeof order._remark === 'undefined') {
+        order._remark = order.remark ?? ''
+      }
+
+      if (typeof order._statusMenu === 'undefined') {
+        order._statusMenu = false
+      }
+
       this.selectedOrder = order
       document.body.style.overflow = 'hidden'
 
@@ -893,7 +1608,452 @@ export default {
                 display: grid;
                 place-items: center;
               }
-            </style>
+
+/* =========================================================
+   PLACE ORDERS — STATUS / REMARK SYNC
+   ========================================================= */
+.status-cell {
+  min-width: 165px;
+  position: relative;
+}
+
+.remark-cell {
+  min-width: 190px;
+}
+
+.po-status-wrap {
+  width: 155px;
+  position: relative;
+}
+
+.po-status-trigger {
+  width: 155px;
+  height: 38px;
+  padding: 0 11px;
+  border: 1px solid transparent;
+  border-radius: 10px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  background: #f3f4f6;
+  cursor: pointer;
+  font-size: 12px;
+  font-weight: 800;
+}
+
+.po-status-trigger:disabled {
+  cursor: default;
+}
+
+.po-status-trigger > span:nth-child(2) {
+  min-width: 0;
+  flex: 1;
+  overflow: hidden;
+  text-align: left;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.po-status-trigger i {
+  font-size: 9px;
+}
+
+.po-status-dot {
+  width: 8px;
+  height: 8px;
+  flex-shrink: 0;
+  border-radius: 50%;
+}
+
+.po-status-menu {
+  width: 245px;
+  padding: 7px;
+  position: absolute;
+  top: calc(100% + 6px);
+  left: 0;
+  z-index: 1200;
+  border: 1px solid #e1e5ea;
+  border-radius: 12px;
+  background: #fff;
+  box-shadow: 0 18px 42px rgba(15, 23, 42, .16);
+}
+
+.po-status-menu-item,
+.po-custom-status-open {
+  width: 100%;
+  min-height: 38px;
+  padding: 0 9px;
+  border: 0;
+  border-radius: 8px;
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  background: transparent;
+  color: #344054;
+  cursor: pointer;
+  font-size: 11px;
+  font-weight: 700;
+}
+
+.po-status-menu-item:hover,
+.po-custom-status-open:hover {
+  background: #f7f8fa;
+}
+
+.po-status-menu-item i {
+  margin-left: auto;
+  font-size: 9px;
+}
+
+.po-status-divider {
+  height: 1px;
+  margin: 6px 3px;
+  background: #eceff3;
+}
+
+.po-custom-status-open {
+  color: #111827;
+  font-weight: 850;
+}
+
+.remark-line-wrap {
+  width: 180px;
+  position: relative;
+  padding-bottom: 11px;
+}
+
+.remark-line-input {
+  width: 100%;
+  height: 36px;
+  padding: 0 3px;
+  border: 0;
+  border-bottom: 1px solid #cfd5dd;
+  outline: 0;
+  background: transparent;
+  color: #101828;
+  font-size: 12px;
+}
+
+.remark-line-input:focus {
+  border-bottom-color: #111827;
+}
+
+.remark-saved {
+  position: absolute;
+  right: 0;
+  bottom: -1px;
+  color: #15956b;
+  font-size: 8px;
+  font-weight: 700;
+}
+
+.remark-readonly {
+  display: block;
+  max-width: 180px;
+  overflow: hidden;
+  color: #667085;
+  font-size: 11px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.placeorder-controls-card {
+  margin-top: 14px;
+  padding: 15px;
+  border: 1px solid #e4e7ec;
+  border-radius: 12px;
+  display: grid;
+  grid-template-columns: 220px minmax(0, 1fr);
+  gap: 18px;
+  background: #f9fafb;
+}
+
+.placeorder-control > label {
+  display: block;
+  margin-bottom: 7px;
+  color: #667085;
+  font-size: 10px;
+  font-weight: 850;
+  text-transform: uppercase;
+}
+
+.modal-status-wrap,
+.modal-status-trigger {
+  width: 100%;
+}
+
+.modal-po-status-menu {
+  width: 260px;
+}
+
+.modal-remark-wrap {
+  position: relative;
+  padding-bottom: 12px;
+}
+
+.modal-remark-wrap input {
+  width: 100%;
+  height: 38px;
+  padding: 0 4px;
+  border: 0;
+  border-bottom: 1px solid #cfd5dd;
+  outline: 0;
+  background: transparent;
+  color: #101828;
+  font-size: 12px;
+}
+
+.modal-remark-wrap small {
+  position: absolute;
+  right: 0;
+  bottom: 0;
+  color: #98a2b3;
+  font-size: 8px;
+}
+
+.modal-remark-readonly {
+  min-height: 38px;
+  padding: 10px 11px;
+  border: 1px solid #e4e7ec;
+  border-radius: 9px;
+  background: #fff;
+  color: #475467;
+  font-size: 11px;
+}
+
+/* Status manager */
+.status-manager-overlay {
+  padding: 28px;
+  position: fixed;
+  inset: 0;
+  z-index: 5000;
+  overflow-y: auto;
+  display: flex;
+  align-items: flex-start;
+  justify-content: center;
+  background: rgba(15, 23, 42, .56);
+  backdrop-filter: blur(3px);
+}
+
+.status-manager-modal {
+  width: min(900px, 100%);
+  overflow: hidden;
+  border-radius: 18px;
+  background: #fff;
+  box-shadow: 0 28px 70px rgba(15, 23, 42, .24);
+}
+
+.status-manager-head {
+  padding: 20px 22px;
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 20px;
+  background: #111827;
+  color: #fff;
+}
+
+.status-manager-head span {
+  color: #98a2b3;
+  font-size: 9px;
+  font-weight: 900;
+  letter-spacing: .12em;
+}
+
+.status-manager-head h2 {
+  margin: 4px 0 0;
+  font-size: 20px;
+}
+
+.status-manager-head p {
+  margin: 6px 0 0;
+  color: #c5cbd5;
+  font-size: 11px;
+}
+
+.status-manager-head > button {
+  width: 38px;
+  height: 38px;
+  border: 0;
+  border-radius: 10px;
+  background: #242b39;
+  color: #fff;
+  cursor: pointer;
+}
+
+.status-manager-body {
+  padding: 18px;
+  background: #f7f8fa;
+}
+
+.new-status-row {
+  padding: 14px;
+  border: 1px solid #e4e7ec;
+  border-radius: 12px;
+  display: flex;
+  align-items: flex-end;
+  gap: 10px;
+  background: #fff;
+}
+
+.status-form-field {
+  min-width: 0;
+  flex: 1;
+}
+
+.status-form-field.color-field {
+  max-width: 100px;
+}
+
+.status-form-field label,
+.status-edit-name label,
+.status-edit-color label,
+.status-definition-preview label {
+  display: block;
+  margin-bottom: 5px;
+  color: #667085;
+  font-size: 9px;
+  font-weight: 850;
+}
+
+.status-form-field input[type="text"],
+.status-edit-name input {
+  width: 100%;
+  height: 39px;
+  padding: 0 10px;
+  border: 1px solid #d0d5dd;
+  border-radius: 9px;
+  outline: 0;
+  font-size: 12px;
+}
+
+.status-form-field input[type="color"],
+.status-edit-color input {
+  width: 52px;
+  height: 39px;
+  border: 0;
+  background: transparent;
+  cursor: pointer;
+}
+
+.create-status-btn {
+  height: 39px;
+  padding: 0 14px;
+  border: 0;
+  border-radius: 9px;
+  background: #111827;
+  color: #fff;
+  cursor: pointer;
+  font-size: 11px;
+  font-weight: 850;
+}
+
+.create-status-btn:disabled {
+  opacity: .45;
+}
+
+.status-definition-list {
+  margin-top: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.status-definition-row {
+  padding: 11px;
+  border: 1px solid #e4e7ec;
+  border-radius: 11px;
+  display: grid;
+  grid-template-columns: 10px minmax(180px, 1fr) 70px 160px 95px;
+  align-items: end;
+  gap: 10px;
+  background: #fff;
+}
+
+.status-color-preview {
+  width: 9px;
+  height: 42px;
+  align-self: center;
+  border-radius: 999px;
+}
+
+.status-edit-name small {
+  display: block;
+  margin-top: 3px;
+  color: #98a2b3;
+  font-size: 8px;
+}
+
+.status-definition-preview > span {
+  min-height: 36px;
+  padding: 0 9px;
+  border: 1px solid transparent;
+  border-radius: 9px;
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  font-size: 10px;
+  font-weight: 800;
+}
+
+.status-definition-preview i {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+}
+
+.status-definition-actions {
+  display: flex;
+  gap: 5px;
+}
+
+.status-save-btn,
+.status-delete-btn {
+  height: 36px;
+  border: 0;
+  border-radius: 8px;
+  cursor: pointer;
+  font-size: 9px;
+  font-weight: 850;
+}
+
+.status-save-btn {
+  padding: 0 11px;
+  background: #111827;
+  color: #fff;
+}
+
+.status-delete-btn {
+  width: 36px;
+  background: #fee4e2;
+  color: #b42318;
+}
+
+@media (max-width: 760px) {
+  .placeorder-controls-card {
+    grid-template-columns: 1fr;
+  }
+
+  .new-status-row {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .status-form-field.color-field {
+    max-width: none;
+  }
+
+  .status-definition-row {
+    grid-template-columns: 10px 1fr 70px;
+  }
+
+  .status-definition-preview,
+  .status-definition-actions {
+    grid-column: 2 / -1;
+  }
+}
+
+</style>
           </head>
 
           <body>

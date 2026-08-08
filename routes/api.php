@@ -101,20 +101,20 @@ Route::middleware('auth:sanctum')->group(function () {
     |--------------------------------------------------------------------------
     */
 
-    Route::get('/place-orders', [
-        PlaceOrderController::class,
-        'index'
-    ]);
+  Route::middleware('auth:sanctum')
+    ->prefix('place-orders')
+    ->group(function () {
+        Route::get('/', [PlaceOrderController::class, 'index']);
+        Route::get('/unread-count', [PlaceOrderController::class, 'unreadCount']);
 
-    Route::get('/place-orders/unread-count', [
-        PlaceOrderController::class,
-        'unreadCount'
-    ]);
+        Route::get('/statuses', [PlaceOrderController::class, 'statuses']);
+        Route::post('/statuses', [PlaceOrderController::class, 'storeStatus']);
+        Route::put('/statuses/{id}', [PlaceOrderController::class, 'updateStatusDefinition']);
+        Route::delete('/statuses/{id}', [PlaceOrderController::class, 'destroyStatus']);
 
-    Route::post('/place-orders/{id}/mark-read', [
-        PlaceOrderController::class,
-        'markRead'
-    ]);
+        Route::post('/{id}/mark-read', [PlaceOrderController::class, 'markRead']);
+        Route::put('/{id}', [PlaceOrderController::class, 'update']);
+    });
 
     /*
     |--------------------------------------------------------------------------
