@@ -525,25 +525,6 @@
                 <strong>{{ order.name }}</strong>
                 <small>{{ order.po || 'N/A' }}</small>
 
-                <span
-                  v-if="workingDesigner(order)"
-                  class="working-designer-pill"
-                  :title="workingDesigner(order).name + ' is working on this order'"
-                >
-                  <span class="working-live-dot"></span>
-
-                  <img
-                    v-if="workingDesigner(order).profile_photo_url"
-                    :src="workingDesigner(order).profile_photo_url"
-                    alt=""
-                  />
-
-                  <strong>
-                    {{ workingDesigner(order).name }}
-                  </strong>
-
-                  <small>working</small>
-                </span>
               </button>
 
               <div class="order-working-actions">
@@ -551,20 +532,36 @@
                   v-if="!workingDesigner(order)"
                   type="button"
                   class="start-working-btn"
+                  title="Start Order"
+                  aria-label="Start Order"
                   @click.stop="startWorking(order)"
                 >
                   <i class="fa-solid fa-play"></i>
-                  Start Order
                 </button>
 
-                <span
+                <div
                   v-else
-                  class="working-locked-label"
-                  :title="workingDesigner(order)?.name + ' started this order'"
+                  class="row-working-user"
+                  :title="workingDesigner(order).name + ' is working'"
                 >
-                  <i class="fa-solid fa-lock"></i>
-                  Started
-                </span>
+                  <span class="row-working-live-dot"></span>
+
+                  <img
+                    v-if="workingDesigner(order).profile_photo_url"
+                    :src="workingDesigner(order).profile_photo_url"
+                    :alt="workingDesigner(order).name"
+                  />
+
+                  <span
+                    v-else
+                    class="row-working-avatar-fallback"
+                  >
+                    {{ initial(workingDesigner(order).name) }}
+                  </span>
+
+                  <strong>{{ workingDesigner(order).name }}</strong>
+                  <small>working</small>
+                </div>
               </div>
             </div>
           </div>
@@ -575,14 +572,13 @@
                 type="button"
                 class="status-ref-trigger"
                 :class="{ open: rowStatusMenuId === Number(order.id) }"
+                :style="{
+                  '--status-fill': order.statusColor || '#e5e7eb',
+                  '--status-text': readableTextColor(order.statusColor || '#e5e7eb')
+                }"
                 @click.stop="toggleRowStatusMenu(order, $event)"
               >
-                <span
-                  class="status-ref-dot"
-                  :style="{ background: order.statusColor }"
-                ></span>
-
-                <span class="status-ref-label">
+<span class="status-ref-label">
                   {{ order.status }}
                 </span>
 
@@ -810,34 +806,173 @@
     <!-- ROW STATUS DROPDOWN -->
     <div
       v-if="rowStatusMenuId && rowStatusMenuOrder"
-      class="status-fixed-dropdown"
+      class="status-fixed-dropdown monday-status-menu"
       :style="rowStatusMenuStyle"
       @click.stop
     >
-      <button
-        v-for="status in statusOptions"
-        :key="'status-fixed-' + status.label"
-        type="button"
-        class="status-fixed-option"
-        :class="{ active: status.label === rowStatusMenuOrder.status }"
-        @click.stop="selectRowStatus(rowStatusMenuOrder, status)"
-      >
-        <span
-          class="status-fixed-dot"
-          :style="{ background: status.color }"
-        ></span>
+      <div class="monday-status-menu-head">
+        <div>
+          <strong>Change Status</strong>
+          <small>{{ rowStatusMenuOrder?.name }}</small>
+        </div>
 
-        <span class="status-fixed-label">
-          {{ status.label }}
-        </span>
+        <button
+          type="button"
+          class="monday-status-close"
+          title="Close"
+          @click.stop="closeRowStatusMenu"
+        >
+          <i class="fa-solid fa-xmark"></i>
+        </button>
+      </div>
 
-        <i
-          v-if="status.label === rowStatusMenuOrder.status"
-          class="fa-solid fa-check status-fixed-check"
-        ></i>
-      </button>
+      <div class="monday-status-options">
+        <div
+          v-for="status in statusOptions"
+          :key="'status-fixed-' + status.label"
+          class="monday-status-row"
+          :class="{
+            active: status.label === rowStatusMenuOrder.status,
+            editing: rowStatusEditingLabel === status.label
+          }"
+        >
+          <!-- NORMAL VIEW -->
+          <template v-if="rowStatusEditingLabel !== status.label">
+            <button
+              type="button"
+              class="monday-status-select"
+              @click.stop="selectRowStatus(rowStatusMenuOrder, status)"
+            >
+              <span
+                class="monday-status-dot"
+                :style="{ background: status.color }"
+              ></span>
+
+              <span class="monday-status-name">
+                {{ status.label }}
+              </span>
+
+              <i
+                v-if="status.label === rowStatusMenuOrder.status"
+                class="fa-solid fa-check monday-status-check"
+              ></i>
+            </button>
+
+            <div
+              v-if="status.custom"
+              class="monday-status-actions"
+            >
+              <button
+                type="button"
+                title="Edit status"
+                @click.stop="startRowStatusEdit(status)"
+              >
+                <i class="fa-solid fa-pen"></i>
+              </button>
+
+              <button
+                type="button"
+                class="danger"
+                title="Delete status"
+                @click.stop="deleteRowCustomStatus(status)"
+              >
+                <i class="fa-solid fa-trash"></i>
+              </button>
+            </div>
+          </template>
+
+          <!-- INLINE EDIT -->
+          <div
+            v-else
+            class="monday-status-edit-row"
+          >
+            <label
+              class="monday-status-color-button"
+              title="Change color"
+            >
+              <span :style="{ background: rowStatusEditColor }"></span>
+
+              <input
+                v-model="rowStatusEditColor"
+                type="color"
+              />
+            </label>
+
+            <input
+              v-model="rowStatusEditName"
+              type="text"
+              class="monday-status-edit-input"
+              placeholder="Status name"
+              @keydown.enter.prevent="saveRowStatusEdit(status)"
+              @keydown.esc.prevent="cancelRowStatusEdit"
+            />
+
+            <button
+              type="button"
+              class="monday-status-save-edit"
+              title="Save"
+              @click.stop="saveRowStatusEdit(status)"
+            >
+              <i class="fa-solid fa-check"></i>
+            </button>
+
+            <button
+              type="button"
+              class="monday-status-cancel-edit"
+              title="Cancel"
+              @click.stop="cancelRowStatusEdit"
+            >
+              <i class="fa-solid fa-xmark"></i>
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <!-- ADD CUSTOM STATUS -->
+      <div class="monday-status-add">
+        <div class="monday-status-add-title">
+          <span class="monday-status-add-icon">
+            <i class="fa-solid fa-plus"></i>
+          </span>
+
+          <div>
+            <strong>Add Custom Status</strong>
+            <small>Create your own label and color</small>
+          </div>
+        </div>
+
+        <div class="monday-status-add-form">
+          <label
+            class="monday-status-add-color"
+            title="Choose color"
+          >
+            <span :style="{ background: customStatusColor }"></span>
+
+            <input
+              v-model="customStatusColor"
+              type="color"
+            />
+          </label>
+
+          <input
+            v-model="customStatusLabel"
+            type="text"
+            class="monday-status-add-input"
+            placeholder="e.g. Waiting Approval"
+            @keydown.enter.prevent="addCustomRowStatus(rowStatusMenuOrder)"
+          />
+
+          <button
+            type="button"
+            class="monday-status-add-button"
+            :disabled="!customStatusLabel.trim()"
+            @click.stop="addCustomRowStatus(rowStatusMenuOrder)"
+          >
+            Add
+          </button>
+        </div>
+      </div>
     </div>
-
 
     <!-- RIGHT PANEL -->
     <div v-if="selectedOrder && detailOpen" class="board-detail-overlay" @click.self="closeBoardDetail">
@@ -1756,8 +1891,8 @@ export default {
 
       columnWidths: {
         check: 42,
-        name: 430,
-        status: 120,
+        name: 380,
+        status: 170,
         owner: 120,
         files: 190,
         packing: 130,
@@ -1806,6 +1941,12 @@ export default {
       previewFile: null,
       customStatusLabel: '',
       customStatusColor: '#6161ff',
+
+      // Row status manager
+      rowStatusEditingLabel: null,
+      rowStatusEditName: '',
+      rowStatusEditColor: '#6161ff',
+
       orders: [],
       availableMembers: [],
       availableClients: [],
@@ -2111,7 +2252,7 @@ filteredOrders() {
         position: 'fixed',
         top: `${Number(pos.top || 0)}px`,
         left: `${Number(pos.left || 0)}px`,
-        width: `${Number(pos.width || 230)}px`,
+        width: `${Number(pos.width || 320)}px`,
         zIndex: 2147483647
       }
     },
@@ -4325,7 +4466,7 @@ beforeUnmount()  {
 /* white background + black grid lines */
 .board-table-shell {
   background: #ffffff !important;
-  border: 1px solid #111827 !important;
+  border: 1px solid ##aeb0b3 !important;
   overflow-x: auto !important;
   overflow-y: visible !important;
 }
@@ -5364,12 +5505,14 @@ body.board-column-resizing .column-resizer::before {
 
       if (!rect) return
 
-      const width = 230
-      const gap = 7
-      const padding = 10
+      const width = 320
+      const gap = 8
+      const padding = 12
 
       let left = rect.left
       let top = rect.bottom + gap
+
+      const estimatedHeight = 470
 
       if (left + width > window.innerWidth - padding) {
         left = window.innerWidth - width - padding
@@ -5377,6 +5520,13 @@ body.board-column-resizing .column-resizer::before {
 
       if (left < padding) {
         left = padding
+      }
+
+      if (top + estimatedHeight > window.innerHeight - padding) {
+        top = Math.max(
+          padding,
+          rect.top - estimatedHeight - gap
+        )
       }
 
       this.rowStatusMenuPosition = {
@@ -5399,6 +5549,220 @@ body.board-column-resizing .column-resizer::before {
         order,
         status.label
       )
+    },
+
+    startRowStatusEdit(status) {
+      if (!status?.custom) return
+
+      this.rowStatusEditingLabel = status.label
+      this.rowStatusEditName = status.label
+      this.rowStatusEditColor = status.color || '#6161ff'
+    },
+
+    cancelRowStatusEdit() {
+      this.rowStatusEditingLabel = null
+      this.rowStatusEditName = ''
+      this.rowStatusEditColor = '#6161ff'
+    },
+
+    async saveRowStatusEdit(status) {
+      if (!status?.custom) return
+
+      const oldLabel = String(status.label || '').trim()
+      const newLabel = String(this.rowStatusEditName || '').trim()
+      const newColor = this.rowStatusEditColor || status.color || '#6161ff'
+
+      if (!oldLabel || !newLabel) return
+
+      const duplicate = this.statusOptions.some(
+        item =>
+          item !== status &&
+          String(item.label || '').trim().toLowerCase() ===
+          newLabel.toLowerCase()
+      )
+
+      if (duplicate) {
+        alert('A status with this name already exists.')
+        return
+      }
+
+      const affectedOrders = this.orders.filter(
+        order =>
+          String(order.status || '').trim().toLowerCase() ===
+          oldLabel.toLowerCase()
+      )
+
+      status.label = newLabel
+      status.color = newColor
+      status.custom = true
+
+      const customOnly = this.statusOptions
+        .filter(item => item.custom)
+        .map(item => ({
+          label: item.label,
+          color: item.color,
+          group: item.group || 'in_production',
+          groupLabel: item.groupLabel || 'In Production',
+          custom: true
+        }))
+
+      localStorage.setItem(
+        'custom_order_statuses',
+        JSON.stringify(customOnly)
+      )
+
+      // Keep already-loaded orders in sync and persist them.
+      affectedOrders.forEach(order => {
+        order.status = newLabel
+        order.statusColor = newColor
+      })
+
+      await Promise.allSettled(
+        affectedOrders.map(order =>
+          axios.put(
+            `/api/orders/${order.id}`,
+            {
+              status: newLabel,
+              status_color: newColor
+            },
+            { headers: this.headers() }
+          )
+        )
+      )
+
+      if (
+        this.rowStatusMenuOrder &&
+        String(this.rowStatusMenuOrder.status || '').trim().toLowerCase() ===
+          oldLabel.toLowerCase()
+      ) {
+        this.rowStatusMenuOrder.status = newLabel
+        this.rowStatusMenuOrder.statusColor = newColor
+      }
+
+      if (
+        this.selectedOrder &&
+        String(this.selectedOrder.status || '').trim().toLowerCase() ===
+          oldLabel.toLowerCase()
+      ) {
+        this.selectedOrder.status = newLabel
+        this.selectedOrder.statusColor = newColor
+      }
+
+      this.cancelRowStatusEdit()
+    },
+
+    async deleteRowCustomStatus(status) {
+      if (!status?.custom) return
+
+      const label = String(status.label || '').trim()
+
+      if (
+        !confirm(
+          `Delete "${label}" status?\n\nOrders already using it will keep their current status until you change them.`
+        )
+      ) {
+        return
+      }
+
+      this.statusOptions = this.statusOptions.filter(
+        item => item !== status
+      )
+
+      const customOnly = this.statusOptions
+        .filter(item => item.custom)
+        .map(item => ({
+          label: item.label,
+          color: item.color,
+          group: item.group || 'in_production',
+          groupLabel: item.groupLabel || 'In Production',
+          custom: true
+        }))
+
+      localStorage.setItem(
+        'custom_order_statuses',
+        JSON.stringify(customOnly)
+      )
+
+      if (this.rowStatusEditingLabel === label) {
+        this.cancelRowStatusEdit()
+      }
+    },
+
+    async addCustomRowStatus(order) {
+      if (!order) return
+
+      const label = String(this.customStatusLabel || '').trim()
+      if (!label) return
+
+      const existing = this.statusOptions.find(
+        item =>
+          String(item.label || '').toLowerCase() ===
+          label.toLowerCase()
+      )
+
+      const status = existing || {
+        label,
+        color: this.customStatusColor || '#6161ff',
+        group: order.group || this.activeGroup || 'in_production',
+        groupLabel:
+          this.boardGroups.find(
+            group =>
+              group.key ===
+              (order.group || this.activeGroup)
+          )?.label || 'In Production',
+        custom: true
+      }
+
+      if (!existing) {
+        this.saveCustomStatusOption(status)
+      }
+
+      this.customStatusLabel = ''
+      this.customStatusColor = '#6161ff'
+
+      await this.inlineChangeStatus(order, status.label)
+
+      this.rowStatusMenuId = null
+      this.rowStatusMenuOrder = null
+    },
+
+    async changeRowCustomStatusColor(status, color) {
+      if (!status || !color) return
+
+      status.color = color
+      status.custom = true
+      this.saveCustomStatusOption(status)
+
+      const affectedOrders = this.orders.filter(
+        order =>
+          String(order.status || '').toLowerCase() ===
+          String(status.label || '').toLowerCase()
+      )
+
+      for (const order of affectedOrders) {
+        order.statusColor = color
+      }
+
+      if (
+        this.rowStatusMenuOrder &&
+        String(this.rowStatusMenuOrder.status || '').toLowerCase() ===
+        String(status.label || '').toLowerCase()
+      ) {
+        try {
+          await axios.put(
+            `/api/orders/${this.rowStatusMenuOrder.id}`,
+            {
+              status: status.label,
+              status_color: color
+            },
+            { headers: this.headers() }
+          )
+
+          this.rowStatusMenuOrder.statusColor = color
+        } catch (error) {
+          console.error('changeRowCustomStatusColor error:', error)
+        }
+      }
     },
 
     async openStatusForRow(order) {
@@ -13215,7 +13579,7 @@ body.board-column-resizing .column-resizer::before {
 /* Open section: white card, but text + left strip use its exact section color */
 .collapsible-active-heading {
   background: #ffffff !important;
-  border: 1px solid #111827 !important;
+  border: 1px solid #aeb0b3 !important;
   border-left: 5px solid var(--active-section-color) !important;
   box-shadow: none !important;
 }
@@ -14088,6 +14452,2662 @@ body.board-column-resizing .column-resizer::before {
 
     max-height: calc(100vh - 90px) !important;
   }
+}
+
+
+
+/* =========================================================
+   FINAL STATUS CELL STYLE
+   Full name + square box + full status color
+   ========================================================= */
+
+.factory-board-page .board-col-status {
+  overflow: visible !important;
+}
+
+.factory-board-page .status-ref-wrap {
+  width: 100% !important;
+  max-width: none !important;
+  padding: 0 6px !important;
+}
+
+.factory-board-page .status-ref-trigger,
+.factory-board-page .status-ref-trigger.open {
+  width: 100% !important;
+  min-width: 150px !important;
+  max-width: none !important;
+  height: 38px !important;
+
+  padding: 0 11px !important;
+
+  display: grid !important;
+  grid-template-columns: 8px minmax(0, 1fr) 16px !important;
+  align-items: center !important;
+  gap: 8px !important;
+
+  background: var(--status-fill) !important;
+  background-color: var(--status-fill) !important;
+
+  border: 1px solid var(--status-fill) !important;
+  border-radius: 0 !important;
+
+  color: var(--status-text) !important;
+
+  box-shadow: none !important;
+  overflow: visible !important;
+}
+
+.factory-board-page .status-ref-label {
+  min-width: 0 !important;
+
+  overflow: visible !important;
+  text-overflow: clip !important;
+  white-space: nowrap !important;
+
+  color: var(--status-text) !important;
+
+  font-size: 11px !important;
+  font-weight: 800 !important;
+  line-height: 1 !important;
+
+  text-align: left !important;
+}
+
+.factory-board-page .status-ref-chevron {
+  color: var(--status-text) !important;
+  flex: 0 0 auto !important;
+}
+
+.factory-board-page .status-ref-dot {
+  width: 7px !important;
+  height: 7px !important;
+  min-width: 7px !important;
+
+  background: var(--status-text) !important;
+  opacity: .75 !important;
+
+  border-radius: 50% !important;
+}
+
+/* Keep the status cell centered */
+.factory-board-page .row-status-cell {
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+}
+
+/* Do not let dark-mode rules replace the selected status color */
+.factory-board-page.theme-dark .status-ref-trigger,
+.factory-board-page.theme-dark .status-ref-trigger.open {
+  background: var(--status-fill) !important;
+  background-color: var(--status-fill) !important;
+  border-color: var(--status-fill) !important;
+  color: var(--status-text) !important;
+}
+
+.factory-board-page.theme-dark .status-ref-label,
+.factory-board-page.theme-dark .status-ref-chevron {
+  color: var(--status-text) !important;
+}
+
+
+
+/* =========================================================
+   FINAL STATUS / PIPELINE ALIGNMENT FIX
+   - no status dot
+   - status text centered
+   - status box never spills outside its column
+   - vertical pipelines touch row top + bottom
+   ========================================================= */
+
+/* Every row cell clips its own content so resize never pushes
+   status/owner controls outside the assigned column. */
+.factory-board-page .board-table-row > .board-col {
+  position: relative !important;
+  min-width: 0 !important;
+  overflow: hidden !important;
+}
+
+/* Status cell specifically */
+.factory-board-page .board-table-row .row-status-cell {
+  width: 100% !important;
+  min-width: 0 !important;
+
+  padding: 0 8px !important;
+
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+
+  overflow: hidden !important;
+}
+
+/* Wrapper must follow resized column width */
+.factory-board-page .board-table-row .status-ref-wrap {
+  width: 100% !important;
+  min-width: 0 !important;
+  max-width: 100% !important;
+
+  padding: 0 !important;
+  margin: 0 !important;
+
+  overflow: hidden !important;
+}
+
+/* Full colored status box */
+.factory-board-page .board-table-row .status-ref-trigger,
+.factory-board-page .board-table-row .status-ref-trigger.open {
+  width: 100% !important;
+  min-width: 0 !important;
+  max-width: 100% !important;
+  height: 38px !important;
+
+  margin: 0 !important;
+  padding: 0 10px !important;
+
+  display: grid !important;
+  grid-template-columns: minmax(0, 1fr) 28px !important;
+  align-items: stretch !important;
+
+  background: var(--status-fill) !important;
+  background-color: var(--status-fill) !important;
+
+  border: 1px solid var(--status-fill) !important;
+  border-radius: 0 !important;
+
+  color: var(--status-text) !important;
+
+  box-shadow: none !important;
+  overflow: hidden !important;
+}
+
+/* Remove any old dot generated by CSS/template */
+.factory-board-page .board-table-row .status-ref-dot {
+  display: none !important;
+}
+
+/* Exact centered status name */
+.factory-board-page .board-table-row .status-ref-label {
+  min-width: 0 !important;
+  width: 100% !important;
+
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+
+  padding: 0 4px !important;
+
+  color: var(--status-text) !important;
+
+  font-size: 11px !important;
+  font-weight: 800 !important;
+  line-height: 1 !important;
+
+  white-space: nowrap !important;
+  overflow: hidden !important;
+  text-overflow: ellipsis !important;
+
+  text-align: center !important;
+}
+
+/* Arrow gets its own clean right section */
+.factory-board-page .board-table-row .status-ref-chevron {
+  width: 28px !important;
+  height: 100% !important;
+
+  margin: 0 !important;
+
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+
+  color: var(--status-text) !important;
+
+  border-left: 1px solid color-mix(in srgb, var(--status-text), transparent 45%) !important;
+}
+
+/* =========================================================
+   ROW VERTICAL PIPELINES — TOP TO BOTTOM ATTACHED
+   ========================================================= */
+
+/* Remove older short pseudo pipeline */
+.factory-board-page .board-table-row > .board-col::before,
+.factory-board-page .board-table-row > .board-col::after {
+  content: none !important;
+}
+
+/* One full-height divider on the RIGHT of every column */
+.factory-board-page .board-table-row > .board-col:not(:last-child) {
+  border-right: 1px solid #111827 !important;
+}
+
+/* Do not add extra left/right margin around dividers */
+.factory-board-page .board-table-row {
+  column-gap: 0 !important;
+}
+
+/* Header pipelines also touch top and bottom */
+.factory-board-page .board-table-head > .board-col {
+  position: relative !important;
+  min-width: 0 !important;
+}
+
+.factory-board-page .board-table-head > .board-col::before,
+.factory-board-page .board-table-head > .board-col::after {
+  content: none !important;
+}
+
+.factory-board-page .board-table-head > .board-col:not(:last-child) {
+  border-right: 1px solid rgba(255,255,255,.78) !important;
+}
+
+/* The actual resize handle still stays draggable, but visually
+   becomes the same full-height pipeline. */
+.factory-board-page .column-resizer {
+  position: absolute !important;
+  top: 0 !important;
+  right: -4px !important;
+  bottom: 0 !important;
+
+  width: 8px !important;
+  height: 100% !important;
+
+  cursor: col-resize !important;
+  z-index: 20 !important;
+
+  background: transparent !important;
+}
+
+.factory-board-page .column-resizer::before {
+  content: "" !important;
+
+  position: absolute !important;
+  top: 0 !important;
+  bottom: 0 !important;
+  left: 50% !important;
+
+  width: 1px !important;
+  height: 100% !important;
+
+  transform: translateX(-50%) !important;
+
+  background: rgba(255,255,255,.78) !important;
+}
+
+/* When resizing, controls must remain inside their own cells */
+.factory-board-page .board-table-row,
+.factory-board-page .board-table-head {
+  overflow: visible !important;
+}
+
+/* Keep owner/avatar content contained after status column resize */
+.factory-board-page .board-col-owner {
+  min-width: 0 !important;
+  overflow: hidden !important;
+}
+
+.factory-board-page .board-avatar-stack {
+  max-width: 100% !important;
+  min-width: 0 !important;
+  overflow: hidden !important;
+}
+
+/* Dark theme */
+.factory-board-page.theme-dark .board-table-row > .board-col:not(:last-child) {
+  border-right-color: rgba(255,255,255,.45) !important;
+}
+
+
+/* =========================================================
+   FINAL COMPACT ROW + FULL STATUS FILL
+   Added 2026-08-08
+========================================================= */
+.factory-board-page .board-table-row {
+  min-height: 48px !important;
+  height: 48px !important;
+}
+
+.factory-board-page .board-table-row > .board-col {
+  min-height: 48px !important;
+  height: 48px !important;
+  padding-top: 0 !important;
+  padding-bottom: 0 !important;
+  align-items: center !important;
+}
+
+.factory-board-page .board-table-row .board-col-status.row-status-cell {
+  height: 48px !important;
+  min-height: 48px !important;
+  padding: 0 !important;
+  margin: 0 !important;
+  overflow: hidden !important;
+}
+
+.factory-board-page .board-table-row .row-status-cell .status-ref-wrap {
+  width: 100% !important;
+  height: 100% !important;
+  min-height: 48px !important;
+  padding: 0 !important;
+  margin: 0 !important;
+}
+
+.factory-board-page .board-table-row .row-status-cell .status-ref-trigger {
+  width: 100% !important;
+  height: 100% !important;
+  min-height: 48px !important;
+  margin: 0 !important;
+  padding: 0 12px !important;
+  border: 0 !important;
+  border-radius: 0 !important;
+  outline: 0 !important;
+  box-shadow: none !important;
+  background: var(--status-fill) !important;
+  color: var(--status-text) !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: space-between !important;
+  gap: 8px !important;
+}
+
+.factory-board-page .board-table-row .row-status-cell .status-ref-label {
+  flex: 1 1 auto !important;
+  min-width: 0 !important;
+  text-align: center !important;
+  font-size: 12px !important;
+  font-weight: 700 !important;
+  line-height: 1 !important;
+  color: inherit !important;
+  white-space: nowrap !important;
+  overflow: hidden !important;
+  text-overflow: ellipsis !important;
+}
+
+.factory-board-page .board-table-row .row-status-cell .status-ref-chevron {
+  flex: 0 0 auto !important;
+  width: auto !important;
+  min-width: 0 !important;
+  height: auto !important;
+  margin: 0 !important;
+  padding: 0 !important;
+  border: 0 !important;
+  border-left: 0 !important;
+  border-right: 0 !important;
+  box-shadow: none !important;
+  font-size: 10px !important;
+  color: inherit !important;
+}
+
+.factory-board-page .board-table-row .row-status-cell .status-ref-trigger::before,
+.factory-board-page .board-table-row .row-status-cell .status-ref-trigger::after,
+.factory-board-page .board-table-row .row-status-cell .status-ref-chevron::before,
+.factory-board-page .board-table-row .row-status-cell .status-ref-chevron::after {
+  border-left: 0 !important;
+  border-right: 0 !important;
+}
+
+.factory-board-page .board-table-row .row-status-cell .status-ref-chevron.rotate {
+  transform: rotate(180deg) !important;
+}
+/* =========================================================
+   ORDER NAME CELL - CLEAN COMPACT LAYOUT
+========================================================= */
+
+.board-table-row {
+  min-height: 64px !important;
+  height: 64px !important;
+}
+
+/* Name cell */
+.board-col-name {
+  position: relative !important;
+
+  display: flex !important;
+  align-items: center !important;
+
+  min-width: 0 !important;
+  height: 64px !important;
+
+  padding: 6px 12px !important;
+
+  overflow: hidden !important;
+}
+
+/* Main wrapper */
+.board-col-name .inline-cell-wrap {
+  width: 100% !important;
+  min-width: 0 !important;
+
+  display: flex !important;
+  flex-direction: column !important;
+  align-items: flex-start !important;
+  justify-content: center !important;
+
+  gap: 2px !important;
+}
+
+/* Order name button */
+.board-col-name .name-value {
+  width: 100% !important;
+  min-width: 0 !important;
+
+  display: flex !important;
+  flex-direction: column !important;
+  align-items: flex-start !important;
+
+  padding: 0 !important;
+  margin: 0 !important;
+
+  background: transparent !important;
+  border: 0 !important;
+
+  text-align: left !important;
+}
+
+/* ORDER NAME bigger */
+.board-col-name .name-value > strong {
+  display: flex !important;
+  align-items: center !important;
+  gap: 6px !important;
+
+  max-width: 100% !important;
+
+  margin: 0 !important;
+
+  color: #111827 !important;
+
+  font-size: 13px !important;
+  font-weight: 800 !important;
+  line-height: 1.2 !important;
+
+  white-space: nowrap !important;
+  overflow: hidden !important;
+  text-overflow: ellipsis !important;
+}
+
+/* small order icon */
+.board-col-name .name-value > strong::before {
+  content: "\f07b";
+
+  font-family: "Font Awesome 6 Free";
+  font-weight: 900;
+
+  color: #94a3b8;
+
+  font-size: 10px;
+
+  flex: 0 0 auto;
+}
+
+/* PO NUMBER */
+.board-col-name .name-value > small {
+  display: flex !important;
+  align-items: center !important;
+  gap: 5px !important;
+
+  margin-top: 2px !important;
+
+  color: #94a3b8 !important;
+
+  font-size: 9px !important;
+  font-weight: 500 !important;
+  line-height: 1 !important;
+
+  white-space: nowrap !important;
+}
+
+/* PO icon */
+.board-col-name .name-value > small::before {
+  content: "\f02b";
+
+  font-family: "Font Awesome 6 Free";
+  font-weight: 900;
+
+  color: #b0b8c4;
+
+  font-size: 8px;
+}
+
+/* Start Order area */
+.board-col-name .order-working-actions {
+  margin-top: 4px !important;
+
+  display: flex !important;
+  align-items: center !important;
+}
+
+/* Start Order */
+.board-col-name .start-working-btn {
+  height: 19px !important;
+
+  padding: 0 9px !important;
+
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+
+  gap: 4px !important;
+
+  border: 0 !important;
+  border-radius: 999px !important;
+
+  background: #dcfce7 !important;
+  color: #087443 !important;
+
+  font-size: 8px !important;
+  font-weight: 800 !important;
+  line-height: 1 !important;
+
+  white-space: nowrap !important;
+}
+
+/* Better play icon */
+.board-col-name .start-working-btn i {
+  font-size: 6px !important;
+}
+
+/* Started badge */
+.board-col-name .working-locked-label {
+  height: 19px !important;
+
+  padding: 0 8px !important;
+
+  display: inline-flex !important;
+  align-items: center !important;
+
+  gap: 4px !important;
+
+  border-radius: 999px !important;
+
+  background: #edf2f7 !important;
+  color: #475569 !important;
+
+  font-size: 8px !important;
+  font-weight: 700 !important;
+}
+
+/* unread/new dot */
+.board-col-name .board-new-dot {
+  position: absolute !important;
+
+  left: 5px !important;
+  top: 10px !important;
+
+  width: 6px !important;
+  height: 6px !important;
+
+  border-radius: 50% !important;
+
+  background: #94a3b8 !important;
+}
+
+/* Leave small space when new dot exists */
+.board-col-name:has(.board-new-dot) {
+  padding-left: 18px !important;
+}
+
+/* Other cells remain vertically centered */
+.board-table-row > .board-col:not(.board-col-name) {
+  min-height: 64px !important;
+  height: 64px !important;
+
+  display: flex !important;
+  align-items: center !important;
+}
+
+/* don't clip name content vertically */
+.board-col-name,
+.board-col-name .inline-cell-wrap,
+.board-col-name .name-value {
+  overflow-y: visible !important;
+}
+
+
+/* =========================================================
+   FINAL WORKING USER POSITION
+   User appears in the SAME right-side slot as Start Order
+========================================================= */
+
+.factory-board-page .board-col-name {
+  position: relative !important;
+  min-width: 0 !important;
+  height: 64px !important;
+  min-height: 64px !important;
+
+  padding: 6px 180px 6px 14px !important;
+
+  display: flex !important;
+  align-items: center !important;
+
+  overflow: hidden !important;
+}
+
+.factory-board-page .board-col-name .inline-cell-wrap {
+  width: 100% !important;
+  min-width: 0 !important;
+  height: 100% !important;
+
+  display: flex !important;
+  align-items: center !important;
+
+  margin: 0 !important;
+  padding: 0 !important;
+
+  overflow: hidden !important;
+}
+
+.factory-board-page .board-col-name .name-value {
+  width: 100% !important;
+  min-width: 0 !important;
+
+  display: flex !important;
+  flex-direction: column !important;
+  align-items: flex-start !important;
+  justify-content: center !important;
+
+  padding: 0 !important;
+  margin: 0 !important;
+
+  border: 0 !important;
+  background: transparent !important;
+
+  overflow: hidden !important;
+}
+
+.factory-board-page .board-col-name .name-value > strong {
+  width: 100% !important;
+  min-width: 0 !important;
+
+  margin: 0 !important;
+
+  color: #111827 !important;
+
+  font-size: 13px !important;
+  font-weight: 800 !important;
+  line-height: 1.2 !important;
+
+  white-space: nowrap !important;
+  overflow: hidden !important;
+  text-overflow: ellipsis !important;
+}
+
+.factory-board-page .board-col-name .name-value > small {
+  width: 100% !important;
+  min-width: 0 !important;
+
+  margin-top: 3px !important;
+
+  color: #94a3b8 !important;
+
+  font-size: 9px !important;
+  font-weight: 500 !important;
+  line-height: 1.1 !important;
+
+  white-space: nowrap !important;
+  overflow: hidden !important;
+  text-overflow: ellipsis !important;
+}
+
+/* Old pill must never appear under the name */
+.factory-board-page .working-designer-pill {
+  display: none !important;
+}
+
+/* Same right-side slot */
+.factory-board-page .board-col-name .order-working-actions {
+  position: absolute !important;
+
+  right: 8px !important;
+  top: 50% !important;
+
+  transform: translateY(-50%) !important;
+
+  margin: 0 !important;
+  padding: 0 !important;
+
+  display: flex !important;
+  align-items: center !important;
+  justify-content: flex-end !important;
+
+  z-index: 5 !important;
+}
+
+/* Start icon */
+.factory-board-page .board-col-name .start-working-btn {
+  position: static !important;
+  transform: none !important;
+
+  width: 30px !important;
+  height: 30px !important;
+  min-width: 30px !important;
+
+  padding: 0 !important;
+  margin: 0 !important;
+
+  display: grid !important;
+  place-items: center !important;
+
+  border: 1px solid #bbf7d0 !important;
+  border-radius: 50% !important;
+
+  background: #ecfdf3 !important;
+  color: #059669 !important;
+
+  cursor: pointer !important;
+  box-shadow: none !important;
+}
+
+.factory-board-page .board-col-name .start-working-btn i {
+  margin: 0 !important;
+  padding: 0 !important;
+  color: #059669 !important;
+  font-size: 9px !important;
+}
+
+/* Working user */
+.factory-board-page .board-col-name .row-working-user {
+  height: 30px !important;
+  max-width: 166px !important;
+
+  padding: 3px 8px 3px 5px !important;
+
+  display: flex !important;
+  align-items: center !important;
+  gap: 5px !important;
+
+  border: 1px solid #a7f3d0 !important;
+  border-radius: 15px !important;
+
+  background: #ecfdf5 !important;
+
+  white-space: nowrap !important;
+  overflow: hidden !important;
+}
+
+.factory-board-page .row-working-live-dot {
+  width: 6px !important;
+  height: 6px !important;
+  min-width: 6px !important;
+
+  border-radius: 50% !important;
+  background: #22c55e !important;
+
+  flex: 0 0 auto !important;
+}
+
+.factory-board-page .row-working-user img,
+.factory-board-page .row-working-avatar-fallback {
+  width: 21px !important;
+  height: 21px !important;
+  min-width: 21px !important;
+
+  border-radius: 50% !important;
+  object-fit: cover !important;
+
+  display: grid !important;
+  place-items: center !important;
+
+  background: #111827 !important;
+  color: #fff !important;
+
+  font-size: 8px !important;
+  font-weight: 800 !important;
+
+  flex: 0 0 auto !important;
+}
+
+.factory-board-page .row-working-user strong {
+  min-width: 0 !important;
+  max-width: 84px !important;
+
+  color: #047857 !important;
+
+  font-size: 10px !important;
+  font-weight: 800 !important;
+
+  overflow: hidden !important;
+  text-overflow: ellipsis !important;
+  white-space: nowrap !important;
+}
+
+.factory-board-page .row-working-user small {
+  color: #16a34a !important;
+  font-size: 7px !important;
+  font-weight: 600 !important;
+  flex: 0 0 auto !important;
+}
+
+/* Hide old Started badge if old CSS/template survives anywhere */
+.factory-board-page .working-locked-label {
+  display: none !important;
+}
+
+
+
+/* =========================================================
+   FINAL COMPACT ORDER ROW
+   - order name + PO stay inside same fixed row
+   - Start icon stays on right
+   - after click, icon is replaced by working user in SAME place
+   - row height never grows
+========================================================= */
+
+.factory-board-page .board-table-row {
+  height: 54px !important;
+  min-height: 54px !important;
+  max-height: 54px !important;
+}
+
+/* all cells same fixed height and vertically centered */
+.factory-board-page .board-table-row > .board-col {
+  height: 54px !important;
+  min-height: 54px !important;
+  max-height: 54px !important;
+
+  display: flex !important;
+  align-items: center !important;
+
+  padding-top: 0 !important;
+  padding-bottom: 0 !important;
+
+  overflow: hidden !important;
+}
+
+/* =========================
+   ORDER NAME CELL
+========================= */
+.factory-board-page .board-col-name {
+  position: relative !important;
+
+  padding: 5px 145px 5px 14px !important;
+
+  display: flex !important;
+  align-items: center !important;
+
+  overflow: hidden !important;
+}
+
+.factory-board-page .board-col-name .inline-cell-wrap {
+  width: 100% !important;
+  min-width: 0 !important;
+  height: 44px !important;
+
+  display: flex !important;
+  align-items: center !important;
+
+  padding: 0 !important;
+  margin: 0 !important;
+
+  overflow: hidden !important;
+}
+
+.factory-board-page .board-col-name .name-value {
+  width: 100% !important;
+  min-width: 0 !important;
+  height: 44px !important;
+
+  display: flex !important;
+  flex-direction: column !important;
+  align-items: flex-start !important;
+  justify-content: center !important;
+
+  gap: 2px !important;
+
+  padding: 0 !important;
+  margin: 0 !important;
+
+  border: 0 !important;
+  background: transparent !important;
+
+  text-align: left !important;
+
+  overflow: hidden !important;
+}
+
+/* order name */
+.factory-board-page .board-col-name .name-value > strong {
+  width: 100% !important;
+  min-width: 0 !important;
+
+  display: block !important;
+
+  margin: 0 !important;
+  padding: 0 !important;
+
+  color: #111827 !important;
+
+  font-size: 12px !important;
+  font-weight: 800 !important;
+  line-height: 15px !important;
+
+  white-space: nowrap !important;
+  overflow: hidden !important;
+  text-overflow: ellipsis !important;
+}
+
+/* PO under name */
+.factory-board-page .board-col-name .name-value > small {
+  width: 100% !important;
+  min-width: 0 !important;
+
+  display: block !important;
+
+  margin: 0 !important;
+  padding: 0 !important;
+
+  color: #94a3b8 !important;
+
+  font-size: 8px !important;
+  font-weight: 500 !important;
+  line-height: 12px !important;
+
+  white-space: nowrap !important;
+  overflow: hidden !important;
+  text-overflow: ellipsis !important;
+}
+
+/* do not create extra icons/lines before name or PO */
+.factory-board-page .board-col-name .name-value > strong::before,
+.factory-board-page .board-col-name .name-value > small::before {
+  content: none !important;
+  display: none !important;
+}
+
+/* unread dot stays left and does not disturb layout */
+.factory-board-page .board-col-name .board-new-dot {
+  position: absolute !important;
+  left: 6px !important;
+  top: 10px !important;
+
+  width: 5px !important;
+  height: 5px !important;
+  min-width: 5px !important;
+
+  border-radius: 50% !important;
+
+  z-index: 2 !important;
+}
+
+/* =========================
+   RIGHT SLOT
+========================= */
+.factory-board-page .board-col-name .order-working-actions {
+  position: absolute !important;
+
+  right: 8px !important;
+  top: 50% !important;
+
+  transform: translateY(-50%) !important;
+
+  width: 128px !important;
+  height: 30px !important;
+
+  display: flex !important;
+  align-items: center !important;
+  justify-content: flex-end !important;
+
+  margin: 0 !important;
+  padding: 0 !important;
+
+  overflow: hidden !important;
+
+  z-index: 6 !important;
+}
+
+/* =========================
+   START ICON BEFORE CLICK
+========================= */
+.factory-board-page .board-col-name .start-working-btn {
+  position: static !important;
+  inset: auto !important;
+  transform: none !important;
+
+  width: 28px !important;
+  height: 28px !important;
+  min-width: 28px !important;
+  max-width: 28px !important;
+
+  padding: 0 !important;
+  margin: 0 !important;
+
+  display: grid !important;
+  place-items: center !important;
+
+  border: 1px solid #bbf7d0 !important;
+  border-radius: 50% !important;
+
+  background: #ecfdf3 !important;
+  color: #059669 !important;
+
+  box-shadow: none !important;
+}
+
+.factory-board-page .board-col-name .start-working-btn i {
+  margin: 0 !important;
+  padding: 0 !important;
+
+  color: #059669 !important;
+  font-size: 8px !important;
+}
+
+/* =========================
+   AFTER CLICK: SAME SLOT
+========================= */
+.factory-board-page .board-col-name .row-working-user {
+  width: 128px !important;
+  max-width: 128px !important;
+  height: 28px !important;
+  min-height: 28px !important;
+
+  padding: 2px 7px 2px 5px !important;
+  margin: 0 !important;
+
+  display: flex !important;
+  align-items: center !important;
+  gap: 4px !important;
+
+  border: 1px solid #a7f3d0 !important;
+  border-radius: 14px !important;
+
+  background: #ecfdf5 !important;
+
+  white-space: nowrap !important;
+  overflow: hidden !important;
+}
+
+.factory-board-page .row-working-live-dot {
+  width: 5px !important;
+  height: 5px !important;
+  min-width: 5px !important;
+
+  border-radius: 50% !important;
+  background: #22c55e !important;
+
+  flex: 0 0 auto !important;
+}
+
+.factory-board-page .row-working-user img,
+.factory-board-page .row-working-avatar-fallback {
+  width: 20px !important;
+  height: 20px !important;
+  min-width: 20px !important;
+
+  border-radius: 50% !important;
+  object-fit: cover !important;
+
+  flex: 0 0 auto !important;
+}
+
+.factory-board-page .row-working-user strong {
+  min-width: 0 !important;
+  max-width: 67px !important;
+
+  color: #047857 !important;
+
+  font-size: 9px !important;
+  font-weight: 800 !important;
+  line-height: 1 !important;
+
+  overflow: hidden !important;
+  text-overflow: ellipsis !important;
+  white-space: nowrap !important;
+}
+
+.factory-board-page .row-working-user small {
+  color: #16a34a !important;
+
+  font-size: 6px !important;
+  font-weight: 700 !important;
+  line-height: 1 !important;
+
+  flex: 0 0 auto !important;
+}
+
+/* old under-name working pill / started badge never display */
+.factory-board-page .working-designer-pill,
+.factory-board-page .working-locked-label {
+  display: none !important;
+}
+
+/* keep status and all other controls centered in same 54px row */
+.factory-board-page .row-status-cell,
+.factory-board-page .board-col-owner,
+.factory-board-page .board-col-files,
+.factory-board-page .board-col-packing,
+.factory-board-page .board-col-chat,
+.factory-board-page .board-col-payment,
+.factory-board-page .board-col-address,
+.factory-board-page .board-col-track,
+.factory-board-page .board-col-info {
+  height: 54px !important;
+  min-height: 54px !important;
+  max-height: 54px !important;
+
+  display: flex !important;
+  align-items: center !important;
+}
+
+/* status still fills its column height cleanly */
+.factory-board-page .row-status-cell .status-ref-wrap,
+.factory-board-page .row-status-cell .status-ref-trigger {
+  height: 54px !important;
+  min-height: 54px !important;
+  max-height: 54px !important;
+}
+
+/* packing stays compact */
+.factory-board-page .board-col-packing .packing-clean-input {
+  height: 28px !important;
+  min-height: 28px !important;
+  line-height: 28px !important;
+}
+/* =========================================
+   STATUS COLUMN PERFECT ALIGNMENT
+========================================= */
+
+/* status cell ke apne extra borders hatao */
+.factory-board-page .row-status-cell {
+  padding: 0 !important;
+  margin: 0 !important;
+
+  border-left: 0 !important;
+  border-right: 0 !important;
+
+  display: flex !important;
+  align-items: stretch !important;
+  justify-content: stretch !important;
+
+  overflow: hidden !important;
+}
+
+/* wrapper full cell */
+.factory-board-page .row-status-cell .status-ref-wrap {
+  width: 100% !important;
+  height: 100% !important;
+
+  padding: 0 !important;
+  margin: 0 !important;
+
+  display: flex !important;
+  align-items: stretch !important;
+}
+
+/* orange/colored box full equal width */
+.factory-board-page .row-status-cell .status-ref-trigger {
+  width: 100% !important;
+  height: 100% !important;
+
+  min-width: 0 !important;
+  max-width: 100% !important;
+
+  padding: 0 12px !important;
+  margin: 0 !important;
+
+  border: 0 !important;
+  border-radius: 0 !important;
+
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+
+  box-sizing: border-box !important;
+}
+
+/* actual column divider only */
+.factory-board-page .board-table-row > .board-col-status {
+  border-left: 1px solid #111827 !important;
+  border-right: 1px solid #111827 !important;
+}
+
+/* avoid duplicate line from neighbor columns */
+.factory-board-page .board-table-row > .board-col-name {
+  border-right: 0 !important;
+}
+
+.factory-board-page .board-table-row > .board-col-owner {
+  border-left: 0 !important;
+}
+
+/* =========================================
+   PACKING DETAIL - SAME SIZE AS TRACKING
+========================================= */
+
+.factory-board-page .board-col-packing {
+  padding: 0 8px !important;
+}
+
+.factory-board-page .packing-clean-input {
+  width: 100% !important;
+  height: 28px !important;
+  min-height: 28px !important;
+
+  padding: 0 6px !important;
+  margin: 0 !important;
+
+  border: 0 !important;
+  border-radius: 0 !important;
+
+  background: transparent !important;
+  color: #111827 !important;
+
+  font-size: 9px !important;
+  font-weight: 500 !important;
+  line-height: 28px !important;
+
+  white-space: nowrap !important;
+  overflow: hidden !important;
+  text-overflow: ellipsis !important;
+
+  outline: none !important;
+  box-shadow: none !important;
+}
+
+.factory-board-page .packing-clean-input::placeholder {
+  color: #98a2b3 !important;
+
+  font-size: 9px !important;
+  font-weight: 500 !important;
+}
+
+/* focus same clean tracking style */
+.factory-board-page .packing-clean-input:focus {
+  background: #ffffff !important;
+  border: 1px solid #d0d5dd !important;
+  border-radius: 4px !important;
+}
+
+
+/* =========================================================
+   FINAL STATUS COLUMN FIX
+   Equal black pipelines + full cell color + custom footer
+========================================================= */
+
+/* ROW STATUS CELL: exactly one line on each side */
+.factory-board-page .board-table-row > .board-col-name {
+  border-right: 0 !important;
+}
+
+.factory-board-page .board-table-row > .board-col-status.row-status-cell {
+  position: relative !important;
+
+  height: 54px !important;
+  min-height: 54px !important;
+  max-height: 54px !important;
+
+  padding: 0 !important;
+  margin: 0 !important;
+
+  border-left: 1px solid #111827 !important;
+  border-right: 1px solid #111827 !important;
+
+  display: flex !important;
+  align-items: stretch !important;
+  justify-content: stretch !important;
+
+  overflow: hidden !important;
+  box-sizing: border-box !important;
+}
+
+.factory-board-page .board-table-row > .board-col-owner {
+  border-left: 0 !important;
+}
+
+/* Kill old pseudo pipelines only in status cell */
+.factory-board-page .board-table-row > .board-col-status::before,
+.factory-board-page .board-table-row > .board-col-status::after {
+  content: none !important;
+  display: none !important;
+}
+
+/* Wrapper fills the exact space between both black lines */
+.factory-board-page .row-status-cell .status-ref-wrap {
+  width: 100% !important;
+  min-width: 0 !important;
+  max-width: 100% !important;
+
+  height: 100% !important;
+  min-height: 100% !important;
+  max-height: 100% !important;
+
+  padding: 0 !important;
+  margin: 0 !important;
+
+  display: flex !important;
+  align-items: stretch !important;
+
+  overflow: hidden !important;
+}
+
+/* Colored status fills ALL available cell area */
+.factory-board-page .row-status-cell .status-ref-trigger,
+.factory-board-page .row-status-cell .status-ref-trigger.open {
+  width: 100% !important;
+  min-width: 0 !important;
+  max-width: 100% !important;
+
+  height: 100% !important;
+  min-height: 100% !important;
+  max-height: 100% !important;
+
+  margin: 0 !important;
+  padding: 0 12px !important;
+
+  display: grid !important;
+  grid-template-columns: minmax(0, 1fr) 18px !important;
+  align-items: center !important;
+  gap: 6px !important;
+
+  background: var(--status-fill) !important;
+  background-color: var(--status-fill) !important;
+
+  color: var(--status-text) !important;
+
+  border: 0 !important;
+  border-radius: 0 !important;
+
+  outline: 0 !important;
+  box-shadow: none !important;
+
+  box-sizing: border-box !important;
+  overflow: hidden !important;
+}
+
+/* centered full status name */
+.factory-board-page .row-status-cell .status-ref-label {
+  width: 100% !important;
+  min-width: 0 !important;
+
+  display: block !important;
+
+  color: var(--status-text) !important;
+
+  font-size: 10px !important;
+  font-weight: 800 !important;
+  line-height: 1 !important;
+
+  text-align: center !important;
+
+  white-space: nowrap !important;
+  overflow: hidden !important;
+  text-overflow: ellipsis !important;
+}
+
+/* Arrow has NO inner divider line */
+.factory-board-page .row-status-cell .status-ref-chevron {
+  width: 18px !important;
+  min-width: 18px !important;
+  height: auto !important;
+
+  margin: 0 !important;
+  padding: 0 !important;
+
+  display: grid !important;
+  place-items: center !important;
+
+  color: var(--status-text) !important;
+
+  border: 0 !important;
+  border-left: 0 !important;
+  border-right: 0 !important;
+
+  font-size: 9px !important;
+}
+
+/* Header status/owner divider alignment */
+.factory-board-page .board-table-head > .board-col-status {
+  border-left: 1px solid rgba(255,255,255,.85) !important;
+  border-right: 1px solid rgba(255,255,255,.85) !important;
+  box-sizing: border-box !important;
+}
+
+.factory-board-page .board-table-head > .board-col-name {
+  border-right: 0 !important;
+}
+
+.factory-board-page .board-table-head > .board-col-owner {
+  border-left: 0 !important;
+}
+
+/* =========================================================
+   ROW STATUS DROPDOWN
+========================================================= */
+
+.factory-board-page .status-fixed-dropdown {
+  padding: 7px !important;
+
+  background: #ffffff !important;
+
+  border: 1px solid #d8dee8 !important;
+  border-radius: 12px !important;
+
+  box-shadow:
+    0 18px 45px rgba(15,23,42,.16),
+    0 4px 12px rgba(15,23,42,.08) !important;
+
+  overflow: visible !important;
+}
+
+.factory-board-page .status-fixed-option-row {
+  width: 100% !important;
+
+  display: flex !important;
+  align-items: center !important;
+
+  border-radius: 7px !important;
+
+  overflow: hidden !important;
+}
+
+.factory-board-page .status-fixed-option-row:hover,
+.factory-board-page .status-fixed-option-row.active {
+  background: #f4f6f8 !important;
+}
+
+.factory-board-page .status-fixed-option-row .status-fixed-option {
+  flex: 1 1 auto !important;
+  min-width: 0 !important;
+
+  border-radius: 0 !important;
+  background: transparent !important;
+}
+
+.factory-board-page .status-fixed-color-edit {
+  position: relative !important;
+
+  width: 32px !important;
+  height: 32px !important;
+  min-width: 32px !important;
+
+  display: grid !important;
+  place-items: center !important;
+
+  color: #667085 !important;
+
+  cursor: pointer !important;
+}
+
+.factory-board-page .status-fixed-color-edit i {
+  font-size: 10px !important;
+}
+
+.factory-board-page .status-fixed-color-edit input {
+  position: absolute !important;
+  inset: 0 !important;
+
+  width: 100% !important;
+  height: 100% !important;
+
+  opacity: 0 !important;
+  cursor: pointer !important;
+}
+
+/* =========================================================
+   ADD CUSTOM STATUS AT END OF DROPDOWN
+========================================================= */
+
+.factory-board-page .status-fixed-custom-add {
+  margin-top: 7px !important;
+  padding-top: 8px !important;
+
+  border-top: 1px solid #e7ebf0 !important;
+}
+
+.factory-board-page .status-fixed-custom-title {
+  margin-bottom: 7px !important;
+
+  display: flex !important;
+  align-items: center !important;
+  gap: 6px !important;
+
+  color: #344054 !important;
+
+  font-size: 9px !important;
+  font-weight: 800 !important;
+}
+
+.factory-board-page .status-fixed-custom-fields {
+  display: grid !important;
+  grid-template-columns: minmax(0, 1fr) 32px 42px !important;
+  align-items: center !important;
+  gap: 5px !important;
+}
+
+.factory-board-page .status-fixed-custom-input {
+  width: 100% !important;
+  height: 31px !important;
+
+  padding: 0 8px !important;
+
+  border: 1px solid #d0d5dd !important;
+  border-radius: 6px !important;
+
+  background: #ffffff !important;
+  color: #101828 !important;
+
+  outline: none !important;
+
+  font-size: 9px !important;
+  font-weight: 600 !important;
+}
+
+.factory-board-page .status-fixed-custom-input:focus {
+  border-color: #98a2b3 !important;
+  box-shadow: 0 0 0 3px rgba(15,23,42,.05) !important;
+}
+
+.factory-board-page .status-fixed-custom-color {
+  width: 32px !important;
+  height: 31px !important;
+
+  display: block !important;
+
+  overflow: hidden !important;
+
+  border: 1px solid #d0d5dd !important;
+  border-radius: 6px !important;
+
+  background: #ffffff !important;
+}
+
+.factory-board-page .status-fixed-custom-color input {
+  width: 42px !important;
+  height: 41px !important;
+
+  margin: -5px !important;
+  padding: 0 !important;
+
+  border: 0 !important;
+  cursor: pointer !important;
+}
+
+.factory-board-page .status-fixed-custom-button {
+  height: 31px !important;
+
+  padding: 0 8px !important;
+
+  border: 0 !important;
+  border-radius: 6px !important;
+
+  background: #101828 !important;
+  color: #ffffff !important;
+
+  font-size: 8px !important;
+  font-weight: 800 !important;
+
+  cursor: pointer !important;
+}
+
+.factory-board-page .status-fixed-custom-button:disabled {
+  opacity: .4 !important;
+  cursor: not-allowed !important;
+}
+
+/* Dark mode */
+.factory-board-page.theme-dark .status-fixed-dropdown {
+  background: #111827 !important;
+  border-color: #334155 !important;
+}
+
+.factory-board-page.theme-dark .status-fixed-option-row:hover,
+.factory-board-page.theme-dark .status-fixed-option-row.active {
+  background: #1f2937 !important;
+}
+
+.factory-board-page.theme-dark .status-fixed-custom-add {
+  border-top-color: #334155 !important;
+}
+
+.factory-board-page.theme-dark .status-fixed-custom-title {
+  color: #f8fafc !important;
+}
+
+.factory-board-page.theme-dark .status-fixed-custom-input,
+.factory-board-page.theme-dark .status-fixed-custom-color {
+  background: #0f172a !important;
+  border-color: #475569 !important;
+  color: #f8fafc !important;
+}
+
+
+
+/* =========================================================
+   MONDAY-STYLE ROW STATUS MANAGER
+   Keep this block at the VERY END
+========================================================= */
+
+.factory-board-page .monday-status-menu {
+  width: 320px !important;
+  min-width: 320px !important;
+  max-width: min(320px, calc(100vw - 24px)) !important;
+
+  padding: 0 !important;
+
+  overflow: hidden !important;
+
+  background: #ffffff !important;
+
+  border: 1px solid #d9dee7 !important;
+  border-radius: 12px !important;
+
+  box-shadow:
+    0 20px 55px rgba(15, 23, 42, .18),
+    0 4px 14px rgba(15, 23, 42, .08) !important;
+}
+
+/* header */
+.factory-board-page .monday-status-menu-head {
+  min-height: 56px !important;
+
+  padding: 10px 12px !important;
+
+  display: flex !important;
+  align-items: center !important;
+  justify-content: space-between !important;
+  gap: 10px !important;
+
+  background: #ffffff !important;
+
+  border-bottom: 1px solid #edf0f4 !important;
+}
+
+.factory-board-page .monday-status-menu-head > div {
+  min-width: 0 !important;
+
+  display: flex !important;
+  flex-direction: column !important;
+  gap: 2px !important;
+}
+
+.factory-board-page .monday-status-menu-head strong {
+  color: #101828 !important;
+
+  font-size: 12px !important;
+  font-weight: 800 !important;
+}
+
+.factory-board-page .monday-status-menu-head small {
+  max-width: 235px !important;
+
+  color: #98a2b3 !important;
+
+  font-size: 8px !important;
+  font-weight: 600 !important;
+
+  white-space: nowrap !important;
+  overflow: hidden !important;
+  text-overflow: ellipsis !important;
+}
+
+.factory-board-page .monday-status-close {
+  width: 29px !important;
+  height: 29px !important;
+  min-width: 29px !important;
+
+  padding: 0 !important;
+
+  display: grid !important;
+  place-items: center !important;
+
+  border: 0 !important;
+  border-radius: 7px !important;
+
+  background: transparent !important;
+  color: #667085 !important;
+
+  cursor: pointer !important;
+}
+
+.factory-board-page .monday-status-close:hover {
+  background: #f2f4f7 !important;
+  color: #101828 !important;
+}
+
+/* list */
+.factory-board-page .monday-status-options {
+  max-height: 310px !important;
+
+  padding: 6px !important;
+
+  overflow-y: auto !important;
+  overflow-x: hidden !important;
+}
+
+.factory-board-page .monday-status-row {
+  position: relative !important;
+
+  width: 100% !important;
+  min-height: 38px !important;
+
+  display: flex !important;
+  align-items: center !important;
+
+  border-radius: 7px !important;
+
+  transition: background .15s ease !important;
+}
+
+.factory-board-page .monday-status-row:hover,
+.factory-board-page .monday-status-row.active {
+  background: #f5f6f8 !important;
+}
+
+.factory-board-page .monday-status-row.active {
+  box-shadow: inset 3px 0 0 #101828 !important;
+}
+
+/* selectable status */
+.factory-board-page .monday-status-select {
+  flex: 1 1 auto !important;
+  min-width: 0 !important;
+  height: 38px !important;
+
+  padding: 0 8px !important;
+
+  display: grid !important;
+  grid-template-columns: 9px minmax(0, 1fr) 18px !important;
+  align-items: center !important;
+  gap: 8px !important;
+
+  border: 0 !important;
+  border-radius: 7px !important;
+
+  background: transparent !important;
+  color: #475467 !important;
+
+  text-align: left !important;
+  cursor: pointer !important;
+}
+
+.factory-board-page .monday-status-dot {
+  width: 8px !important;
+  height: 8px !important;
+  min-width: 8px !important;
+
+  border-radius: 50% !important;
+}
+
+.factory-board-page .monday-status-name {
+  min-width: 0 !important;
+
+  color: #475467 !important;
+
+  font-size: 10px !important;
+  font-weight: 600 !important;
+
+  white-space: nowrap !important;
+  overflow: hidden !important;
+  text-overflow: ellipsis !important;
+}
+
+.factory-board-page .monday-status-check {
+  color: #101828 !important;
+  font-size: 9px !important;
+}
+
+/* edit/delete actions */
+.factory-board-page .monday-status-actions {
+  width: 58px !important;
+  min-width: 58px !important;
+
+  padding-right: 4px !important;
+
+  display: flex !important;
+  align-items: center !important;
+  justify-content: flex-end !important;
+  gap: 2px !important;
+
+  opacity: 0 !important;
+  transform: translateX(4px) !important;
+
+  transition:
+    opacity .15s ease,
+    transform .15s ease !important;
+}
+
+.factory-board-page .monday-status-row:hover .monday-status-actions {
+  opacity: 1 !important;
+  transform: translateX(0) !important;
+}
+
+.factory-board-page .monday-status-actions button {
+  width: 26px !important;
+  height: 26px !important;
+
+  padding: 0 !important;
+
+  display: grid !important;
+  place-items: center !important;
+
+  border: 0 !important;
+  border-radius: 6px !important;
+
+  background: transparent !important;
+  color: #667085 !important;
+
+  cursor: pointer !important;
+}
+
+.factory-board-page .monday-status-actions button:hover {
+  background: #e9edf2 !important;
+  color: #101828 !important;
+}
+
+.factory-board-page .monday-status-actions button.danger:hover {
+  background: #fff0f0 !important;
+  color: #d92d20 !important;
+}
+
+/* inline edit */
+.factory-board-page .monday-status-row.editing {
+  padding: 5px !important;
+  background: #f7f8fa !important;
+}
+
+.factory-board-page .monday-status-edit-row {
+  width: 100% !important;
+
+  display: grid !important;
+  grid-template-columns: 30px minmax(0, 1fr) 28px 28px !important;
+  align-items: center !important;
+  gap: 5px !important;
+}
+
+.factory-board-page .monday-status-color-button {
+  position: relative !important;
+
+  width: 30px !important;
+  height: 30px !important;
+
+  display: grid !important;
+  place-items: center !important;
+
+  border: 1px solid #d0d5dd !important;
+  border-radius: 7px !important;
+
+  background: #ffffff !important;
+
+  overflow: hidden !important;
+  cursor: pointer !important;
+}
+
+.factory-board-page .monday-status-color-button > span {
+  width: 16px !important;
+  height: 16px !important;
+
+  border-radius: 5px !important;
+}
+
+.factory-board-page .monday-status-color-button input {
+  position: absolute !important;
+  inset: 0 !important;
+
+  width: 100% !important;
+  height: 100% !important;
+
+  opacity: 0 !important;
+  cursor: pointer !important;
+}
+
+.factory-board-page .monday-status-edit-input {
+  width: 100% !important;
+  min-width: 0 !important;
+  height: 30px !important;
+
+  padding: 0 8px !important;
+
+  border: 1px solid #d0d5dd !important;
+  border-radius: 7px !important;
+
+  background: #ffffff !important;
+  color: #101828 !important;
+
+  outline: none !important;
+
+  font-size: 9px !important;
+  font-weight: 600 !important;
+}
+
+.factory-board-page .monday-status-edit-input:focus {
+  border-color: #8b95a7 !important;
+  box-shadow: 0 0 0 3px rgba(15, 23, 42, .05) !important;
+}
+
+.factory-board-page .monday-status-save-edit,
+.factory-board-page .monday-status-cancel-edit {
+  width: 28px !important;
+  height: 28px !important;
+
+  padding: 0 !important;
+
+  display: grid !important;
+  place-items: center !important;
+
+  border: 0 !important;
+  border-radius: 6px !important;
+
+  cursor: pointer !important;
+}
+
+.factory-board-page .monday-status-save-edit {
+  background: #101828 !important;
+  color: #ffffff !important;
+}
+
+.factory-board-page .monday-status-cancel-edit {
+  background: #eaecf0 !important;
+  color: #475467 !important;
+}
+
+/* add status footer */
+.factory-board-page .monday-status-add {
+  padding: 10px !important;
+
+  background: #fafbfc !important;
+
+  border-top: 1px solid #e7ebf0 !important;
+}
+
+.factory-board-page .monday-status-add-title {
+  margin-bottom: 8px !important;
+
+  display: flex !important;
+  align-items: center !important;
+  gap: 8px !important;
+}
+
+.factory-board-page .monday-status-add-icon {
+  width: 27px !important;
+  height: 27px !important;
+
+  display: grid !important;
+  place-items: center !important;
+
+  border: 1px solid #d0d5dd !important;
+  border-radius: 7px !important;
+
+  background: #ffffff !important;
+  color: #344054 !important;
+
+  font-size: 9px !important;
+}
+
+.factory-board-page .monday-status-add-title > div {
+  min-width: 0 !important;
+
+  display: flex !important;
+  flex-direction: column !important;
+  gap: 1px !important;
+}
+
+.factory-board-page .monday-status-add-title strong {
+  color: #344054 !important;
+
+  font-size: 9px !important;
+  font-weight: 800 !important;
+}
+
+.factory-board-page .monday-status-add-title small {
+  color: #98a2b3 !important;
+
+  font-size: 7px !important;
+  font-weight: 500 !important;
+}
+
+.factory-board-page .monday-status-add-form {
+  display: grid !important;
+  grid-template-columns: 34px minmax(0, 1fr) 48px !important;
+  align-items: center !important;
+  gap: 6px !important;
+}
+
+.factory-board-page .monday-status-add-color {
+  position: relative !important;
+
+  width: 34px !important;
+  height: 32px !important;
+
+  display: grid !important;
+  place-items: center !important;
+
+  border: 1px solid #d0d5dd !important;
+  border-radius: 7px !important;
+
+  background: #ffffff !important;
+
+  overflow: hidden !important;
+  cursor: pointer !important;
+}
+
+.factory-board-page .monday-status-add-color > span {
+  width: 18px !important;
+  height: 18px !important;
+
+  border-radius: 5px !important;
+}
+
+.factory-board-page .monday-status-add-color input {
+  position: absolute !important;
+  inset: 0 !important;
+
+  width: 100% !important;
+  height: 100% !important;
+
+  opacity: 0 !important;
+  cursor: pointer !important;
+}
+
+.factory-board-page .monday-status-add-input {
+  width: 100% !important;
+  min-width: 0 !important;
+  height: 32px !important;
+
+  padding: 0 8px !important;
+
+  border: 1px solid #d0d5dd !important;
+  border-radius: 7px !important;
+
+  background: #ffffff !important;
+  color: #101828 !important;
+
+  outline: none !important;
+
+  font-size: 9px !important;
+  font-weight: 600 !important;
+}
+
+.factory-board-page .monday-status-add-input:focus {
+  border-color: #8b95a7 !important;
+  box-shadow: 0 0 0 3px rgba(15, 23, 42, .05) !important;
+}
+
+.factory-board-page .monday-status-add-button {
+  height: 32px !important;
+
+  padding: 0 10px !important;
+
+  border: 0 !important;
+  border-radius: 7px !important;
+
+  background: #101828 !important;
+  color: #ffffff !important;
+
+  font-size: 8px !important;
+  font-weight: 800 !important;
+
+  cursor: pointer !important;
+}
+
+.factory-board-page .monday-status-add-button:disabled {
+  opacity: .35 !important;
+  cursor: not-allowed !important;
+}
+
+/* Dark */
+.factory-board-page.theme-dark .monday-status-menu,
+.factory-board-page.theme-dark .monday-status-menu-head {
+  background: #111827 !important;
+  border-color: #334155 !important;
+}
+
+.factory-board-page.theme-dark .monday-status-menu-head strong,
+.factory-board-page.theme-dark .monday-status-name {
+  color: #f8fafc !important;
+}
+
+.factory-board-page.theme-dark .monday-status-row:hover,
+.factory-board-page.theme-dark .monday-status-row.active,
+.factory-board-page.theme-dark .monday-status-row.editing {
+  background: #1f2937 !important;
+}
+
+.factory-board-page.theme-dark .monday-status-add {
+  background: #0f172a !important;
+  border-color: #334155 !important;
+}
+
+.factory-board-page.theme-dark .monday-status-add-title strong {
+  color: #f8fafc !important;
+}
+
+.factory-board-page.theme-dark .monday-status-edit-input,
+.factory-board-page.theme-dark .monday-status-add-input,
+.factory-board-page.theme-dark .monday-status-color-button,
+.factory-board-page.theme-dark .monday-status-add-color {
+  background: #111827 !important;
+  border-color: #475569 !important;
+  color: #f8fafc !important;
+}
+
+</style>
+
+
+<style>
+/* =========================================================
+   GLOBAL STATUS DROPDOWN FIX
+   This block is intentionally NOT scoped.
+   The status popup uses position:fixed and had old rules
+   overriding the newer scoped styles.
+========================================================= */
+
+.monday-status-menu.status-fixed-dropdown {
+  position: fixed !important;
+  z-index: 2147483647 !important;
+
+  width: 320px !important;
+  min-width: 320px !important;
+  max-width: min(320px, calc(100vw - 24px)) !important;
+
+  max-height: none !important;
+  padding: 0 !important;
+
+  overflow: hidden !important;
+
+  background: #ffffff !important;
+  border: 1px solid #d9dee7 !important;
+  border-radius: 12px !important;
+
+  box-shadow:
+    0 22px 60px rgba(15, 23, 42, .18),
+    0 5px 16px rgba(15, 23, 42, .08) !important;
+
+  color: #101828 !important;
+
+  font-family: inherit !important;
+}
+
+/* HEADER */
+.monday-status-menu .monday-status-menu-head {
+  min-height: 55px !important;
+  padding: 10px 12px !important;
+
+  display: flex !important;
+  align-items: center !important;
+  justify-content: space-between !important;
+  gap: 10px !important;
+
+  background: #ffffff !important;
+  border-bottom: 1px solid #edf0f4 !important;
+}
+
+.monday-status-menu .monday-status-menu-head > div {
+  min-width: 0 !important;
+
+  display: flex !important;
+  flex-direction: column !important;
+  gap: 2px !important;
+}
+
+.monday-status-menu .monday-status-menu-head strong {
+  color: #101828 !important;
+  font-size: 12px !important;
+  font-weight: 800 !important;
+  line-height: 1.2 !important;
+}
+
+.monday-status-menu .monday-status-menu-head small {
+  display: block !important;
+  max-width: 235px !important;
+
+  color: #98a2b3 !important;
+  font-size: 8px !important;
+  font-weight: 600 !important;
+
+  white-space: nowrap !important;
+  overflow: hidden !important;
+  text-overflow: ellipsis !important;
+}
+
+.monday-status-menu .monday-status-close {
+  width: 29px !important;
+  height: 29px !important;
+  min-width: 29px !important;
+
+  padding: 0 !important;
+
+  display: grid !important;
+  place-items: center !important;
+
+  border: 0 !important;
+  border-radius: 7px !important;
+
+  background: transparent !important;
+  color: #667085 !important;
+
+  cursor: pointer !important;
+}
+
+.monday-status-menu .monday-status-close:hover {
+  background: #f2f4f7 !important;
+  color: #101828 !important;
+}
+
+/* OPTIONS AREA ONLY SCROLLS */
+.monday-status-menu .monday-status-options {
+  max-height: 285px !important;
+
+  padding: 6px !important;
+
+  overflow-y: auto !important;
+  overflow-x: hidden !important;
+
+  background: #ffffff !important;
+}
+
+.monday-status-menu .monday-status-row {
+  position: relative !important;
+
+  width: 100% !important;
+  min-height: 38px !important;
+
+  display: flex !important;
+  align-items: center !important;
+
+  margin: 0 !important;
+  padding: 0 !important;
+
+  border: 0 !important;
+  border-radius: 7px !important;
+
+  background: transparent !important;
+}
+
+.monday-status-menu .monday-status-row + .monday-status-row {
+  margin-top: 2px !important;
+}
+
+.monday-status-menu .monday-status-row:hover,
+.monday-status-menu .monday-status-row.active {
+  background: #f4f5f7 !important;
+}
+
+.monday-status-menu .monday-status-row.active {
+  box-shadow: inset 3px 0 0 #111827 !important;
+}
+
+/* STATUS SELECT BUTTON */
+.monday-status-menu .monday-status-select {
+  flex: 1 1 auto !important;
+  min-width: 0 !important;
+  height: 38px !important;
+
+  padding: 0 8px !important;
+  margin: 0 !important;
+
+  display: grid !important;
+  grid-template-columns: 9px minmax(0, 1fr) 18px !important;
+  align-items: center !important;
+  gap: 8px !important;
+
+  border: 0 !important;
+  border-radius: 7px !important;
+
+  background: transparent !important;
+  color: #475467 !important;
+
+  text-align: left !important;
+  cursor: pointer !important;
+}
+
+.monday-status-menu .monday-status-dot {
+  width: 8px !important;
+  height: 8px !important;
+  min-width: 8px !important;
+
+  display: block !important;
+  border-radius: 50% !important;
+}
+
+.monday-status-menu .monday-status-name {
+  min-width: 0 !important;
+
+  display: block !important;
+
+  color: #475467 !important;
+  font-size: 10px !important;
+  font-weight: 600 !important;
+  line-height: 1 !important;
+
+  white-space: nowrap !important;
+  overflow: hidden !important;
+  text-overflow: ellipsis !important;
+}
+
+.monday-status-menu .monday-status-check {
+  color: #101828 !important;
+  font-size: 9px !important;
+}
+
+/* EDIT + DELETE ONLY FOR CUSTOM STATUS */
+.monday-status-menu .monday-status-actions {
+  width: 58px !important;
+  min-width: 58px !important;
+
+  padding-right: 4px !important;
+
+  display: flex !important;
+  align-items: center !important;
+  justify-content: flex-end !important;
+  gap: 2px !important;
+
+  opacity: 0 !important;
+  visibility: hidden !important;
+
+  transition: opacity .15s ease !important;
+}
+
+.monday-status-menu .monday-status-row:hover .monday-status-actions {
+  opacity: 1 !important;
+  visibility: visible !important;
+}
+
+.monday-status-menu .monday-status-actions button {
+  width: 26px !important;
+  height: 26px !important;
+  min-width: 26px !important;
+
+  padding: 0 !important;
+  margin: 0 !important;
+
+  display: grid !important;
+  place-items: center !important;
+
+  border: 0 !important;
+  border-radius: 6px !important;
+
+  background: transparent !important;
+  color: #667085 !important;
+
+  cursor: pointer !important;
+}
+
+.monday-status-menu .monday-status-actions button:hover {
+  background: #e9edf2 !important;
+  color: #101828 !important;
+}
+
+.monday-status-menu .monday-status-actions button.danger:hover {
+  background: #fff0f0 !important;
+  color: #d92d20 !important;
+}
+
+/* INLINE EDIT MODE */
+.monday-status-menu .monday-status-row.editing {
+  padding: 5px !important;
+  background: #f7f8fa !important;
+}
+
+.monday-status-menu .monday-status-edit-row {
+  width: 100% !important;
+
+  display: grid !important;
+  grid-template-columns: 30px minmax(0, 1fr) 28px 28px !important;
+  align-items: center !important;
+  gap: 5px !important;
+}
+
+.monday-status-menu .monday-status-color-button {
+  position: relative !important;
+
+  width: 30px !important;
+  height: 30px !important;
+
+  display: grid !important;
+  place-items: center !important;
+
+  border: 1px solid #d0d5dd !important;
+  border-radius: 7px !important;
+
+  background: #ffffff !important;
+
+  overflow: hidden !important;
+  cursor: pointer !important;
+}
+
+.monday-status-menu .monday-status-color-button > span {
+  width: 16px !important;
+  height: 16px !important;
+  display: block !important;
+  border-radius: 5px !important;
+}
+
+.monday-status-menu .monday-status-color-button input {
+  position: absolute !important;
+  inset: 0 !important;
+
+  width: 100% !important;
+  height: 100% !important;
+
+  opacity: 0 !important;
+  cursor: pointer !important;
+}
+
+.monday-status-menu .monday-status-edit-input {
+  width: 100% !important;
+  min-width: 0 !important;
+  height: 30px !important;
+
+  padding: 0 8px !important;
+
+  border: 1px solid #d0d5dd !important;
+  border-radius: 7px !important;
+
+  background: #ffffff !important;
+  color: #101828 !important;
+
+  outline: none !important;
+
+  font-size: 9px !important;
+  font-weight: 600 !important;
+}
+
+.monday-status-menu .monday-status-edit-input:focus {
+  border-color: #98a2b3 !important;
+  box-shadow: 0 0 0 3px rgba(15, 23, 42, .05) !important;
+}
+
+.monday-status-menu .monday-status-save-edit,
+.monday-status-menu .monday-status-cancel-edit {
+  width: 28px !important;
+  height: 28px !important;
+
+  padding: 0 !important;
+
+  display: grid !important;
+  place-items: center !important;
+
+  border: 0 !important;
+  border-radius: 6px !important;
+
+  cursor: pointer !important;
+}
+
+.monday-status-menu .monday-status-save-edit {
+  background: #101828 !important;
+  color: #ffffff !important;
+}
+
+.monday-status-menu .monday-status-cancel-edit {
+  background: #eaecf0 !important;
+  color: #475467 !important;
+}
+
+/* ADD CUSTOM STATUS FOOTER */
+.monday-status-menu .monday-status-add {
+  padding: 10px !important;
+
+  background: #fafbfc !important;
+  border-top: 1px solid #e7ebf0 !important;
+}
+
+.monday-status-menu .monday-status-add-title {
+  margin-bottom: 8px !important;
+
+  display: flex !important;
+  align-items: center !important;
+  gap: 8px !important;
+}
+
+.monday-status-menu .monday-status-add-icon {
+  width: 27px !important;
+  height: 27px !important;
+  min-width: 27px !important;
+
+  display: grid !important;
+  place-items: center !important;
+
+  border: 1px solid #d0d5dd !important;
+  border-radius: 7px !important;
+
+  background: #ffffff !important;
+  color: #344054 !important;
+
+  font-size: 9px !important;
+}
+
+.monday-status-menu .monday-status-add-title > div {
+  min-width: 0 !important;
+
+  display: flex !important;
+  flex-direction: column !important;
+  gap: 1px !important;
+}
+
+.monday-status-menu .monday-status-add-title strong {
+  color: #344054 !important;
+  font-size: 9px !important;
+  font-weight: 800 !important;
+}
+
+.monday-status-menu .monday-status-add-title small {
+  color: #98a2b3 !important;
+  font-size: 7px !important;
+  font-weight: 500 !important;
+}
+
+.monday-status-menu .monday-status-add-form {
+  display: grid !important;
+  grid-template-columns: 34px minmax(0, 1fr) 48px !important;
+  align-items: center !important;
+  gap: 6px !important;
+}
+
+.monday-status-menu .monday-status-add-color {
+  position: relative !important;
+
+  width: 34px !important;
+  height: 32px !important;
+
+  display: grid !important;
+  place-items: center !important;
+
+  border: 1px solid #d0d5dd !important;
+  border-radius: 7px !important;
+
+  background: #ffffff !important;
+
+  overflow: hidden !important;
+  cursor: pointer !important;
+}
+
+.monday-status-menu .monday-status-add-color > span {
+  width: 18px !important;
+  height: 18px !important;
+
+  display: block !important;
+  border-radius: 5px !important;
+}
+
+.monday-status-menu .monday-status-add-color input {
+  position: absolute !important;
+  inset: 0 !important;
+
+  width: 100% !important;
+  height: 100% !important;
+
+  opacity: 0 !important;
+  cursor: pointer !important;
+}
+
+.monday-status-menu .monday-status-add-input {
+  width: 100% !important;
+  min-width: 0 !important;
+  height: 32px !important;
+
+  padding: 0 8px !important;
+
+  border: 1px solid #d0d5dd !important;
+  border-radius: 7px !important;
+
+  background: #ffffff !important;
+  color: #101828 !important;
+
+  outline: none !important;
+
+  font-size: 9px !important;
+  font-weight: 600 !important;
+}
+
+.monday-status-menu .monday-status-add-input:focus {
+  border-color: #98a2b3 !important;
+  box-shadow: 0 0 0 3px rgba(15, 23, 42, .05) !important;
+}
+
+.monday-status-menu .monday-status-add-button {
+  height: 32px !important;
+
+  padding: 0 10px !important;
+
+  border: 0 !important;
+  border-radius: 7px !important;
+
+  background: #101828 !important;
+  color: #ffffff !important;
+
+  font-size: 8px !important;
+  font-weight: 800 !important;
+
+  cursor: pointer !important;
+}
+
+.monday-status-menu .monday-status-add-button:disabled {
+  opacity: .35 !important;
+  cursor: not-allowed !important;
+}
+
+/* DARK MODE */
+.theme-dark .monday-status-menu.status-fixed-dropdown,
+.theme-dark .monday-status-menu .monday-status-menu-head,
+.theme-dark .monday-status-menu .monday-status-options {
+  background: #111827 !important;
+  border-color: #334155 !important;
+}
+
+.theme-dark .monday-status-menu .monday-status-menu-head strong,
+.theme-dark .monday-status-menu .monday-status-name {
+  color: #f8fafc !important;
+}
+
+.theme-dark .monday-status-menu .monday-status-row:hover,
+.theme-dark .monday-status-menu .monday-status-row.active,
+.theme-dark .monday-status-menu .monday-status-row.editing {
+  background: #1f2937 !important;
+}
+
+.theme-dark .monday-status-menu .monday-status-add {
+  background: #0f172a !important;
+  border-color: #334155 !important;
+}
+
+.theme-dark .monday-status-menu .monday-status-add-title strong {
+  color: #f8fafc !important;
+}
+
+.theme-dark .monday-status-menu .monday-status-edit-input,
+.theme-dark .monday-status-menu .monday-status-add-input,
+.theme-dark .monday-status-menu .monday-status-color-button,
+.theme-dark .monday-status-menu .monday-status-add-color {
+  background: #111827 !important;
+  border-color: #475569 !important;
+  color: #f8fafc !important;
 }
 
 </style>
