@@ -113,18 +113,15 @@ export default {
 <style scoped>
 .page-header {
   width: 100%;
-  min-height: 104px;
+  min-height: 165px;
   padding: 20px 28px;
 
   display: flex;
   align-items: center;
   justify-content: space-between;
   gap: 24px;
+  background: #f4f5f8;
 
-  background: #ffffff;
-  border: 1px solid #e2e5eb;
-  border-radius: 14px;
-  box-shadow: 0 4px 18px rgba(15, 23, 42, .045);
 }
 
 .page-header__copy {
