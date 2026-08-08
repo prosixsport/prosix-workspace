@@ -13800,4 +13800,294 @@ body.board-column-resizing .column-resizer::before {
   display: none !important;
 }
 
+
+/* =========================================================
+   CHAT NOTIFICATION DROPDOWN - REAL PAGE CSS
+   ========================================================= */
+
+.chat-notification-wrap {
+  position: relative !important;
+  flex: 0 0 auto !important;
+  z-index: 1000 !important;
+}
+
+.chat-notification-button {
+  position: relative !important;
+  width: 40px !important;
+  height: 38px !important;
+  padding: 0 !important;
+
+  display: grid !important;
+  place-items: center !important;
+
+  border: 1px solid #0f172a !important;
+  border-radius: 999px !important;
+
+  background: #ffffff !important;
+  color: #0f172a !important;
+
+  cursor: pointer !important;
+}
+
+.chat-notification-count {
+  position: absolute !important;
+  top: -6px !important;
+  right: -7px !important;
+
+  min-width: 19px !important;
+  height: 19px !important;
+  padding: 0 5px !important;
+
+  display: grid !important;
+  place-items: center !important;
+
+  background: #ef4444 !important;
+  color: #ffffff !important;
+
+  border: 2px solid #ffffff !important;
+  border-radius: 999px !important;
+
+  font-size: 9px !important;
+  font-weight: 900 !important;
+  line-height: 1 !important;
+}
+
+.chat-notification-dropdown {
+  position: absolute !important;
+
+  top: calc(100% + 10px) !important;
+  right: 0 !important;
+  left: auto !important;
+
+  z-index: 2147483647 !important;
+
+  width: 360px !important;
+  min-width: 360px !important;
+  max-width: min(360px, calc(100vw - 24px)) !important;
+  max-height: 420px !important;
+
+  overflow-y: auto !important;
+  overflow-x: hidden !important;
+
+  background: #ffffff !important;
+
+  border: 1px solid #dbe2ea !important;
+  border-radius: 14px !important;
+
+  box-shadow:
+    0 22px 55px rgba(15, 23, 42, .18),
+    0 4px 12px rgba(15, 23, 42, .06) !important;
+}
+
+.chat-notification-head {
+  position: sticky !important;
+  top: 0 !important;
+  z-index: 2 !important;
+
+  width: 100% !important;
+  padding: 13px 14px !important;
+
+  display: flex !important;
+  align-items: center !important;
+  justify-content: space-between !important;
+  gap: 12px !important;
+
+  background: #ffffff !important;
+
+  border-bottom: 1px solid #e8edf3 !important;
+}
+
+.chat-notification-head strong {
+  color: #0f172a !important;
+  font-size: 13px !important;
+  font-weight: 900 !important;
+  white-space: nowrap !important;
+}
+
+.chat-notification-head span {
+  color: #64748b !important;
+  font-size: 10px !important;
+  font-weight: 700 !important;
+  white-space: nowrap !important;
+}
+
+.chat-notification-item {
+  width: 100% !important;
+  min-width: 0 !important;
+
+  padding: 11px 12px !important;
+
+  display: grid !important;
+  grid-template-columns: 36px minmax(0, 1fr) 26px !important;
+  align-items: center !important;
+  gap: 10px !important;
+
+  border: 0 !important;
+  border-bottom: 1px solid #eef2f7 !important;
+
+  background: #ffffff !important;
+  color: #0f172a !important;
+
+  cursor: pointer !important;
+  text-align: left !important;
+}
+
+.chat-notification-item:last-of-type {
+  border-bottom: 0 !important;
+}
+
+.chat-notification-item:hover {
+  background: #f8fafc !important;
+}
+
+.chat-notification-icon {
+  width: 36px !important;
+  height: 36px !important;
+  min-width: 36px !important;
+
+  display: grid !important;
+  place-items: center !important;
+
+  border-radius: 50% !important;
+
+  background: #0f172a !important;
+  color: #ffffff !important;
+
+  font-size: 12px !important;
+}
+
+.chat-notification-content {
+  min-width: 0 !important;
+  width: 100% !important;
+
+  display: flex !important;
+  flex-direction: column !important;
+  gap: 3px !important;
+}
+
+.chat-notification-content strong {
+  display: block !important;
+
+  min-width: 0 !important;
+  max-width: none !important;
+
+  overflow: hidden !important;
+
+  color: #0f172a !important;
+
+  font-size: 11px !important;
+  font-weight: 900 !important;
+
+  white-space: nowrap !important;
+  text-overflow: ellipsis !important;
+}
+
+.chat-notification-content small {
+  display: block !important;
+
+  min-width: 0 !important;
+  max-width: none !important;
+
+  overflow: hidden !important;
+
+  color: #64748b !important;
+
+  font-size: 9px !important;
+  font-weight: 600 !important;
+
+  white-space: nowrap !important;
+  text-overflow: ellipsis !important;
+}
+
+.chat-notification-badge {
+  width: 24px !important;
+  height: 24px !important;
+  min-width: 24px !important;
+
+  display: grid !important;
+  place-items: center !important;
+
+  padding: 0 !important;
+
+  border-radius: 999px !important;
+
+  background: #ef4444 !important;
+  color: #ffffff !important;
+
+  font-size: 9px !important;
+  font-weight: 900 !important;
+}
+
+.chat-notification-empty {
+  min-height: 110px !important;
+
+  display: flex !important;
+  flex-direction: column !important;
+  align-items: center !important;
+  justify-content: center !important;
+  gap: 8px !important;
+
+  padding: 20px !important;
+
+  color: #64748b !important;
+
+  font-size: 11px !important;
+  font-weight: 700 !important;
+}
+
+/* Keep toolbar controls aligned */
+.board-toolbar-actions {
+  display: flex !important;
+  align-items: center !important;
+  justify-content: flex-end !important;
+  gap: 10px !important;
+  overflow: visible !important;
+}
+
+.board-toolbar {
+  overflow: visible !important;
+}
+
+/* DARK */
+.theme-dark .chat-notification-button,
+.theme-dark .chat-notification-dropdown,
+.theme-dark .chat-notification-head,
+.theme-dark .chat-notification-item {
+  background: #111827 !important;
+  color: #f8fafc !important;
+  border-color: #334155 !important;
+}
+
+.theme-dark .chat-notification-item:hover {
+  background: #1e293b !important;
+}
+
+.theme-dark .chat-notification-head strong,
+.theme-dark .chat-notification-content strong {
+  color: #f8fafc !important;
+}
+
+.theme-dark .chat-notification-head span,
+.theme-dark .chat-notification-content small,
+.theme-dark .chat-notification-empty {
+  color: #cbd5e1 !important;
+}
+
+/* MOBILE */
+@media (max-width: 767px) {
+  .chat-notification-dropdown {
+    position: fixed !important;
+
+    top: 72px !important;
+    right: 12px !important;
+    left: 12px !important;
+
+    width: auto !important;
+    min-width: 0 !important;
+    max-width: none !important;
+
+    max-height: calc(100vh - 90px) !important;
+  }
+}
+
 </style>
