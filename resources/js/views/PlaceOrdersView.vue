@@ -162,65 +162,34 @@
               </td>
 
               <td class="status-cell">
-                <div class="clean-status-wrap" @click.stop>
-                  <button
-                    type="button"
-                    class="clean-status-trigger"
-                    :style="statusSelectStyle(order.status)"
+                <div class="status-select-shell">
+                  <span
+                    class="status-select-dot"
+                    :style="{ backgroundColor: statusColor(order.status) }"
+                  ></span>
+
+                  <select
+                    class="status-select-pro"
+                    :value="normalizeStatus(order.status)"
                     :disabled="!canEditStatus || savingOrderId === order.id"
-                    @click="toggleStatusMenu(order)"
+                    :style="statusSelectStyle(order.status)"
+                    @change="handleStatusSelect(order, $event)"
                   >
-                    <span
-                      class="clean-status-dot"
-                      :style="{ backgroundColor: statusColor(order.status) }"
-                    ></span>
-
-                    <span class="clean-status-label">
-                      {{ statusLabel(order.status) }}
-                    </span>
-
-                    <i class="fa-solid fa-chevron-down"></i>
-                  </button>
-
-                  <div
-                    v-if="order._statusMenu && canEditStatus"
-                    class="clean-status-menu"
-                    @click.stop
-                  >
-                    <button
+                    <option
                       v-for="status in statusDefinitions"
                       :key="status.id || status.value"
-                      type="button"
-                      class="clean-status-option"
-                      :class="{
-                        active: normalizeStatus(order.status) === status.value
-                      }"
-                      @click="changeOrderStatus(order, status.value)"
+                      :value="status.value"
                     >
-                      <span
-                        class="clean-status-dot"
-                        :style="{ backgroundColor: status.color }"
-                      ></span>
+                      {{ status.name }}
+                    </option>
 
-                      <span>{{ status.name }}</span>
-
-                      <i
-                        v-if="normalizeStatus(order.status) === status.value"
-                        class="fa-solid fa-check status-check"
-                      ></i>
-                    </button>
-
-                    <div class="clean-status-divider"></div>
-
-                    <button
-                      type="button"
-                      class="clean-status-manage"
-                      @click="openStatusManager(order)"
+                    <option
+                      v-if="canEditStatus"
+                      value="__customize__"
                     >
-                      <span class="manage-plus">+</span>
-                      <span>Add / Edit Status</span>
-                    </button>
-                  </div>
+                      ⚙ Customize Statuses...
+                    </option>
+                  </select>
                 </div>
 
                 <small
@@ -444,54 +413,34 @@
             <div class="placeorder-control">
               <label>Status</label>
 
-              <div class="clean-status-wrap modal-clean-status" @click.stop>
-                <button
-                  type="button"
-                  class="clean-status-trigger"
-                  :style="statusSelectStyle(selectedOrder.status)"
-                  :disabled="!canEditStatus || savingOrderId === selectedOrder.id"
-                  @click="toggleStatusMenu(selectedOrder)"
-                >
-                  <span
-                    class="clean-status-dot"
-                    :style="{ backgroundColor: statusColor(selectedOrder.status) }"
-                  ></span>
-                  <span class="clean-status-label">
-                    {{ statusLabel(selectedOrder.status) }}
-                  </span>
-                  <i class="fa-solid fa-chevron-down"></i>
-                </button>
+              <div class="modal-status-select-shell">
+                <span
+                  class="status-select-dot"
+                  :style="{ backgroundColor: statusColor(selectedOrder.status) }"
+                ></span>
 
-                <div
-                  v-if="selectedOrder._statusMenu && canEditStatus"
-                  class="clean-status-menu"
-                  @click.stop
+                <select
+                  class="status-select-pro modal-status-select"
+                  :value="normalizeStatus(selectedOrder.status)"
+                  :disabled="!canEditStatus || savingOrderId === selectedOrder.id"
+                  :style="statusSelectStyle(selectedOrder.status)"
+                  @change="handleStatusSelect(selectedOrder, $event)"
                 >
-                  <button
+                  <option
                     v-for="status in statusDefinitions"
                     :key="status.id || status.value"
-                    type="button"
-                    class="clean-status-option"
-                    @click="changeOrderStatus(selectedOrder, status.value)"
+                    :value="status.value"
                   >
-                    <span
-                      class="clean-status-dot"
-                      :style="{ backgroundColor: status.color }"
-                    ></span>
-                    <span>{{ status.name }}</span>
-                  </button>
+                    {{ status.name }}
+                  </option>
 
-                  <div class="clean-status-divider"></div>
-
-                  <button
-                    type="button"
-                    class="clean-status-manage"
-                    @click="openStatusManager(selectedOrder)"
+                  <option
+                    v-if="canEditStatus"
+                    value="__customize__"
                   >
-                    <span class="manage-plus">+</span>
-                    <span>Add / Edit Status</span>
-                  </button>
-                </div>
+                    ⚙ Customize Statuses...
+                  </option>
+                </select>
               </div>
             </div>
 
@@ -2643,252 +2592,6 @@ export default {
 
 .status-definition-row {
   font-size: 11px !important;
-}
-
-
-/* =========================================================
-   FINAL CLEAN TABLE TYPOGRAPHY + CUSTOM STATUS DROPDOWN
-   ========================================================= */
-.place-orders-page {
-  font-size: 14px !important;
-}
-
-.place-orders-page .page-head h1 {
-  font-size: 25px !important;
-  line-height: 1.15 !important;
-}
-
-.place-orders-page .page-head .eyebrow {
-  font-size: 10px !important;
-}
-
-.place-orders-page .page-head > div > span {
-  font-size: 12px !important;
-}
-
-.place-orders-page .tabs button {
-  min-height: 34px !important;
-  padding: 0 13px !important;
-  font-size: 11px !important;
-}
-
-.place-orders-page .orders-table th {
-  padding: 12px 10px !important;
-  font-size: 11px !important;
-  font-weight: 900 !important;
-  letter-spacing: .035em !important;
-}
-
-.place-orders-page .orders-table td {
-  padding: 11px 10px !important;
-  font-size: 12px !important;
-}
-
-.place-orders-page .customer-cell strong,
-.place-orders-page .order-no,
-.place-orders-page .email-cell {
-  font-size: 12px !important;
-}
-
-.place-orders-page .customer-cell strong,
-.place-orders-page .order-no {
-  font-weight: 800 !important;
-}
-
-.place-orders-page .customer-cell small {
-  font-size: 9.5px !important;
-}
-
-.place-orders-page .file-count,
-.place-orders-page .view-btn,
-.place-orders-page .print-selected-btn {
-  font-size: 10.5px !important;
-}
-
-.place-orders-page .search-box input {
-  font-size: 12px !important;
-}
-
-/* Compact status control */
-.status-cell {
-  min-width: 155px !important;
-  overflow: visible !important;
-}
-
-.clean-status-wrap {
-  width: 150px;
-  position: relative;
-}
-
-.clean-status-trigger {
-  width: 150px;
-  height: 35px;
-  padding: 0 10px;
-  border: 1px solid transparent;
-  border-radius: 9px;
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  cursor: pointer;
-  font-size: 11px;
-  font-weight: 800;
-  transition: border-color .15s ease, box-shadow .15s ease;
-}
-
-.clean-status-trigger:hover:not(:disabled) {
-  box-shadow: 0 2px 8px rgba(15, 23, 42, .06);
-}
-
-.clean-status-trigger:disabled {
-  cursor: default;
-  opacity: .82;
-}
-
-.clean-status-dot {
-  width: 7px;
-  height: 7px;
-  flex: 0 0 7px;
-  border-radius: 50%;
-}
-
-.clean-status-label {
-  min-width: 0;
-  flex: 1;
-  overflow: hidden;
-  text-align: left;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.clean-status-trigger > i {
-  margin-left: auto;
-  font-size: 9px;
-}
-
-.clean-status-menu {
-  width: 240px;
-  padding: 8px;
-  position: absolute;
-  top: calc(100% + 6px);
-  left: 0;
-  z-index: 9999;
-  border: 1px solid #dfe3e8;
-  border-radius: 12px;
-  background: #fff;
-  box-shadow: 0 18px 40px rgba(15, 23, 42, .15);
-}
-
-.clean-status-option,
-.clean-status-manage {
-  width: 100%;
-  min-height: 36px;
-  padding: 0 9px;
-  border: 0;
-  border-radius: 8px;
-  display: flex;
-  align-items: center;
-  gap: 9px;
-  background: transparent;
-  color: #344054;
-  cursor: pointer;
-  text-align: left;
-  font-size: 11px;
-  font-weight: 650;
-}
-
-.clean-status-option:hover,
-.clean-status-manage:hover,
-.clean-status-option.active {
-  background: #f6f7f9;
-}
-
-.clean-status-option.active {
-  font-weight: 800;
-  color: #101828;
-}
-
-.status-check {
-  margin-left: auto;
-  color: #101828;
-  font-size: 9px;
-}
-
-.clean-status-divider {
-  height: 1px;
-  margin: 6px 2px;
-  background: #eaecf0;
-}
-
-.clean-status-manage {
-  color: #101828;
-  font-weight: 800;
-}
-
-.manage-plus {
-  width: 21px;
-  height: 21px;
-  border: 1px solid #667085;
-  border-radius: 50%;
-  display: inline-grid;
-  place-items: center;
-  color: #344054;
-  font-size: 16px;
-  line-height: 1;
-}
-
-.modal-clean-status,
-.modal-clean-status .clean-status-trigger {
-  width: 100%;
-}
-
-/* Compact but usable remark */
-.remark-cell {
-  min-width: 235px !important;
-}
-
-.place-orders-page .remark-field-pro,
-.place-orders-page .remark-readonly-pro {
-  width: 225px !important;
-  min-height: 35px !important;
-  height: 35px !important;
-  padding: 0 9px !important;
-  border-radius: 9px !important;
-}
-
-.place-orders-page .remark-field-pro input {
-  height: 33px !important;
-  font-size: 11px !important;
-}
-
-.place-orders-page .remark-field-pro > i,
-.place-orders-page .remark-readonly-pro > i {
-  font-size: 10px !important;
-}
-
-.place-orders-page .remark-readonly-pro span {
-  font-size: 11px !important;
-}
-
-/* Keep dropdown above rows/card */
-.place-orders-page .orders-card,
-.place-orders-page .table-wrap,
-.place-orders-page .orders-table,
-.place-orders-page .orders-table tbody,
-.place-orders-page .orders-table tr,
-.place-orders-page .orders-table td {
-  overflow: visible !important;
-}
-
-@media (max-width: 1100px) {
-  .clean-status-wrap,
-  .clean-status-trigger {
-    width: 142px;
-  }
-
-  .place-orders-page .remark-field-pro,
-  .place-orders-page .remark-readonly-pro {
-    width: 205px !important;
-  }
 }
 
 </style>
