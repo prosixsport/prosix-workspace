@@ -1,5 +1,6 @@
 <template>
-  <div class="place-orders-page">
+  <AppLayout>
+    <div class="place-orders-page">
     <header class="page-head">
       <div>
         <p class="eyebrow">Prosix CRM</p>
@@ -161,20 +162,22 @@
               </td>
 
               <td class="status-cell">
-                <div class="po-status-wrap" @click.stop>
+                <div class="status-control">
                   <button
                     type="button"
-                    class="po-status-trigger"
+                    class="status-trigger"
                     :style="statusPillStyle(order.status)"
                     :disabled="!canEditStatus || savingOrderId === order.id"
-                    @click="toggleStatusMenu(order)"
+                    @click.stop="toggleStatusMenu(order)"
                   >
                     <span
-                      class="po-status-dot"
+                      class="status-trigger-dot"
                       :style="{ backgroundColor: statusColor(order.status) }"
                     ></span>
 
-                    <span>{{ statusLabel(order.status) }}</span>
+                    <span class="status-trigger-label">
+                      {{ statusLabel(order.status || 'pending') }}
+                    </span>
 
                     <i
                       v-if="canEditStatus"
@@ -184,17 +187,26 @@
 
                   <div
                     v-if="order._statusMenu && canEditStatus"
-                    class="po-status-menu"
+                    class="status-menu"
+                    @click.stop
                   >
+                    <div class="status-menu-title">
+                      Change Status
+                    </div>
+
                     <button
                       v-for="status in statusDefinitions"
                       :key="status.id || status.value"
                       type="button"
-                      class="po-status-menu-item"
+                      class="status-option"
+                      :class="{
+                        selected:
+                          normalizeStatus(order.status) === status.value
+                      }"
                       @click="changeOrderStatus(order, status.value)"
                     >
                       <span
-                        class="po-status-dot"
+                        class="option-dot"
                         :style="{ backgroundColor: status.color }"
                       ></span>
 
@@ -206,48 +218,108 @@
                       ></i>
                     </button>
 
-                    <div class="po-status-divider"></div>
+                    <div class="custom-divider"></div>
 
                     <button
                       type="button"
-                      class="po-custom-status-open"
+                      class="custom-status-toggle"
+                      @click="order._customOpen = !order._customOpen"
+                    >
+                      <i class="fa-solid fa-pen"></i>
+                      Custom Status
+                    </button>
+
+                    <div
+                      v-if="order._customOpen"
+                      class="custom-status-box"
+                    >
+                      <input
+                        v-model="order._customStatus"
+                        type="text"
+                        placeholder="e.g. Printing, Hold, Packing"
+                        @keyup.enter="saveInlineCustomStatus(order)"
+                      />
+
+                      <input
+                        v-model="order._customColor"
+                        type="color"
+                        class="custom-status-color"
+                        title="Status color"
+                      />
+
+                      <button
+                        type="button"
+                        :disabled="
+                          savingOrderId === order.id ||
+                          !String(order._customStatus || '').trim()
+                        "
+                        @click="saveInlineCustomStatus(order)"
+                      >
+                        Save
+                      </button>
+                    </div>
+
+                    <button
+                      type="button"
+                      class="manage-status-link"
                       @click="openStatusManager(order)"
                     >
-                      <i class="fa-solid fa-plus"></i>
-                      Add / Edit Custom Status
+                      <i class="fa-solid fa-sliders"></i>
+                      Manage Saved Statuses
                     </button>
                   </div>
+
+                  <small
+                    v-if="savingOrderId === order.id"
+                    class="saving-text"
+                  >
+                    Saving...
+                  </small>
                 </div>
               </td>
 
               <td class="remark-cell">
-                <div v-if="canEditRemark" class="remark-line-wrap">
-                  <input
-                    v-model="order._remark"
-                    type="text"
-                    class="remark-line-input"
-                    placeholder="Write remark..."
-                    :disabled="savingOrderId === order.id"
-                    @input="queueRemarkSave(order)"
-                    @blur="saveRemark(order)"
-                    @keyup.enter="$event.target.blur()"
-                  />
+                <div
+                  v-if="canEditRemark"
+                  class="remark-editor"
+                >
+                  <div class="remark-input-wrap">
+                    <i class="fa-regular fa-note-sticky"></i>
 
-                  <small
-                    v-if="order._remarkSaved"
-                    class="remark-saved"
+                    <input
+                      v-model="order._remark"
+                      type="text"
+                      class="remark-input"
+                      placeholder="Write internal remark..."
+                      :disabled="savingOrderId === order.id"
+                      @input="queueRemarkSave(order)"
+                      @blur="saveRemark(order)"
+                      @keyup.enter="$event.target.blur()"
+                    />
+                  </div>
+
+                  <span
+                    class="remark-save-state"
+                    :class="{ saved: order._remarkSaved }"
                   >
-                    Saved
-                  </small>
+                    {{
+                      savingOrderId === order.id
+                        ? 'Saving...'
+                        : order._remarkSaved
+                          ? 'Saved'
+                          : ''
+                    }}
+                  </span>
                 </div>
 
-                <span
+                <div
                   v-else
-                  class="remark-readonly"
+                  class="remark-readonly-box"
                   :title="order.remark || ''"
                 >
-                  {{ order.remark || '—' }}
-                </span>
+                  <i class="fa-regular fa-note-sticky"></i>
+                  <span>{{ order.remark || 'No remark' }}</span>
+                </div>
               </td>
 
               <td>
@@ -773,13 +845,20 @@
     </div>
 
 </div>
+    </div>
+  </AppLayout>
 </template>
 
 <script>
 import axios from 'axios'
+import AppLayout from '../layouts/AppLayout.vue'
 
 export default {
   name: 'PlaceOrdersView',
+
+  components: {
+    AppLayout
+  },
 
   data() {
     return {
@@ -955,7 +1034,10 @@ export default {
         ...order,
         _remark: order?.remark ?? '',
         _remarkSaved: false,
-        _statusMenu: false
+        _statusMenu: false,
+        _customOpen: false,
+        _customStatus: '',
+        _customColor: '#7c3aed'
       }
     },
 
@@ -1168,6 +1250,46 @@ export default {
         )
       } finally {
         this.savingOrderId = null
+      }
+    },
+
+    async saveInlineCustomStatus(order) {
+      if (!this.canEditStatus || !order?.id) return
+
+      const name = String(order._customStatus || '').trim()
+
+      if (!name) return
+
+      try {
+        const response = await axios.post(
+          '/api/place-orders/statuses',
+          {
+            name,
+            color: order._customColor || '#7c3aed'
+          },
+          { headers: this.headers() }
+        )
+
+        const created = response.data?.data
+
+        await this.fetchStatusDefinitions(true)
+
+        if (created?.value) {
+          await this.changeOrderStatus(
+            order,
+            created.value
+          )
+        }
+
+        order._customStatus = ''
+        order._customColor = '#7c3aed'
+        order._customOpen = false
+        order._statusMenu = false
+      } catch (error) {
+        alert(
+          error?.response?.data?.message ||
+          'Could not create custom status.'
+        )
       }
     },
 
@@ -2050,6 +2172,336 @@ export default {
   .status-definition-preview,
   .status-definition-actions {
     grid-column: 2 / -1;
+  }
+}
+
+
+/* =========================================================
+   APP LAYOUT / TEAMSTORE-LIKE PLACE ORDER CONTROLS
+   ========================================================= */
+
+.place-orders-page {
+  width: 100%;
+  min-width: 0;
+  min-height: 100vh;
+  background: #f5f6f8;
+}
+
+/* AppLayout owns the left sidebar exactly like TeamStore. */
+.place-orders-page .page-head,
+.place-orders-page .filters-bar,
+.place-orders-page .orders-card {
+  width: 100%;
+  min-width: 0;
+}
+
+/* Wider table so Status + Remark never get squeezed. */
+.orders-table {
+  min-width: 1320px !important;
+}
+
+.status-cell {
+  min-width: 185px !important;
+  overflow: visible !important;
+}
+
+.status-control {
+  width: 170px;
+  position: relative;
+}
+
+.status-trigger {
+  width: 170px;
+  height: 40px;
+  padding: 0 12px;
+  border: 1px solid transparent;
+  border-radius: 10px;
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  cursor: pointer;
+  font-size: 12px;
+  font-weight: 800;
+  transition: .18s ease;
+}
+
+.status-trigger:hover:not(:disabled) {
+  filter: brightness(.98);
+}
+
+.status-trigger:disabled {
+  cursor: default;
+  opacity: .8;
+}
+
+.status-trigger-dot,
+.option-dot {
+  width: 8px;
+  height: 8px;
+  flex: 0 0 8px;
+  border-radius: 50%;
+}
+
+.status-trigger-label {
+  min-width: 0;
+  flex: 1;
+  overflow: hidden;
+  text-align: left;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.status-trigger > i {
+  margin-left: auto;
+  font-size: 9px;
+}
+
+.status-menu {
+  width: 270px;
+  padding: 8px;
+  position: absolute;
+  top: calc(100% + 7px);
+  left: 0;
+  z-index: 3000;
+  border: 1px solid #e2e6eb;
+  border-radius: 13px;
+  background: #fff;
+  box-shadow: 0 18px 45px rgba(15, 23, 42, .17);
+}
+
+.status-menu-title {
+  padding: 5px 7px 8px;
+  color: #98a2b3;
+  font-size: 9px;
+  font-weight: 900;
+  letter-spacing: .08em;
+  text-transform: uppercase;
+}
+
+.status-option,
+.custom-status-toggle,
+.manage-status-link {
+  width: 100%;
+  min-height: 39px;
+  padding: 0 10px;
+  border: 0;
+  border-radius: 9px;
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  background: transparent;
+  color: #344054;
+  cursor: pointer;
+  font-size: 11px;
+  font-weight: 750;
+  text-align: left;
+}
+
+.status-option:hover,
+.custom-status-toggle:hover,
+.manage-status-link:hover {
+  background: #f7f8fa;
+}
+
+.status-option.selected {
+  background: #f2f4f7;
+  color: #101828;
+  font-weight: 900;
+}
+
+.status-option > i {
+  margin-left: auto;
+  font-size: 9px;
+}
+
+.custom-divider {
+  height: 1px;
+  margin: 6px 3px;
+  background: #eaecf0;
+}
+
+.custom-status-box {
+  margin: 5px 0 7px;
+  padding: 8px;
+  border: 1px solid #e4e7ec;
+  border-radius: 10px;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 38px 54px;
+  gap: 6px;
+  background: #f9fafb;
+}
+
+.custom-status-box input[type="text"] {
+  min-width: 0;
+  height: 38px;
+  padding: 0 9px;
+  border: 1px solid #d0d5dd;
+  border-radius: 8px;
+  outline: 0;
+  background: #fff;
+  color: #101828;
+  font-size: 11px;
+}
+
+.custom-status-box input[type="text"]:focus {
+  border-color: #111827;
+}
+
+.custom-status-color {
+  width: 38px !important;
+  height: 38px !important;
+  padding: 2px !important;
+  border: 1px solid #d0d5dd !important;
+  border-radius: 8px !important;
+  background: #fff !important;
+  cursor: pointer;
+}
+
+.custom-status-box button {
+  height: 38px;
+  border: 0;
+  border-radius: 8px;
+  background: #111827;
+  color: #fff;
+  cursor: pointer;
+  font-size: 10px;
+  font-weight: 850;
+}
+
+.custom-status-box button:disabled {
+  opacity: .45;
+  cursor: not-allowed;
+}
+
+.manage-status-link {
+  margin-top: 3px;
+  color: #111827;
+  font-weight: 850;
+}
+
+.saving-text {
+  display: block;
+  margin-top: 4px;
+  color: #98a2b3;
+  font-size: 9px;
+}
+
+/* ---------------------------------------------------------
+   BIGGER REMARK FIELD
+   --------------------------------------------------------- */
+.remark-cell {
+  min-width: 300px !important;
+}
+
+.remark-editor {
+  width: 280px;
+  position: relative;
+  padding-bottom: 13px;
+}
+
+.remark-input-wrap {
+  width: 100%;
+  height: 42px;
+  padding: 0 11px;
+  border: 1px solid #d9dee6;
+  border-radius: 10px;
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  background: #fff;
+  transition: .18s ease;
+}
+
+.remark-input-wrap:focus-within {
+  border-color: #111827;
+  box-shadow: 0 0 0 3px rgba(17, 24, 39, .05);
+}
+
+.remark-input-wrap > i {
+  flex-shrink: 0;
+  color: #98a2b3;
+  font-size: 12px;
+}
+
+.remark-input {
+  width: 100%;
+  min-width: 0;
+  height: 38px;
+  padding: 0;
+  border: 0;
+  outline: 0;
+  background: transparent;
+  color: #101828;
+  font-size: 12px;
+  font-weight: 550;
+}
+
+.remark-input::placeholder {
+  color: #98a2b3;
+}
+
+.remark-save-state {
+  position: absolute;
+  right: 3px;
+  bottom: 0;
+  min-height: 11px;
+  color: #98a2b3;
+  font-size: 9px;
+  font-weight: 700;
+}
+
+.remark-save-state.saved {
+  color: #15956b;
+}
+
+.remark-readonly-box {
+  width: 280px;
+  min-height: 42px;
+  padding: 0 11px;
+  border: 1px solid #e4e7ec;
+  border-radius: 10px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  background: #f9fafb;
+  color: #667085;
+  font-size: 11px;
+}
+
+.remark-readonly-box i {
+  color: #98a2b3;
+}
+
+/* Modal controls should also be easy to type in. */
+.placeorder-controls-card {
+  grid-template-columns: 260px minmax(0, 1fr) !important;
+}
+
+.modal-status-trigger {
+  width: 100% !important;
+}
+
+.modal-remark-wrap input {
+  height: 42px !important;
+  padding: 0 11px !important;
+  border: 1px solid #d9dee6 !important;
+  border-radius: 10px !important;
+  background: #fff !important;
+  font-size: 12px !important;
+}
+
+@media (max-width: 900px) {
+  .remark-cell {
+    min-width: 260px !important;
+  }
+
+  .remark-editor,
+  .remark-readonly-box {
+    width: 240px;
+  }
+
+  .placeorder-controls-card {
+    grid-template-columns: 1fr !important;
   }
 }
 
