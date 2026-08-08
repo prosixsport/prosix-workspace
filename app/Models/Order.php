@@ -22,6 +22,7 @@ class Order extends Model
         'payment_balance',
         'created_by',
         'shipping_address',
+        'packing_detail',
     ];
 
     protected $casts = [

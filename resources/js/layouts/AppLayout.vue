@@ -1,23 +1,34 @@
 <template>
     <div class="prosix-layout">
 
-        <!-- MOBILE TOPBAR -->
+        <!-- MOBILE TOP BAR -->
         <div class="mobile-topbar">
             <div class="mobile-logo">
-                <div class="logo-icon">P</div>
-                <span>Prosix Sports</span>
+                <img
+                    src="/public/assets/images/P LOGO BLACK.png"
+                    alt="Prosix"
+                    class="mobile-prosix-logo"
+                    @error="$event.target.style.display = 'none'"
+                />
             </div>
-            <button class="hamburger-btn" @click="sidebarOpen = true">
+
+            <button
+                type="button"
+                class="hamburger-btn"
+                @click="sidebarOpen = true"
+            >
                 <i class="fa-solid fa-bars"></i>
             </button>
         </div>
 
-        <!-- OVERLAY -->
+
+        <!-- MOBILE OVERLAY -->
         <div
             class="sidebar-overlay"
             :class="{ open: sidebarOpen }"
             @click="sidebarOpen = false"
         ></div>
+
 
         <!-- SIDEBAR -->
         <aside
@@ -26,57 +37,79 @@
             :class="{ 'sidebar-open': sidebarOpen }"
         >
 
-            <button class="sidebar-close-btn" @click="sidebarOpen = false">
+            <!-- MOBILE CLOSE -->
+            <button
+                type="button"
+                class="sidebar-close-btn"
+                @click="sidebarOpen = false"
+            >
                 <i class="fa-solid fa-xmark"></i>
             </button>
 
-            <div class="sidebar-logo">
-                <div class="logo-icon">P</div>
-                <div>
-                    <h5>Prosix Sports</h5>
-                    <small>Work Management</small>
-                </div>
+
+            <!-- =========================
+                 WHITE LOGO AREA
+            ========================== -->
+            <div class="sidebar-brand">
+                <img
+                    src="/public/assets/images/P LOGO BLACK.png"
+                    alt="Prosix"
+                    class="sidebar-prosix-logo"
+                    @error="$event.target.style.display = 'none'"
+                />
             </div>
 
-            <div class="user-card" @click="openProfile">
-                <div class="user-avatar" :class="{ 'has-photo': userPhoto }">
-                    <img v-if="userPhoto" :src="userPhoto" class="user-avatar-img" alt="Profile" />
-                    <span v-else>{{ userInitial }}</span>
-                </div>
-                <div class="user-info">
-                    <div class="user-name">{{ user?.name || 'User' }}</div>
-                    <div class="user-role">{{ formatRole(user?.role) }}</div>
-                </div>
-                <i class="fa-solid fa-pen edit-profile-icon"></i>
-            </div>
 
+            <!-- =========================
+                 NAVIGATION
+            ========================== -->
             <nav class="sidebar-nav">
+
+                <!-- HOME -->
                 <router-link
                     to="/dashboard"
                     class="nav-link-custom"
-                    :class="{ active: $route.path === '/dashboard' }"
+                    :class="{
+                        active: $route.path === '/dashboard'
+                    }"
                     @click="sidebarOpen = false"
                 >
-                    <span class="nav-icon"><i class="fa-solid fa-house"></i></span>
-                    <span>Home</span>
+                    <span class="nav-icon">
+                        <i class="fa-solid fa-house"></i>
+                    </span>
+
+                    <span class="nav-text">
+                        Home
+                    </span>
                 </router-link>
+
 
                 <!-- FACTORY ORDERS -->
                 <router-link
-                    :to="{ path: '/orders', query: { type: 'factory' } }"
+                    :to="{
+                        path: '/orders',
+                        query: {
+                            type: 'factory'
+                        }
+                    }"
                     class="nav-link-custom"
                     :class="{
                         active:
                             $route.path === '/orders' &&
                             ($route.query.type || 'factory') === 'factory'
                     }"
-                    @click="clearOrderBadge(); sidebarOpen = false"
+                    @click="
+                        clearOrderBadge();
+                        sidebarOpen = false;
+                    "
                 >
                     <span class="nav-icon">
                         <i class="fa-solid fa-industry"></i>
                     </span>
 
-                    <span>Factory Orders</span>
+                    <span class="nav-text">
+                        Factory Orders
+                    </span>
 
                     <span
                         v-if="showOrderBadge"
@@ -85,6 +118,7 @@
                         {{ orderNotificationCount }}
                     </span>
                 </router-link>
+
 
                 <!-- TEAMSTORE ORDERS -->
                 <router-link
@@ -99,7 +133,9 @@
                         <i class="fa-solid fa-store"></i>
                     </span>
 
-                    <span>TeamStore Orders</span>
+                    <span class="nav-text">
+                        TeamStore Orders
+                    </span>
 
                     <span
                         v-if="teamStoreNotificationCount > 0"
@@ -109,18 +145,23 @@
                     </span>
                 </router-link>
 
+
                 <!-- PLACE ORDERS -->
                 <router-link
                     to="/place-orders"
                     class="nav-link-custom"
-                    :class="{ active: $route.path === '/place-orders' }"
+                    :class="{
+                        active: $route.path === '/place-orders'
+                    }"
                     @click="sidebarOpen = false"
                 >
                     <span class="nav-icon">
                         <i class="fa-solid fa-cart-shopping"></i>
                     </span>
 
-                    <span>Place Orders</span>
+                    <span class="nav-text">
+                        Place Orders
+                    </span>
 
                     <span
                         v-if="placeOrderNotificationCount > 0"
@@ -130,209 +171,244 @@
                     </span>
                 </router-link>
 
+
                 <!-- ARTWORK REQUESTS -->
-                <!-- <router-link
-                    :to="{ path: '/orders', query: { type: 'artwork_request' } }"
-                    class="nav-link-custom"
-                    :class="{
-                        active:
-                            $route.path === '/orders' &&
-                            $route.query.type === 'artwork_request'
-                    }"
-                    @click="clearOrderBadge(); sidebarOpen = false"
-                >
-                    <span class="nav-icon">
-                        <i class="fa-solid fa-palette"></i>
-                    </span>
-
-                    <span>Artwork Requests</span>
-                </router-link> -->
                 <router-link
-to="/artwork-requests"
+                    to="/artwork-requests"
                     class="nav-link-custom"
                     :class="{
-                        active:
-                            $route.path === '/orders' &&
-                            $route.query.type === 'artwork_request'
+                        active: $route.path === '/artwork-requests'
                     }"
-                    @click="clearOrderBadge(); sidebarOpen = false"
+                    @click="
+                        clearOrderBadge();
+                        sidebarOpen = false;
+                    "
                 >
                     <span class="nav-icon">
                         <i class="fa-solid fa-palette"></i>
                     </span>
 
-                    <span>Artwork Requests</span>
+                    <span class="nav-text">
+                        Artwork Requests
+                    </span>
                 </router-link>
 
 
+                <!-- MEMBERS -->
                 <router-link
                     v-if="isSuperAdmin || isAdmin"
                     to="/members"
                     class="nav-link-custom"
-                    :class="{ active: $route.path === '/members' }"
+                    :class="{
+                        active: $route.path === '/members'
+                    }"
                     @click="sidebarOpen = false"
                 >
-                    <span class="nav-icon"><i class="fa-solid fa-users"></i></span>
-                    <span>Members</span>
+                    <span class="nav-icon">
+                        <i class="fa-solid fa-users"></i>
+                    </span>
+
+                    <span class="nav-text">
+                        Members
+                    </span>
                 </router-link>
 
 
+                <!-- CLIENTS -->
                 <router-link
-    v-if="isSuperAdmin"
-    to="/clients"
-    class="nav-link-custom"
-    :class="{ active: $route.path.startsWith('/clients') }"
-    @click="sidebarOpen = false"
->
-    <span class="nav-icon"><i class="fa-solid fa-user-tie"></i></span>
-    <span>Clients</span>
-</router-link>
+                    v-if="isSuperAdmin"
+                    to="/clients"
+                    class="nav-link-custom"
+                    :class="{
+                        active: $route.path.startsWith('/clients')
+                    }"
+                    @click="sidebarOpen = false"
+                >
+                    <span class="nav-icon">
+                        <i class="fa-solid fa-user-tie"></i>
+                    </span>
 
-<router-link
-    v-if="isSuperAdmin"
-    to="/invoices"
-    class="nav-link-custom"
-    :class="{ active: $route.path.startsWith('/invoices') }"
-    @click="sidebarOpen = false"
->
-    <span class="nav-icon"><i class="fa-solid fa-file-invoice-dollar"></i></span>
-    <span>Invoices</span>
-</router-link>
-<router-link
-    v-if="isSuperAdmin"
-    to="/activity-logs"
-    class="nav-link-custom"
-    :class="{ active: $route.path.startsWith('/activity-logs') }"
-    @click="sidebarOpen = false"
->
-    <span class="nav-icon"><i class="fa-solid fa-clock-rotate-left"></i></span>
-    <span>Activity Logs</span>
-</router-link>
+                    <span class="nav-text">
+                        Clients
+                    </span>
+                </router-link>
 
-<router-link
-    v-if="isSuperAdmin"
-    to="/recycle-bin"
-    class="nav-link-custom"
-    :class="{ active: $route.path.startsWith('/recycle-bin') }"
-    @click="sidebarOpen = false"
->
-    <span class="nav-icon"><i class="fa-solid fa-recycle"></i></span>
-    <span>Recycle Bin</span>
-</router-link>
+
+                <!-- INVOICES -->
+                <router-link
+                    v-if="isSuperAdmin"
+                    to="/invoices"
+                    class="nav-link-custom"
+                    :class="{
+                        active: $route.path.startsWith('/invoices')
+                    }"
+                    @click="sidebarOpen = false"
+                >
+                    <span class="nav-icon">
+                        <i class="fa-solid fa-file-invoice-dollar"></i>
+                    </span>
+
+                    <span class="nav-text">
+                        Invoices
+                    </span>
+                </router-link>
+
+
+                <!-- ACTIVITY LOGS -->
+                <router-link
+                    v-if="isSuperAdmin"
+                    to="/activity-logs"
+                    class="nav-link-custom"
+                    :class="{
+                        active: $route.path.startsWith('/activity-logs')
+                    }"
+                    @click="sidebarOpen = false"
+                >
+                    <span class="nav-icon">
+                        <i class="fa-solid fa-clock-rotate-left"></i>
+                    </span>
+
+                    <span class="nav-text">
+                        Activity Logs
+                    </span>
+                </router-link>
+
+
+                <!-- RECYCLE BIN -->
+                <router-link
+                    v-if="isSuperAdmin"
+                    to="/recycle-bin"
+                    class="nav-link-custom"
+                    :class="{
+                        active: $route.path.startsWith('/recycle-bin')
+                    }"
+                    @click="sidebarOpen = false"
+                >
+                    <span class="nav-icon">
+                        <i class="fa-solid fa-recycle"></i>
+                    </span>
+
+                    <span class="nav-text">
+                        Recycle Bin
+                    </span>
+                </router-link>
 
             </nav>
 
+
+            <!-- =========================
+                 LOGOUT
+            ========================== -->
             <div class="sidebar-bottom">
-                <button @click="logout" class="logout-btn">
+                <button
+                    type="button"
+                    class="logout-btn"
+                    @click="logout"
+                >
                     <i class="fa-solid fa-right-from-bracket"></i>
-                    Logout
+
+                    <span>
+                        Logout
+                    </span>
                 </button>
             </div>
 
         </aside>
 
-        <!-- MAIN -->
+
+        <!-- =========================
+             MAIN CONTENT
+        ========================== -->
         <main
             class="prosix-main"
-            :class="{ 'orders-full-width': $route.path === '/orders' }"
+            :class="{
+                'orders-full-width': $route.path === '/orders'
+            }"
         >
             <slot />
         </main>
 
-        <!-- PROFILE MODAL -->
-        <div v-if="profileModal" class="profile-modal-overlay" @click.self="closeProfile">
-            <div class="profile-modal">
-                <button class="profile-close" @click="closeProfile">
-                    <i class="fa-solid fa-xmark"></i>
-                </button>
-                <h4>Edit Profile</h4>
-                <p class="profile-subtitle">Update your Prosix profile</p>
-                <div class="profile-photo-wrap">
-                    <img v-if="profileForm.preview" :src="profileForm.preview" class="profile-photo" />
-                    <div v-else class="profile-photo-empty">{{ userInitial }}</div>
-                </div>
-                <input type="file" accept="image/*" class="profile-file" @change="onProfilePhotoChange" />
-                <div class="profile-field">
-                    <label>Name</label>
-                    <input v-model="profileForm.name" type="text" />
-                </div>
-                <div class="profile-field">
-                    <label>Email</label>
-                    <input :value="user?.email || ''" readonly />
-                </div>
-                <div class="profile-field">
-                    <label>Role</label>
-                    <input :value="formatRole(user?.role)" readonly />
-                </div>
-                <div class="profile-field">
-                    <label>About</label>
-                    <textarea v-model="profileForm.about" rows="4" placeholder="Write something about yourself..."></textarea>
-                </div>
-                <button class="profile-save-btn" @click="saveProfile" :disabled="savingProfile">
-                    <span v-if="savingProfile"><i class="fa-solid fa-spinner fa-spin"></i> Saving...</span>
-                    <span v-else>Save Profile</span>
-                </button>
-            </div>
-        </div>
-
     </div>
 </template>
+
 
 <script>
 import axios from 'axios'
 
 export default {
+
     name: 'AppLayout',
+
 
     data() {
         return {
+
             sidebarOpen: false,
-            profileModal: false,
-            savingProfile: false,
+
             orderNotificationCount: 0,
+
             placeOrderNotificationCount: 0,
-            teamStoreNotificationCount: 0,
-            profileForm: {
-                name: '',
-                about: '',
-                profile_photo: null,
-                preview: ''
-            }
+
+            teamStoreNotificationCount: 0
         }
     },
 
+
     computed: {
+
+        // LOGGED IN USER
         user() {
             try {
-                return JSON.parse(localStorage.getItem('user'))
-            } catch { return null }
+
+                return JSON.parse(
+                    localStorage.getItem('user')
+                )
+
+            } catch (error) {
+
+                return null
+            }
         },
-        userInitial() {
-            return this.user?.name?.charAt(0).toUpperCase() || 'U'
-        },
-        userPhoto() {
-            return this.user?.profile_photo_url || null
-        },
+
+
+        // SUPER ADMIN
         isSuperAdmin() {
             return this.user?.role === 'super_admin'
         },
+
+
+        // ADMIN
         isAdmin() {
             return this.user?.role === 'admin'
         },
+
+
+        // FACTORY ORDER BADGE
         showOrderBadge() {
-            return !this.isSuperAdmin && !this.isAdmin && this.orderNotificationCount > 0
+
+            return (
+                !this.isSuperAdmin &&
+                !this.isAdmin &&
+                this.orderNotificationCount > 0
+            )
         }
     },
 
+
     mounted() {
+
         this.loadOrderNotificationCount()
+
         this.loadPlaceOrderNotificationCount()
+
         this.loadTeamStoreNotificationCount()
+
 
         window.addEventListener(
             'place-orders-read-updated',
             this.loadPlaceOrderNotificationCount
         )
+
 
         window.addEventListener(
             'teamstore-orders-read-updated',
@@ -340,415 +416,1421 @@ export default {
         )
     },
 
+
+    beforeUnmount() {
+
+        window.removeEventListener(
+            'place-orders-read-updated',
+            this.loadPlaceOrderNotificationCount
+        )
+
+
+        window.removeEventListener(
+            'teamstore-orders-read-updated',
+            this.loadTeamStoreNotificationCount
+        )
+    },
+
+
     watch: {
+
         '$route.path'(newPath) {
+
             this.sidebarOpen = false
 
+
             if (newPath.startsWith('/orders')) {
+
                 this.clearOrderBadge()
+
             } else {
+
                 this.loadOrderNotificationCount()
             }
 
+
             this.loadPlaceOrderNotificationCount()
+
             this.loadTeamStoreNotificationCount()
         }
     },
 
-    beforeUnmount() {
-        window.removeEventListener(
-            'place-orders-read-updated',
-            this.loadPlaceOrderNotificationCount
-        )
-
-        window.removeEventListener(
-            'teamstore-orders-read-updated',
-            this.loadTeamStoreNotificationCount
-        )
-    },
 
     methods: {
+
+        // =========================
+        // API HEADERS
+        // =========================
         headers() {
+
             return {
-                Authorization: `Bearer ${localStorage.getItem('token')}`,
-                Accept: 'application/json'
+
+                Authorization:
+                    `Bearer ${localStorage.getItem('token')}`,
+
+                Accept:
+                    'application/json'
             }
         },
 
+
+        // =========================
+        // FACTORY ORDERS COUNT
+        // =========================
         async loadOrderNotificationCount() {
-            if (this.isSuperAdmin || this.isAdmin) { this.orderNotificationCount = 0; return }
-            if (this.$route.path.startsWith('/orders')) { this.orderNotificationCount = 0; return }
+
+            if (this.isSuperAdmin || this.isAdmin) {
+
+                this.orderNotificationCount = 0
+
+                return
+            }
+
+
+            if (this.$route.path.startsWith('/orders')) {
+
+                this.orderNotificationCount = 0
+
+                return
+            }
+
+
             try {
-                const res = await axios.get('/api/orders', { headers: this.headers() })
-                const orders = Array.isArray(res.data) ? res.data : (res.data?.data || [])
-                this.orderNotificationCount = orders.filter(o => !o.user_has_seen).length
-            } catch (e) { console.error(e) }
+
+                const response = await axios.get(
+                    '/api/orders',
+                    {
+                        headers: this.headers()
+                    }
+                )
+
+
+                const orders =
+                    Array.isArray(response.data)
+                        ? response.data
+                        : response.data?.data || []
+
+
+                this.orderNotificationCount =
+                    orders.filter(
+                        order => !order.user_has_seen
+                    ).length
+
+            } catch (error) {
+
+                console.error(
+                    'Factory order notification error:',
+                    error
+                )
+
+                this.orderNotificationCount = 0
+            }
         },
 
-        clearOrderBadge() { this.orderNotificationCount = 0 },
 
+        // =========================
+        // CLEAR FACTORY BADGE
+        // =========================
+        clearOrderBadge() {
+
+            this.orderNotificationCount = 0
+        },
+
+
+        // =========================
+        // PLACE ORDERS COUNT
+        // =========================
         async loadPlaceOrderNotificationCount() {
+
             try {
+
                 const response = await axios.get(
                     '/api/place-orders/unread-count',
-                    { headers: this.headers() }
+                    {
+                        headers: this.headers()
+                    }
                 )
 
-                this.placeOrderNotificationCount = Number(
-                    response.data?.count || 0
-                )
+
+                this.placeOrderNotificationCount =
+                    Number(
+                        response.data?.count || 0
+                    )
+
             } catch (error) {
-                console.error('Place order notification error:', error)
+
+                console.error(
+                    'Place order notification error:',
+                    error
+                )
+
+
                 this.placeOrderNotificationCount = 0
             }
         },
 
+
+        // =========================
+        // TEAMSTORE COUNT
+        // =========================
         async loadTeamStoreNotificationCount() {
+
             try {
+
                 const response = await axios.get(
                     '/api/teamstore-orders/unread-count',
-                    { headers: this.headers() }
+                    {
+                        headers: this.headers()
+                    }
                 )
 
-                this.teamStoreNotificationCount = Number(
-                    response.data?.count || 0
-                )
+
+                this.teamStoreNotificationCount =
+                    Number(
+                        response.data?.count || 0
+                    )
+
             } catch (error) {
+
                 console.error(
                     'TeamStore notification error:',
                     error
                 )
+
 
                 this.teamStoreNotificationCount = 0
             }
         },
 
 
-        formatRole(role) {
-            if (!role) return 'Member'
-            return role.replace('_', ' ').replace(/\b\w/g, c => c.toUpperCase())
-        },
-
-        openProfile() {
-            this.profileForm = {
-                name: this.user?.name || '',
-                about: this.user?.about || '',
-                profile_photo: null,
-                preview: this.user?.profile_photo_url || ''
-            }
-            this.profileModal = true
-        },
-
-        closeProfile() { this.profileModal = false },
-
-        onProfilePhotoChange(event) {
-            const file = event.target.files?.[0]
-            if (!file) return
-            this.profileForm.profile_photo = file
-            this.profileForm.preview = URL.createObjectURL(file)
-        },
-
-        async saveProfile() {
-            this.savingProfile = true
-            const form = new FormData()
-            form.append('name', this.profileForm.name || '')
-            form.append('about', this.profileForm.about || '')
-            if (this.profileForm.profile_photo) {
-                form.append('profile_photo', this.profileForm.profile_photo)
-            }
-            try {
-                const res = await axios.post('/api/me/profile', form, {
-                    headers: { ...this.headers(), 'Content-Type': 'multipart/form-data' }
-                })
-                const updatedUser = res.data?.user || res.data
-                if (updatedUser) localStorage.setItem('user', JSON.stringify(updatedUser))
-                this.closeProfile()
-                window.location.reload()
-            } catch (e) {
-                console.error(e)
-                alert(e.response?.data?.message || 'Profile save failed')
-            } finally {
-                this.savingProfile = false
-            }
-        },
-
+        // =========================
+        // LOGOUT
+        // =========================
         async logout() {
+
             try {
-                await axios.post('/api/logout', {}, { headers: this.headers() })
-            } catch (e) { console.error(e) }
+
+                await axios.post(
+                    '/api/logout',
+                    {},
+                    {
+                        headers: this.headers()
+                    }
+                )
+
+            } catch (error) {
+
+                console.error(
+                    'Logout error:',
+                    error
+                )
+            }
+
+
             localStorage.removeItem('token')
+
             localStorage.removeItem('user')
+
+
             this.$router.push('/login')
         }
     }
 }
 </script>
 
+
 <style scoped>
-*, *::before, *::after { box-sizing: border-box; }
+
+/* ==================================================
+   RESET
+\\================================================== */
+
+\*,
+\*::before,
+\*::after {
+    box-sizing: border-box;
+}
+
 
 .prosix-layout {
     min-height: 100vh;
+
     display: flex;
+
     background: #f6f7fb;
 }
 
-/* ─── SIDEBAR ─── */
+
+
+/* ==================================================
+   SIDEBAR
+\\================================================== */
+
 .prosix-sidebar {
     width: 250px;
-    min-height: 100vh;
+
+    height: 100vh;
+
     position: fixed;
-    left: 0;
+
     top: 0;
-    background: linear-gradient(180deg, #0f1117 0%, #181b25 100%);
-    color: #fff;
+    left: 0;
+
     display: flex;
+
     flex-direction: column;
-    border-right: 1px solid rgba(255,255,255,0.08);
+
+    background: linear-gradient(
+        180deg,
+        #0f1117 0%,
+        #171a24 100%
+    );
+
+    color: #ffffff;
+
+    border: 0 !important;
+
+    border-right: 0 !important;
+
+    outline: 0 !important;
+
+    box-shadow: none !important;
+
+    overflow: hidden;
+
     z-index: 1000;
+
     transition: left 0.25s ease;
 }
 
-.sidebar-logo {
-    height: 78px;
-    padding: 18px;
-    display: flex;
-    align-items: center;
-    gap: 12px;
-    border-bottom: 1px solid rgba(255,255,255,0.08);
-    flex-shrink: 0;
-}
 
-.logo-icon {
-    width: 40px;
-    height: 40px;
-    border-radius: 12px;
-    background: #fff;
-    color: #000;
+
+/* ==================================================
+   TOP WHITE LOGO SECTION
+\\================================================== */
+
+.sidebar-brand {
+    width: 100%;
+
+    height: 190px;
+
+    min-height: 190px;
+
+    flex-shrink: 0;
+
     display: flex;
+
     align-items: center;
+
     justify-content: center;
-    font-size: 18px;
-    font-weight: 900;
-    flex-shrink: 0;
+
+    background: #f4f5f8 !important;
+
+    border: none !important;
+
+    border-top: none !important;
+
+    border-right: none !important;
+
+    border-bottom: none !important;
+
+    border-left: none !important;
+
+    outline: none !important;
+
+    box-shadow: none !important;
+
+    margin: 0;
+
+    padding: 20px;
+
+    position: relative;
+
+    overflow: hidden;
 }
 
-.sidebar-logo h5 { margin: 0; font-size: 18px; font-weight: 900; color: #fff; }
-.sidebar-logo small { color: #9aa0b8; font-size: 11px; }
 
-.user-card {
-    margin: 16px;
-    padding: 12px;
-    background: rgba(255,255,255,0.05);
-    border: 1px solid rgba(255,255,255,0.08);
-    border-radius: 16px;
-    display: flex;
-    align-items: center;
-    gap: 10px;
-    cursor: pointer;
+.sidebar-brand::before,
+.sidebar-brand::after {
+    display: none !important;
+
+    content: none !important;
+
+    border: none !important;
+
+    outline: none !important;
+
+    box-shadow: none !important;
 }
-.user-card:hover { background: rgba(255,255,255,0.1); }
 
-.user-avatar {
-    width: 42px; height: 42px;
-    border-radius: 50%;
-    background: #fff; color: #000;
-    font-size: 15px; font-weight: 900;
-    display: flex; align-items: center; justify-content: center;
-    flex-shrink: 0;
+
+
+/* ==================================================
+   REAL PROSIX LOGO
+\\================================================== */
+
+.sidebar-prosix-logo {
+    display: block;
+
+    width: 135px;
+
+    height: 135px;
+
+    max-width: 80%;
+
+    max-height: 90%;
+
+    object-fit: contain;
+
+    object-position: center;
+
+    margin: 0 auto;
+
+    padding: 0;
+
+    background: transparent;
+
+    border: none !important;
+
+    outline: none !important;
+
+    box-shadow: none !important;
 }
-.user-avatar.has-photo { overflow: hidden; }
-.user-avatar-img { width: 100%; height: 100%; object-fit: cover; border-radius: 50%; }
 
-.user-info { overflow: hidden; flex: 1; }
-.user-name { font-size: 14px; font-weight: 800; color: #fff; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.user-role { font-size: 11px; color: #9aa0b8; margin-top: 2px; }
-.edit-profile-icon { font-size: 12px; color: #9aa0b8; }
 
-.sidebar-nav { padding: 4px 12px; flex: 1; }
+
+/* ==================================================
+   NAVIGATION
+\\================================================== */
+
+.sidebar-nav {
+    flex: 1;
+
+    padding: 28px 12px 15px;
+
+    background: transparent;
+
+    overflow-y: auto;
+
+    overflow-x: hidden;
+
+    border: 0;
+
+    outline: 0;
+
+    scrollbar-width: thin;
+
+    scrollbar-color:
+        rgba(255, 255, 255, 0.15)
+        transparent;
+}
+
+
+.sidebar-nav::-webkit-scrollbar {
+    width: 4px;
+}
+
+
+.sidebar-nav::-webkit-scrollbar-track {
+    background: transparent;
+}
+
+
+.sidebar-nav::-webkit-scrollbar-thumb {
+    background: rgba(255, 255, 255, 0.15);
+
+    border-radius: 20px;
+}
+
+
+
+/* ==================================================
+   NAV ITEM
+\\================================================== */
 
 .nav-link-custom {
-    height: 46px;
+    width: 100%;
+
+    min-height: 45px;
+
+    margin-bottom: 7px;
+
     padding: 0 14px;
-    margin-bottom: 6px;
-    border-radius: 12px;
-    color: #b8bfd3;
-    text-decoration: none;
+
     display: flex;
+
     align-items: center;
+
     gap: 11px;
-    font-size: 14px;
-    font-weight: 700;
-    transition: 0.18s ease;
+
     position: relative;
+
+    border: 0;
+
+    border-radius: 4px;
+
+    outline: none;
+
+    color: #b8bfd3;
+
+    text-decoration: none;
+
+    font-size: 14px;
+
+    font-weight: 700;
+
+    transition:
+        \*background\* 0.18s ease,
+        color 0.18s ease;
 }
-.nav-link-custom:hover { background: rgba(255,255,255,0.08); color: #fff; }
-.nav-link-custom.active { background: #fff; color: #000; }
-.nav-icon { width: 22px; display: inline-flex; justify-content: center; }
+
+
+.nav-link-custom:hover {
+    background: rgba(255, 255, 255, 0.07);
+
+    color: #ffffff;
+}
+
+
+.nav-link-custom.active {
+    background: #f7f6f1;
+
+    color: #1a1a1a;
+}
+
+
+
+/* ==================================================
+   NAV ICON
+\\================================================== */
+
+.nav-icon {
+    width: 21px;
+
+    min-width: 21px;
+
+    display: inline-flex;
+
+    align-items: center;
+
+    justify-content: center;
+
+    font-size: 13px;
+}
+
+
+.nav-link-custom.active .nav-icon {
+    color: #1a1a1a;
+}
+
+
+
+/* ==================================================
+   NAV TEXT
+\\================================================== */
+
+.nav-text {
+    min-width: 0;
+
+    white-space: nowrap;
+
+    overflow: hidden;
+
+    text-overflow: ellipsis;
+}
+
+
+
+/* ==================================================
+   ORDER BADGES
+\\================================================== */
 
 .order-badge {
     margin-left: auto;
-    background: #fff; color: #000;
-    border-radius: 999px;
-    font-size: 11px; font-weight: 900;
-    padding: 2px 8px;
+
+    min-width: 27px;
+
+    height: 22px;
+
+    padding: 0 7px;
+
+    display: inline-flex;
+
+    align-items: center;
+
+    justify-content: center;
+
+    flex-shrink: 0;
+
+    border: 0;
+
+    border-radius: 50px;
+
+    background: #ffffff;
+
+    color: #000000;
+
+    font-size: 11px;
+
+    font-weight: 900;
 }
+
+
+.nav-link-custom.active .order-badge {
+    background: #111111;
+
+    color: #ffffff;
+}
+
+
+
+/* ==================================================
+   SIDEBAR BOTTOM
+\\================================================== */
 
 .sidebar-bottom {
+    flex-shrink: 0;
+
     padding: 16px;
-    border-top: 1px solid rgba(255,255,255,0.08);
+
+    border: 0;
+
+    border-top:
+        1px solid rgba(255, 255, 255, 0.08);
 }
 
+
+
+/* ==================================================
+   LOGOUT BUTTON
+\\================================================== */
+
 .logout-btn {
-    width: 100%; height: 44px;
-    border: 1px solid rgba(255,255,255,0.12);
-    background: rgba(255,255,255,0.05);
-    color: #fff; border-radius: 12px;
-    font-size: 14px; font-weight: 800;
-    display: flex; align-items: center; justify-content: center;
-    gap: 8px; cursor: pointer;
+    width: 100%;
+
+    height: 46px;
+
+    display: flex;
+
+    align-items: center;
+
+    justify-content: center;
+
+    gap: 9px;
+
+    border:
+        1px solid rgba(255, 255, 255, 0.13);
+
+    border-radius: 10px;
+
+    background:
+        rgba(255, 255, 255, 0.05);
+
+    color: #ffffff;
+
+    font-size: 14px;
+
+    font-weight: 800;
+
+    cursor: pointer;
+
+    transition:
+        \*background\* 0.2s ease,
+        color 0.2s ease,
+        border-color 0.2s ease;
 }
-.logout-btn:hover { background: #fff; color: #000; }
+
+
+.logout-btn:hover {
+    background: #ffffff;
+
+    border-color: #ffffff;
+
+    color: #000000;
+}
+
+
+
+/* ==================================================
+   MOBILE CLOSE BUTTON
+\\================================================== */
 
 .sidebar-close-btn {
     display: none;
+
     position: absolute;
-    top: 12px; right: 12px;
-    background: rgba(255,255,255,0.1);
-    border: 1px solid rgba(255,255,255,0.15);
-    color: #fff;
-    width: 32px; height: 32px;
+
+    top: 12px;
+
+    right: 12px;
+
+    width: 34px;
+
+    height: 34px;
+
+    align-items: center;
+
+    justify-content: center;
+
+    border: 0;
+
     border-radius: 8px;
-    font-size: 14px; cursor: pointer;
-    align-items: center; justify-content: center;
+
+    background:
+        rgba(255, 255, 255, 0.9);
+
+    color: #111111;
+
+    font-size: 15px;
+
+    cursor: pointer;
+
     z-index: 10;
 }
 
-/* ─── MAIN ─── */
+
+
+/* ==================================================
+   MAIN CONTENT
+\\================================================== */
+
 .prosix-main {
-    margin-left: 250px;
     flex: 1;
-    min-height: 100vh;
-    background: #f6f7fb;
+
     min-width: 0;
+
+    min-height: 100vh;
+
+    margin-left: 250px;
+
+    background: #f6f7fb;
+
+    border: 0 !important;
+
+    border-left: 0 !important;
+
+    outline: 0 !important;
+
+    box-shadow: none !important;
 }
 
-/* ─── MOBILE TOPBAR ─── */
+
+
+/* ==================================================
+   ORDERS FULL WIDTH
+\\================================================== */
+
+.prosix-main.orders-full-width {
+    width: 100%;
+
+    margin-left: 0;
+
+    border: 0 !important;
+
+    box-shadow: none !important;
+}
+
+
+
+/* ==================================================
+   MOBILE TOP BAR
+\\================================================== */
+
 .mobile-topbar {
     display: none;
+
     position: fixed;
-    top: 0; left: 0; right: 0;
-    height: 56px;
-    background: linear-gradient(180deg, #0f1117 0%, #181b25 100%);
-    color: #fff;
-    z-index: 999;
+
+    top: 0;
+
+    left: 0;
+
+    right: 0;
+
+    height: 58px;
+
+    padding: 0 14px;
+
     align-items: center;
+
     justify-content: space-between;
-    padding: 0 16px;
-    border-bottom: 1px solid rgba(255,255,255,0.08);
+
+    background: #ffffff;
+
+    border: 0 !important;
+
+    border-bottom: 0 !important;
+
+    outline: 0 !important;
+
+    box-shadow: none !important;
+
+    color: #111111;
+
+    z-index: 999;
 }
+
+
+
+/* ==================================================
+   MOBILE LOGO
+\\================================================== */
 
 .mobile-logo {
-    display: flex; align-items: center; gap: 10px;
-    font-size: 16px; font-weight: 900;
+    height: 58px;
+
+    display: flex;
+
+    align-items: center;
+
+    justify-content: center;
 }
 
-.hamburger-btn {
-    background: rgba(255,255,255,0.1);
-    border: 1px solid rgba(255,255,255,0.15);
-    color: #fff;
-    width: 38px; height: 38px;
-    border-radius: 10px;
-    font-size: 16px; cursor: pointer;
-    display: flex; align-items: center; justify-content: center;
+
+.mobile-prosix-logo {
+    display: block;
+
+    width: 44px;
+
+    height: 44px;
+
+    object-fit: contain;
+
+    object-position: center;
+
+    background: transparent;
+
+    border: none !important;
+
+    outline: none !important;
+
+    box-shadow: none !important;
 }
+
+
+
+/* ==================================================
+   HAMBURGER
+\\================================================== */
+
+.hamburger-btn {
+    width: 38px;
+
+    height: 38px;
+
+    display: flex;
+
+    align-items: center;
+
+    justify-content: center;
+
+    border: 1px solid #e5e7eb;
+
+    border-radius: 9px;
+
+    background: #111111;
+
+    color: #ffffff;
+
+    font-size: 16px;
+
+    cursor: pointer;
+}
+
+
+
+/* ==================================================
+   OVERLAY
+\\================================================== */
 
 .sidebar-overlay {
     display: none;
-    position: fixed; inset: 0;
-    background: rgba(0,0,0,0.55);
+
+    position: fixed;
+
+    inset: 0;
+
+    background:
+        rgba(0, 0, 0, 0.58);
+
     z-index: 999;
 }
-.sidebar-overlay.open { display: block; }
 
-/* ─── PROFILE MODAL ─── */
-.profile-modal-overlay {
-    position: fixed; inset: 0;
-    background: rgba(0,0,0,0.55);
-    z-index: 99999;
-    display: flex; align-items: center; justify-content: center;
-    padding: 16px;
+
+.sidebar-overlay.open {
+    display: block;
 }
 
-.profile-modal {
-    width: 430px; max-width: 100%;
-    max-height: 90vh; overflow-y: auto;
-    background: #fff; border-radius: 20px;
-    padding: 26px; position: relative;
-    box-shadow: 0 30px 90px rgba(0,0,0,0.35);
+
+
+/* ==================================================
+   FORCE REMOVE LOGO AREA LINES
+\\================================================== */
+
+.prosix-sidebar,
+.sidebar-brand,
+.sidebar-brand::before,
+.sidebar-brand::after,
+.sidebar-prosix-logo,
+.prosix-main {
+    box-shadow: none !important;
 }
 
-.profile-modal h4 { margin: 0; font-size: 24px; font-weight: 900; color: #000; text-align: center; }
-.profile-subtitle { margin: 6px 0 18px; color: #6b7280; text-align: center; font-size: 13px; }
 
-.profile-close {
-    position: absolute; right: 16px; top: 16px;
-    border: none; background: #f3f4f6;
-    width: 34px; height: 34px; border-radius: 10px; cursor: pointer;
+.prosix-sidebar {
+    border-right: none !important;
 }
 
-.profile-photo-wrap { display: flex; justify-content: center; margin-bottom: 12px; }
 
-.profile-photo,
-.profile-photo-empty {
-    width: 92px; height: 92px; border-radius: 50%;
-    object-fit: cover; background: #000; color: #fff;
-    display: flex; align-items: center; justify-content: center;
-    font-size: 30px; font-weight: 900;
+.sidebar-brand {
+    border: none !important;
 }
 
-.profile-file { width: 100%; margin-bottom: 16px; }
 
-.profile-field { margin-bottom: 14px; }
-.profile-field label { display: block; margin-bottom: 6px; color: #111; font-size: 13px; font-weight: 900; }
-.profile-field input,
-.profile-field textarea {
-    width: 100%; border: 1.5px solid #d1d5db; border-radius: 10px;
-    padding: 10px 12px; color: #111; font-size: 14px; font-weight: 600; outline: none;
+.prosix-main {
+    border-left: none !important;
 }
-.profile-field input:focus,
-.profile-field textarea:focus { border-color: #000; box-shadow: 0 0 0 4px rgba(0,0,0,0.08); }
-.profile-field input[readonly] { background: #f3f4f6; }
 
-.profile-save-btn {
-    width: 100%; height: 46px; border: none;
-    background: #000; color: #fff; border-radius: 12px;
-    font-size: 14px; font-weight: 900; cursor: pointer;
-}
-.profile-save-btn:disabled { opacity: 0.65; }
 
-/* ─── RESPONSIVE ─── */
+
+/* ==================================================
+   TABLET / MOBILE
+\\================================================== */
+
 @media (max-width: 768px) {
-    .mobile-topbar { display: flex; }
-    .sidebar-close-btn { display: flex; }
+
+    .mobile-topbar {
+        display: flex;
+    }
+
+
+    .sidebar-close-btn {
+        display: flex;
+    }
+
 
     .prosix-sidebar {
-        left: -260px;
         width: 250px;
+
+        left: -260px;
+
+        border: 0 !important;
+
+        box-shadow: none !important;
+
         z-index: 1001;
     }
-    .prosix-sidebar.sidebar-open { left: 0; }
+
+
+    .prosix-sidebar.sidebar-open {
+        left: 0;
+    }
+
+
+    .sidebar-brand {
+        height: 165px;
+
+        min-height: 165px;
+
+        border: 0 !important;
+
+        padding: 18px;
+    }
+
+
+    .sidebar-prosix-logo {
+        width: 125px;
+
+        height: 125px;
+    }
+
+
+    .sidebar-nav {
+        padding-top: 20px;
+    }
+
 
     .prosix-main {
-        margin-left: 0;
         width: 100%;
-        padding-top: 56px;
+
+        margin-left: 0;
+
+        padding-top: 58px;
+
+        border: 0 !important;
+    }
+
+
+    .prosix-main.orders-full-width {
+        width: 100%;
+
+        margin-left: 0;
     }
 }
 
-.prosix-main.orders-full-width {
-    margin-left: 0;
-    width: 100%;
+
+
+/* ==================================================
+   SMALL MOBILE
+\\================================================== */
+
+@media (max-width: 480px) {
+
+    .prosix-sidebar {
+        width: 235px;
+
+        left: -245px;
+    }
+
+
+    .sidebar-brand {
+        height: 150px;
+
+        min-height: 150px;
+
+        padding: 16px;
+    }
+
+
+    .sidebar-prosix-logo {
+        width: 110px;
+
+        height: 110px;
+    }
+
+
+    .sidebar-nav {
+        padding: 18px 10px 12px;
+    }
+
+
+    .nav-link-custom {
+        min-height: 43px;
+
+        padding: 0 12px;
+
+        font-size: 13px;
+    }
 }
 
+
+
+/* ==================================================
+   STYLISH PROSIX SIDEBAR - FINAL OVERRIDE
+\================================================== */
+
+/* Keep layout background consistent */
+.prosix-layout,
+.prosix-main {
+    background: #f4f5f8 !important;
+}
+
+/* Main sidebar */
+.prosix-sidebar {
+    width: 250px;
+
+    background:
+        linear-gradient(
+            180deg,
+            #0b0e15 0%,
+            #10141d 50%,
+            #151a24 100%
+        ) !important;
+
+    overflow: hidden !important;
+}
+
+/* Logo area */
+.sidebar-brand {
+    position: relative !important;
+
+    height: 190px !important;
+    min-height: 190px !important;
+
+    display: flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+
+    padding: 18px 20px 32px !important;
+
+    background: #f4f5f8 !important;
+
+    overflow: visible !important;
+
+    z-index: 5 !important;
+}
+
+/* Angled / cut shape under logo */
+.sidebar-brand::after {
+    content: "" !important;
+
+    display: block !important;
+
+    position: absolute !important;
+
+    left: 0 !important;
+    bottom: -34px !important;
+
+    width: 168px !important;
+    height: 44px !important;
+
+    background: #f4f5f8 !important;
+
+    clip-path: polygon(
+        0 0,
+        100% 0,
+        82% 100%,
+        0 100%
+    ) !important;
+
+    z-index: 6 !important;
+
+    pointer-events: none !important;
+}
+
+/* Extra small angled accent */
+.sidebar-brand::before {
+    content: "" !important;
+
+    display: block !important;
+
+    position: absolute !important;
+
+    left: 142px !important;
+    bottom: -34px !important;
+
+    width: 48px !important;
+    height: 44px !important;
+
+    background: #f4f5f8 !important;
+
+    clip-path: polygon(
+        0 0,
+        100% 0,
+        35% 100%,
+        0 100%
+    ) !important;
+
+    z-index: 6 !important;
+
+    pointer-events: none !important;
+}
+
+/* Logo */
+.sidebar-prosix-logo {
+    width: 128px !important;
+    height: 128px !important;
+
+    max-width: 82% !important;
+
+    object-fit: contain !important;
+
+    transform: translateY(-4px);
+
+    position: relative !important;
+    z-index: 8 !important;
+}
+
+/* Navigation area starts lower so angled logo cut has breathing room */
+.sidebar-nav {
+    position: relative !important;
+
+    padding:
+        55px
+        12px
+        15px !important;
+
+    background: transparent !important;
+}
+
+/* Soft dark transition under the logo */
+.sidebar-nav::before {
+    content: "" !important;
+
+    position: absolute !important;
+
+    top: 0 !important;
+    left: 0 !important;
+    right: 0 !important;
+
+    height: 72px !important;
+
+    background:
+        linear-gradient(
+            180deg,
+            rgba(7, 10, 16, 0.95) 0%,
+            rgba(11, 14, 21, 0.25) 65%,
+            rgba(11, 14, 21, 0) 100%
+        ) !important;
+
+    pointer-events: none !important;
+
+    z-index: 0 !important;
+}
+
+.sidebar-nav > \* {
+    position: relative;
+    z-index: 1;
+}
+
+/* Menu items */
+.nav-link-custom {
+    min-height: 46px !important;
+
+    margin-bottom: 6px !important;
+
+    padding:
+        0
+        14px !important;
+
+    gap: 11px !important;
+
+    border-radius: 9px !important;
+
+    color: #b7bfd0 !important;
+
+    font-size: 13px !important;
+    font-weight: 700 !important;
+
+    transition:
+        background 0.18s ease,
+        color 0.18s ease,
+        transform 0.18s ease,
+        box-shadow 0.18s ease !important;
+}
+
+/* Hover */
+.nav-link-custom:hover {
+    background:
+        rgba(
+            255,
+            255,
+            255,
+            0.07
+        ) !important;
+
+    color: #ffffff !important;
+
+    transform: translateX(3px);
+}
+
+/* Active menu */
+.nav-link-custom.active {
+    background: #f7f6f1 !important;
+
+    color: #10131a !important;
+
+    border-radius: 9px !important;
+
+    box-shadow:
+        0 5px 14px
+        rgba(
+            0,
+            0,
+            0,
+            0.18
+        ) !important;
+
+    transform: none !important;
+}
+
+/* Active left indicator */
+.nav-link-custom.active::before {
+    content: "" !important;
+
+    position: absolute !important;
+
+    left: 0 !important;
+    top: 50% !important;
+
+    transform:
+        translateY(-50%) !important;
+
+    width: 3px !important;
+    height: 24px !important;
+
+    background: #111111 !important;
+
+    border-radius:
+        0
+        4px
+        4px
+        0 !important;
+}
+
+/* Icons */
+.nav-icon {
+    width: 22px !important;
+    min-width: 22px !important;
+
+    font-size: 13px !important;
+
+    color: #aeb8cd !important;
+}
+
+.nav-link-custom:hover .nav-icon {
+    color: #ffffff !important;
+}
+
+.nav-link-custom.active .nav-icon {
+    color: #10131a !important;
+}
+
+/* Notification badges */
+.order-badge {
+    min-width: 26px !important;
+    height: 22px !important;
+
+    padding: 0 7px !important;
+
+    background: #ffffff !important;
+
+    color: #111111 !important;
+
+    border:
+        1px solid
+        rgba(
+            255,
+            255,
+            255,
+            0.18
+        ) !important;
+
+    font-size: 10px !important;
+    font-weight: 900 !important;
+
+    box-shadow:
+        0 2px 6px
+        rgba(
+            0,
+            0,
+            0,
+            0.16
+        );
+}
+
+.nav-link-custom.active .order-badge {
+    background: #111111 !important;
+    color: #ffffff !important;
+}
+
+/* Bottom logout section */
+.sidebar-bottom {
+    padding:
+        14px
+        14px
+        16px !important;
+
+    background:
+        linear-gradient(
+            180deg,
+            rgba(21, 26, 36, 0) 0%,
+            rgba(21, 26, 36, 0.95) 45%,
+            #151a24 100%
+        ) !important;
+}
+
+/* Logout */
+.logout-btn {
+    height: 44px !important;
+
+    border:
+        1px solid
+        rgba(
+            255,
+            255,
+            255,
+            0.12
+        ) !important;
+
+    border-radius: 10px !important;
+
+    background:
+        rgba(
+            255,
+            255,
+            255,
+            0.045
+        ) !important;
+
+    color: #ffffff !important;
+}
+
+.logout-btn:hover {
+    background: #ffffff !important;
+
+    color: #111111 !important;
+
+    border-color: #ffffff !important;
+}
+
+/* Tablet */
+@media (max-width: 768px) {
+
+    .sidebar-brand {
+        height: 165px !important;
+        min-height: 165px !important;
+
+        padding:
+            16px
+            18px
+            28px !important;
+    }
+
+    .sidebar-brand::after {
+        bottom: -28px !important;
+
+        width: 150px !important;
+        height: 38px !important;
+    }
+
+    .sidebar-brand::before {
+        left: 127px !important;
+        bottom: -28px !important;
+
+        width: 42px !important;
+        height: 38px !important;
+    }
+
+    .sidebar-prosix-logo {
+        width: 112px !important;
+        height: 112px !important;
+    }
+
+    .sidebar-nav {
+        padding-top: 48px !important;
+    }
+}
+
+/* Small mobile */
+@media (max-width: 480px) {
+
+    .sidebar-brand {
+        height: 150px !important;
+        min-height: 150px !important;
+    }
+
+    .sidebar-brand::after {
+        width: 135px !important;
+    }
+
+    .sidebar-brand::before {
+        left: 113px !important;
+    }
+
+    .sidebar-prosix-logo {
+        width: 100px !important;
+        height: 100px !important;
+    }
+}
+.sidebar-brand::before {
+  display: none !important;
+  content: none !important;
+}
+/* P LOGO BIGGER */
+.sidebar-prosix-logo {
+    width: 150px !important;
+    height: 150px !important;
+    max-width: 80% !important;
+}
 </style>

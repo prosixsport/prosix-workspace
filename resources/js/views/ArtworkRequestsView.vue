@@ -1,42 +1,18 @@
 <template>
+  <AppLayout>
   <div
     class="factory-board-page"
     :class="`theme-${boardTheme}`"
     @click="closeAllMenus"
   >
-    <!-- TOP BRAND / PROFILE -->
-    <header class="board-brand-header">
-      <div class="board-brand-mark">
-        <img
-          src="/public/assets/images/P LOGO BLACK.png"
-          alt="Prosix"
-          @error="$event.target.style.display = 'none'"
-        />
-        <span class="fallback-p">P</span>
-      </div>
-
-      <div class="board-header-center">
-        <span>FACTORY All ORDER MANAGEMENT</span>
-      </div>
-
-      <button
-        type="button"
-        class="board-profile-button"
-        title="Open profile"
-        @click.stop="openProfile(currentUser)"
-      >
-        <img
-          v-if="userPhoto"
-          :src="userPhoto"
-          class="board-profile-photo"
-          alt="Profile"
-        />
-
-        <span v-else>{{ userInitial }}</span>
-
-        <i class="fa-solid fa-gear"></i>
-      </button>
-    </header>
+    <!-- REUSABLE PAGE HEADER -->
+ <PageHeader
+  title="Factory Order Management"
+  subtitle="Track production, manage orders and keep your workflow organized."
+  :user="currentUser"
+  :photo="currentUser?.profile_photo_url"
+  @profile="openProfile"
+/>
 
     <!-- STATUS NAVIGATION -->
     <section class="board-toolbar">
@@ -69,28 +45,36 @@
             type="button"
             class="workflow-tab"
             :class="{ active: activeGroup === group.key }"
-            :style="{ '--group-color': group.color }"
+            :style="{
+              '--group-color': group.color,
+              background: softColor(group.color, 0.12),
+              color: group.color
+            }"
             @click="
               activeGroup = group.key;
               activeSectionCollapsed = false
             "
           >
             <span class="workflow-tab-label">{{ group.label }}</span>
-            <strong>{{ countForGroup(group.key) }}</strong>
 
-            <span class="workflow-home-box">
-              <i :class="group.icon"></i>
+            <span
+              class="workflow-total-box"
+              :style="{
+                background: softColor(group.color, 0.18),
+                color: group.color
+              }"
+            >
+              {{ countForGroup(group.key) }}
             </span>
           </button>
 
           <div
-            v-if="group.custom"
             class="workflow-custom-actions"
             @click.stop
           >
             <label
               class="workflow-color-action"
-              title="Change color"
+              title="Change section color"
             >
               <i class="fa-solid fa-palette"></i>
 
@@ -132,6 +116,65 @@
       </div>
 
       <div class="board-toolbar-actions">
+        <!-- ALL CHAT NOTIFICATIONS -->
+        <div class="chat-notification-wrap" @click.stop>
+          <button
+            type="button"
+            class="chat-notification-button"
+            title="Unread chats"
+            @click="showChatNotificationMenu = !showChatNotificationMenu"
+          >
+            <i class="fa-solid fa-bell"></i>
+            <span v-if="totalUnreadChatCount > 0" class="chat-notification-count">
+              {{ totalUnreadChatCount }}
+            </span>
+          </button>
+
+          <div
+            v-if="showChatNotificationMenu"
+            class="chat-notification-dropdown"
+          >
+            <div class="chat-notification-head">
+              <strong>Unread Chats</strong>
+              <span>{{ totalUnreadChatCount }} total</span>
+            </div>
+
+            <button
+              v-for="order in unreadChatOrders"
+              :key="'chat-notification-' + order.id"
+              type="button"
+              class="chat-notification-item"
+              @click="openChatFromNotification(order)"
+            >
+              <span class="chat-notification-icon">
+                <i class="fa-solid fa-comments"></i>
+              </span>
+
+              <span class="chat-notification-content">
+                <strong>{{ order.name }}</strong>
+                <small>
+                  {{ order.last_message_sender || 'New message' }}
+                  <template v-if="order.last_message_text">
+                    · {{ shortLastMessage(order.last_message_text) }}
+                  </template>
+                </small>
+              </span>
+
+              <span class="chat-notification-badge">
+                {{ order.unread_chat_count }}
+              </span>
+            </button>
+
+            <div
+              v-if="unreadChatOrders.length === 0"
+              class="chat-notification-empty"
+            >
+              <i class="fa-regular fa-bell-slash"></i>
+              No unread chats
+            </div>
+          </div>
+        </div>
+
         <button
           type="button"
           class="theme-toggle-button"
@@ -166,24 +209,34 @@
       <section
         class="board-section-heading collapsible-active-heading"
         :class="{ collapsed: activeSectionCollapsed }"
+        :style="{
+          '--active-section-color': activeBoardGroup.color,
+          background: '#ffffff',
+          color: activeBoardGroup.color,
+          borderLeftColor: activeBoardGroup.color
+        }"
         @click="activeSectionCollapsed = !activeSectionCollapsed"
       >
         <div>
-          <i
-            class="fa-solid section-collapse-icon"
-            :class="
-              activeSectionCollapsed
-                ? 'fa-chevron-right'
-                : 'fa-chevron-down'
-            "
-          ></i>
-
-          <h1>{{ activeBoardGroup.label }}</h1>
-
-          <span>
-            {{ unreadOrdersCount }} TO OPEN
-            · {{ filteredOrders.length }} TOTAL
+          <span class="section-chevron-slot">
+            <i
+              class="fa-solid section-collapse-icon"
+              :class="
+                activeSectionCollapsed
+                  ? 'fa-chevron-right'
+                  : 'fa-chevron-down'
+              "
+            ></i>
           </span>
+
+          <div class="active-section-title-wrap">
+            <h1>{{ activeBoardGroup.label }}</h1>
+
+            <span class="active-section-meta">
+              {{ unreadOrdersCount }} TO OPEN
+              · {{ filteredOrders.length }} TOTAL
+            </span>
+          </div>
         </div>
 
         <div class="board-heading-actions" @click.stop>
@@ -200,6 +253,7 @@
           <button
             type="button"
             class="board-print-button"
+            :style="{ color: readableTextColor(activeBoardGroup.color) }"
             title="Print"
             @click="printVisibleOrders"
           >
@@ -271,32 +325,113 @@
         v-show="!activeSectionCollapsed"
         class="board-table-shell"
       >
-        <div class="board-table-head">
-          <div class="board-col board-col-check">
+        <div class="board-table-head" :style="boardGridStyle">
+          <div class="board-col board-col-check resizable-head-cell">
             <input
               type="checkbox"
               v-model="selectAll"
               @change="toggleSelectAll"
               @click.stop
             />
+            <span
+              class="column-resizer"
+              title="Drag to resize"
+              @mousedown.stop.prevent="startColumnResize('check', $event)"
+            ></span>
           </div>
 
-          <div class="board-col board-col-name">ORDER NAME</div>
-          <div class="board-col board-col-status">STATUS</div>
-          <div class="board-col board-col-owner">OWNER</div>
-          <div class="board-col board-col-files">FILES</div>
-          <div class="board-col board-col-packing">PACKING DETAIL</div>
-          <div class="board-col board-col-chat">CHAT</div>
-          <div class="board-col board-col-payment">PAYMENT</div>
-          <div class="board-col board-col-address">ADDRESS</div>
-          <div class="board-col board-col-track">TRK#</div>
+          <div class="board-col board-col-name resizable-head-cell">
+            ORDER NAME
+            <span
+              class="column-resizer"
+              title="Drag to resize"
+              @mousedown.stop.prevent="startColumnResize('name', $event)"
+            ></span>
+          </div>
+
+          <div class="board-col board-col-status resizable-head-cell">
+            STATUS
+            <span
+              class="column-resizer"
+              title="Drag to resize"
+              @mousedown.stop.prevent="startColumnResize('status', $event)"
+            ></span>
+          </div>
+
+          <div class="board-col board-col-owner resizable-head-cell">
+            OWNER
+            <span
+              class="column-resizer"
+              title="Drag to resize"
+              @mousedown.stop.prevent="startColumnResize('owner', $event)"
+            ></span>
+          </div>
+
+          <div class="board-col board-col-files resizable-head-cell">
+            FILES
+            <span
+              class="column-resizer"
+              title="Drag to resize"
+              @mousedown.stop.prevent="startColumnResize('files', $event)"
+            ></span>
+          </div>
+
+          <div class="board-col board-col-packing resizable-head-cell">
+            PACKING DETAIL
+            <span
+              class="column-resizer"
+              title="Drag to resize"
+              @mousedown.stop.prevent="startColumnResize('packing', $event)"
+            ></span>
+          </div>
+
+          <div class="board-col board-col-chat resizable-head-cell">
+            CHAT
+            <span
+              class="column-resizer"
+              title="Drag to resize"
+              @mousedown.stop.prevent="startColumnResize('chat', $event)"
+            ></span>
+          </div>
+
+          <div class="board-col board-col-payment resizable-head-cell">
+            PAYMENT
+            <span
+              class="column-resizer"
+              title="Drag to resize"
+              @mousedown.stop.prevent="startColumnResize('payment', $event)"
+            ></span>
+          </div>
+
+          <div class="board-col board-col-address resizable-head-cell">
+            ADDRESS
+            <span
+              class="column-resizer"
+              title="Drag to resize"
+              @mousedown.stop.prevent="startColumnResize('address', $event)"
+            ></span>
+          </div>
+
+          <div class="board-col board-col-track resizable-head-cell">
+            TRK#
+            <span
+              class="column-resizer"
+              title="Drag to resize"
+              @mousedown.stop.prevent="startColumnResize('track', $event)"
+            ></span>
+          </div>
+
           <div class="board-col board-col-info">
             <i class="fa-regular fa-circle-question"></i>
           </div>
         </div>
 
         <!-- INLINE ADD ORDER -->
-        <div v-if="canCreateOrder && inlineAddOpen" class="board-inline-add-row board-inline-add-top">
+        <div
+          v-if="canCreateOrder && inlineAddOpen"
+          class="board-inline-add-row board-inline-add-top"
+          :style="boardGridStyle"
+        >
           <div class="board-col board-col-check"></div>
 
           <div class="board-col board-inline-add-main">
@@ -353,6 +488,7 @@
             opened: order.user_has_seen,
             selected: selectedOrders.includes(order.id)
           }"
+          :style="boardGridStyle"
           @click="openBoardOrder(order)"
         >
           <div class="board-col board-col-check">
@@ -418,56 +554,44 @@
                   @click.stop="startWorking(order)"
                 >
                   <i class="fa-solid fa-play"></i>
-                  Start Working
-                </button>
-
-                <button
-                  v-else-if="Number(workingDesigner(order)?.id) === Number(currentUser?.id)"
-                  type="button"
-                  class="stop-working-btn"
-                  @click.stop="stopWorking(order)"
-                >
-                  <i class="fa-solid fa-stop"></i>
-                  Stop Working
+                  Start Order
                 </button>
 
                 <span
                   v-else
-                  class="busy-working-label"
+                  class="working-locked-label"
+                  :title="workingDesigner(order)?.name + ' started this order'"
                 >
-                  <i class="fa-solid fa-user-lock"></i>
-                  Busy
+                  <i class="fa-solid fa-lock"></i>
+                  Started
                 </span>
               </div>
             </div>
           </div>
 
-          <div class="board-col board-col-status">
-            <select
-              class="board-inline-select board-status-pill"
-              :style="{
-                background: order.statusColor,
-                color: readableTextColor(order.statusColor)
-              }"
-              :value="order.status"
-              @click.stop
-              @change="
-                inlineChangeStatus(order, $event.target.value);
-                $event.target.blur()
-              "
-            >
-              <option
-                v-for="status in statusOptions"
-                :key="status.label"
-                :value="status.label"
-                :style="{
-                  backgroundColor: status.color,
-                  color: readableTextColor(status.color)
-                }"
+          <div class="board-col board-col-status row-status-cell" @click.stop>
+            <div class="status-ref-wrap">
+              <button
+                type="button"
+                class="status-ref-trigger"
+                :class="{ open: rowStatusMenuId === Number(order.id) }"
+                @click.stop="toggleRowStatusMenu(order, $event)"
               >
-                {{ status.label }}
-              </option>
-            </select>
+                <span
+                  class="status-ref-dot"
+                  :style="{ background: order.statusColor }"
+                ></span>
+
+                <span class="status-ref-label">
+                  {{ order.status }}
+                </span>
+
+                <i
+                  class="fa-solid fa-chevron-down status-ref-chevron"
+                  :class="{ rotate: rowStatusMenuId === Number(order.id) }"
+                ></i>
+              </button>
+            </div>
           </div>
 
           <div class="board-col board-col-owner">
@@ -582,9 +706,16 @@
           </div>
 
           <div class="board-col board-col-packing">
-            <span class="board-packing-text">
-              {{ order.cards?.find(card => card.type === 'notes')?.noteText ? 'Added' : '—' }}
-            </span>
+            <input
+              class="packing-clean-input"
+              :value="packingDetailText(order)"
+              type="text"
+              placeholder="Add packing detail"
+              :title="packingDetailText(order) || 'Add packing detail'"
+              @click.stop
+              @keydown.enter.prevent="savePackingInline(order, $event)"
+              @blur="savePackingInline(order, $event, true)"
+            />
           </div>
 
           <div class="board-col board-col-chat">
@@ -656,17 +787,57 @@
           :key="group.key"
           type="button"
           class="collapsed-status-bar"
-          :style="{ '--group-color': group.color }"
+          :style="{
+            '--group-color': group.color,
+            background: '#ffffff',
+            color: group.color,
+            borderLeftColor: group.color
+          }"
           @click="
             activeGroup = group.key;
             activeSectionCollapsed = false
           "
         >
-          <strong>{{ group.label }}</strong>
-          <span>TOTAL {{ countForGroup(group.key) }} ORDER</span>
+          <span class="collapsed-status-left">
+            <span class="section-chevron-slot">
+              <i class="fa-solid fa-chevron-right collapsed-status-icon"></i>
+            </span>
+            <strong>{{ group.label }}</strong>
+          </span>
         </button>
       </section>
     </main>
+    <!-- ROW STATUS DROPDOWN -->
+    <div
+      v-if="rowStatusMenuId && rowStatusMenuOrder"
+      class="status-fixed-dropdown"
+      :style="rowStatusMenuStyle"
+      @click.stop
+    >
+      <button
+        v-for="status in statusOptions"
+        :key="'status-fixed-' + status.label"
+        type="button"
+        class="status-fixed-option"
+        :class="{ active: status.label === rowStatusMenuOrder.status }"
+        @click.stop="selectRowStatus(rowStatusMenuOrder, status)"
+      >
+        <span
+          class="status-fixed-dot"
+          :style="{ background: status.color }"
+        ></span>
+
+        <span class="status-fixed-label">
+          {{ status.label }}
+        </span>
+
+        <i
+          v-if="status.label === rowStatusMenuOrder.status"
+          class="fa-solid fa-check status-fixed-check"
+        ></i>
+      </button>
+    </div>
+
 
     <!-- RIGHT PANEL -->
     <div v-if="selectedOrder && detailOpen" class="board-detail-overlay" @click.self="closeBoardDetail">
@@ -1546,6 +1717,7 @@
     </div>
 
   </div>
+  </AppLayout>
 </template>
 
 <script>
@@ -1553,11 +1725,13 @@ import axios from 'axios'
 import JSZip from 'jszip'
 import Multiselect from 'vue-multiselect'
 import OrderChatPanel from './OrderChatPanel.vue'
+import AppLayout from '../layouts/AppLayout.vue'
+import PageHeader from '../layouts/PageHeader.vue'
 import 'vue-multiselect/dist/vue-multiselect.min.css'
 
 export default {
   name: 'AllOrdersView',
-  components: { Multiselect, OrderChatPanel },
+  components: { Multiselect, OrderChatPanel, AppLayout, PageHeader },
   data() {
       return {
       showShippingAddressMenu: false,
@@ -1569,10 +1743,40 @@ export default {
       inlineOrderSaving: false,
       inlineEditingCell: null,
       inlineEditValue: '',
+      packingEditOrderId: null,
+      packingEditValue: '',
+      packingSavingOrderId: null,
+      rowStatusMenuId: null,
+      rowStatusMenuOrder: null,
+      rowStatusMenuPosition: {
+        top: 0,
+        left: 0,
+        width: 190
+      },
+
+      columnWidths: {
+        check: 42,
+        name: 430,
+        status: 120,
+        owner: 120,
+        files: 190,
+        packing: 130,
+        chat: 85,
+        payment: 120,
+        address: 240,
+        track: 110,
+        info: 42
+      },
+      columnResizeState: null,
+
       rowFileDragOrderId: null,
       rowFileDragDepth: 0,
       customBoardGroups: [],
-      newlyCreatedOrderIds: [],
+      defaultBoardGroupOverrides: {},
+      newlyCreatedOrderIds: JSON.parse(
+        localStorage.getItem('factory_pinned_new_order_ids') || '[]'
+      ).map(Number),
+      showChatNotificationMenu: false,
       activeSectionCollapsed: false,
       boardTheme: localStorage.getItem('artwork_board_theme') || 'light',
       persistentSeenOrderIds: JSON.parse(
@@ -1671,32 +1875,56 @@ activeTrackingIndex: 0,
 
   computed: {
     boardGroups() {
-      const defaults = [
+      const statusColorByLabel = (label, fallback) => {
+        const found = this.statusOptions.find(
+          status =>
+            String(status.label || '').toLowerCase() ===
+            String(label).toLowerCase()
+        )
+
+        return found?.color || fallback
+      }
+
+      const baseDefaults = [
         {
           key: 'in_production',
           label: 'IN PRODUCTION',
-          color: '#4a90e2',
+          color: statusColorByLabel('In Production', '#6161ff'),
           icon: 'fa-solid fa-house'
         },
         {
           key: 'completed',
           label: 'COMPLETED',
-          color: '#4cd137',
+          color: statusColorByLabel('Completed', '#00c875'),
           icon: 'fa-solid fa-house'
         },
         {
           key: 'shipped',
           label: 'SHIPPED',
-          color: '#ffe83b',
+          color: statusColorByLabel('Shipped', '#fdab3d'),
           icon: 'fa-solid fa-house'
         },
         {
           key: 'delivered',
           label: 'DELIVERED',
-          color: '#f28c28',
+          color: statusColorByLabel('Delivered', '#00c875'),
           icon: 'fa-solid fa-house'
         }
       ]
+
+      const defaults = baseDefaults
+        .map(group => {
+          const override =
+            this.defaultBoardGroupOverrides?.[group.key] || {}
+
+          return {
+            ...group,
+            ...override,
+            key: group.key,
+            custom: false
+          }
+        })
+        .filter(group => !group.hidden)
 
       return [...defaults, ...this.customBoardGroups]
     },
@@ -1799,25 +2027,11 @@ filteredOrders() {
       return groupMatch && searchMatch && clientMatch
     })
     .sort((a, b) => {
-      const aNewIndex = this.newlyCreatedOrderIds.indexOf(
-        Number(a.id)
-      )
-
-      const bNewIndex = this.newlyCreatedOrderIds.indexOf(
-        Number(b.id)
-      )
-
-      const aIsNew = aNewIndex !== -1
-      const bIsNew = bNewIndex !== -1
-
-      if (aIsNew !== bIsNew) {
-        return aIsNew ? -1 : 1
-      }
-
-      if (aIsNew && bIsNew && aNewIndex !== bNewIndex) {
-        return aNewIndex - bNewIndex
-      }
-
+      /*
+       * 1) Jis order mein unread chat aaye woh sab se upar.
+       *    Chat view hote hi unread count 0 ho jata hai aur row apni normal
+       *    pinned/A-Z position par wapas chali jati hai.
+       */
       const aUnread = Number(a.unread_chat_count || 0) > 0
       const bUnread = Number(b.unread_chat_count || 0) > 0
 
@@ -1834,6 +2048,26 @@ filteredOrders() {
         }
       }
 
+      /*
+       * 2) Is browser se newly-created orders refresh ke baad bhi top par.
+       *    IDs localStorage mein persist hoti hain.
+       */
+      const aNewIndex = this.newlyCreatedOrderIds.indexOf(Number(a.id))
+      const bNewIndex = this.newlyCreatedOrderIds.indexOf(Number(b.id))
+      const aIsNew = aNewIndex !== -1
+      const bIsNew = bNewIndex !== -1
+
+      if (aIsNew !== bIsNew) {
+        return aIsNew ? -1 : 1
+      }
+
+      if (aIsNew && bIsNew && aNewIndex !== bNewIndex) {
+        return aNewIndex - bNewIndex
+      }
+
+      /*
+       * 3) Baqi orders A-Z.
+       */
       return String(a.name || '').localeCompare(
         String(b.name || ''),
         'en',
@@ -1845,7 +2079,85 @@ filteredOrders() {
       )
     })
 },
+    unreadChatOrders() {
+      return this.orders
+        .filter(order => Number(order.unread_chat_count || 0) > 0)
+        .sort((a, b) => {
+          const aTime = new Date(a.last_message_at || 0).getTime()
+          const bTime = new Date(b.last_message_at || 0).getTime()
+          return bTime - aTime
+        })
+    },
+    totalUnreadChatCount() {
+      return this.unreadChatOrders.reduce(
+        (total, order) => total + Number(order.unread_chat_count || 0),
+        0
+      )
+    },
     unreadOrdersCount() { return this.orders.filter(o => !o.user_has_seen).length },
+
+    rowStatusOrder() {
+      if (!this.rowStatusMenuId) return null
+
+      return this.orders.find(
+        order => Number(order.id) === Number(this.rowStatusMenuId)
+      ) || null
+    },
+
+    rowStatusMenuStyle() {
+      const pos = this.rowStatusMenuPosition || {}
+
+      return {
+        position: 'fixed',
+        top: `${Number(pos.top || 0)}px`,
+        left: `${Number(pos.left || 0)}px`,
+        width: `${Number(pos.width || 230)}px`,
+        zIndex: 2147483647
+      }
+    },
+
+    boardGridStyle() {
+      const w = this.columnWidths
+
+      const keys = [
+        'check',
+        'name',
+        'status',
+        'owner',
+        'files',
+        'packing',
+        'chat',
+        'payment',
+        'address',
+        'track',
+        'info'
+      ]
+
+      const total = keys.reduce(
+        (sum, key) => sum + Number(w[key] || 0),
+        0
+      ) || 1
+
+      /*
+       * Percent-based grid:
+       * table always remains exactly 100% wide.
+       * Divider move = one column grows, next one shrinks.
+       * No blank area, no horizontal layout break.
+       */
+      const columns = keys
+        .map(key => {
+          const percent =
+            (Number(w[key] || 0) / total) * 100
+
+          return `${percent.toFixed(5)}%`
+        })
+        .join(' ')
+
+      return {
+        '--board-grid-columns': columns,
+        gridTemplateColumns: columns
+      }
+    },
     desktopLeftStyle() {
        // Only apply dynamic width on desktop (>= 768px)
       if (typeof window !== 'undefined' && window.innerWidth >= 768) {
@@ -1891,6 +2203,7 @@ watch: {
 async mounted() {
   this.loadCustomStatuses()
   this.loadBoardGroups()
+  this.loadDefaultBoardGroupOverrides()
   await this.fetchOrders()
   await this.fetchMembers()
 await this.fetchClients()
@@ -1900,9 +2213,6 @@ await this.fetchClients()
 
   await this.fetchNotifications(false)
 
-  this.notificationTimer = setInterval(() => {
-    this.fetchNotifications(true)
-  }, 5000)
 
   const orderId = this.$route.query.order_id
   const openChat = this.$route.query.open_chat
@@ -1922,12 +2232,13 @@ await this.fetchClients()
 } else if (this.filteredOrders.length) {
   this.selectedOrder = this.filteredOrders[0]
 }
-    this.unreadTimer = setInterval(() => { this.fetchUnreadCount() }, 5000)
   },
 
 beforeUnmount()  {
   document.removeEventListener('mousemove', this.resizeSidebar)
   document.removeEventListener('mouseup', this.stopResize)
+  document.removeEventListener('mousemove', this.resizeBoardColumn)
+  document.removeEventListener('mouseup', this.stopColumnResize)
 
   if (this.unreadTimer) {
     clearInterval(this.unreadTimer)
@@ -2118,6 +2429,22 @@ beforeUnmount()  {
         'artwork_board_theme',
         this.boardTheme
       )
+    },
+
+    softColor(color, alpha = 0.08) {
+      const value = String(color || '')
+        .replace('#', '')
+        .trim()
+
+      if (!/^[0-9a-f]{6}$/i.test(value)) {
+        return `rgba(100, 116, 139, ${alpha})`
+      }
+
+      const red = parseInt(value.slice(0, 2), 16)
+      const green = parseInt(value.slice(2, 4), 16)
+      const blue = parseInt(value.slice(4, 6), 16)
+
+      return `rgba(${red}, ${green}, ${blue}, ${alpha})`
     },
 
     readableTextColor(color) {
@@ -2451,30 +2778,106 @@ beforeUnmount()  {
       )
     },
 
-    changeWorkflowGroupColor(group, color) {
-      const target = this.customBoardGroups.find(
-        item => item.key === group.key
-      )
-
-      if (!target) return
-
-      target.color = color
-      this.persistWorkflowGroups()
-
-      const relatedStatuses = this.statusOptions.filter(
-        status => status.group === group.key
-      )
-
-      relatedStatuses.forEach(status => {
-        status.color = color
-      })
-
-      localStorage.setItem(
-        'custom_order_statuses',
-        JSON.stringify(
-          this.statusOptions.filter(status => status.custom)
+    loadDefaultBoardGroupOverrides() {
+      try {
+        const saved = JSON.parse(
+          localStorage.getItem(
+            'default_factory_order_group_overrides'
+          ) || '{}'
         )
+
+        this.defaultBoardGroupOverrides =
+          saved && typeof saved === 'object'
+            ? saved
+            : {}
+      } catch (error) {
+        console.error(
+          'Default board group overrides load error:',
+          error
+        )
+        this.defaultBoardGroupOverrides = {}
+      }
+    },
+
+    persistDefaultBoardGroupOverrides() {
+      localStorage.setItem(
+        'default_factory_order_group_overrides',
+        JSON.stringify(this.defaultBoardGroupOverrides)
       )
+    },
+
+    defaultStatusLabelForGroup(groupKey) {
+      const map = {
+        in_production: 'In Production',
+        completed: 'Completed',
+        shipped: 'Shipped',
+        delivered: 'Delivered'
+      }
+
+      return map[groupKey] || null
+    },
+
+    changeWorkflowGroupColor(group, color) {
+      if (!group?.key || !color) return
+
+      if (group.custom) {
+        const target = this.customBoardGroups.find(
+          item => item.key === group.key
+        )
+
+        if (!target) return
+
+        target.color = color
+        this.persistWorkflowGroups()
+
+        const relatedStatuses = this.statusOptions.filter(
+          status => status.group === group.key
+        )
+
+        relatedStatuses.forEach(status => {
+          status.color = color
+        })
+
+        localStorage.setItem(
+          'custom_order_statuses',
+          JSON.stringify(
+            this.statusOptions.filter(status => status.custom)
+          )
+        )
+
+        return
+      }
+
+      /*
+       * Default sections:
+       * color override save hota hai, aur usi named main status
+       * ka color bhi update hota hai. Is se SHIPPED bar/status
+       * mismatch nahi hota.
+       */
+      this.defaultBoardGroupOverrides = {
+        ...this.defaultBoardGroupOverrides,
+        [group.key]: {
+          ...(this.defaultBoardGroupOverrides?.[group.key] || {}),
+          color
+        }
+      }
+
+      this.persistDefaultBoardGroupOverrides()
+
+      const statusLabel =
+        this.defaultStatusLabelForGroup(group.key)
+
+      if (statusLabel) {
+        const status = this.statusOptions.find(
+          item =>
+            String(item.label || '').toLowerCase() ===
+            String(statusLabel).toLowerCase()
+        )
+
+        if (status) {
+          status.color = color
+        }
+      }
     },
 
     editWorkflowGroup(group) {
@@ -2489,12 +2892,31 @@ beforeUnmount()  {
 
       const newLabel = entered.trim().toUpperCase()
 
+      if (!group.custom) {
+        /*
+         * Default section ka display name change hoga.
+         * Internal key/status relation same rahegi, is liye orders
+         * aur pipeline break nahi hongi.
+         */
+        this.defaultBoardGroupOverrides = {
+          ...this.defaultBoardGroupOverrides,
+          [group.key]: {
+            ...(this.defaultBoardGroupOverrides?.[group.key] || {}),
+            label: newLabel
+          }
+        }
+
+        this.persistDefaultBoardGroupOverrides()
+        return
+      }
+
       const target = this.customBoardGroups.find(
         item => item.key === group.key
       )
 
       if (!target) return
 
+      const oldLabel = target.label
       target.label = newLabel
       this.persistWorkflowGroups()
 
@@ -2503,7 +2925,7 @@ beforeUnmount()  {
         .forEach(status => {
           status.groupLabel = newLabel
 
-          if (status.label === group.label) {
+          if (status.label === oldLabel) {
             status.label = newLabel
           }
         })
@@ -2521,7 +2943,7 @@ beforeUnmount()  {
 
       if (count > 0) {
         alert(
-          `This section has ${count} order(s). Move those orders to another status before deleting it.`
+          `This section has ${count} order(s). Move those orders to another section before deleting it.`
         )
         return
       }
@@ -2531,6 +2953,24 @@ beforeUnmount()  {
       )
 
       if (!confirmed) return
+
+      if (!group.custom) {
+        this.defaultBoardGroupOverrides = {
+          ...this.defaultBoardGroupOverrides,
+          [group.key]: {
+            ...(this.defaultBoardGroupOverrides?.[group.key] || {}),
+            hidden: true
+          }
+        }
+
+        this.persistDefaultBoardGroupOverrides()
+
+        if (this.activeGroup === group.key) {
+          this.activeGroup = this.boardGroups[0]?.key || 'all'
+        }
+
+        return
+      }
 
       this.customBoardGroups =
         this.customBoardGroups.filter(
@@ -2552,7 +2992,7 @@ beforeUnmount()  {
       )
 
       if (this.activeGroup === group.key) {
-        this.activeGroup = 'in_production'
+        this.activeGroup = this.boardGroups[0]?.key || 'all'
       }
     },
 
@@ -2676,8 +3116,40 @@ beforeUnmount()  {
       }
     },
 
+    async savePackingInline(order, event, fromBlur = false) {
+      const input = event?.target
+      if (!input || !order?.id) return
+
+      const value = String(input.value || '').trim()
+      const oldValue = this.packingDetailText(order)
+
+      // Blur after Enter should not make a duplicate request.
+      if (fromBlur && value === oldValue) {
+        return
+      }
+
+      const saved = await this.saveDirectInlineField(
+        order,
+        'packing_detail',
+        value
+      )
+
+      if (!saved) {
+        input.value = oldValue
+        return
+      }
+
+      order.packing_detail = value
+      order.packingDetail = value
+      input.value = value
+
+      if (!fromBlur) {
+        input.blur()
+      }
+    },
+
     async saveDirectInlineField(order, field, value) {
-      if (!this.canEditWorkflowFields) return
+      if (!this.canEditWorkflowFields) return false
 
       try {
         await axios.put(
@@ -2692,6 +3164,9 @@ beforeUnmount()  {
 
         if (field === 'shipping_address') {
           order.shippingAddress = value
+        } else if (field === 'packing_detail') {
+          order.packingDetail = value
+          order.packing_detail = value
         } else {
           order[field] = value
         }
@@ -2702,10 +3177,15 @@ beforeUnmount()  {
         ) {
           if (field === 'shipping_address') {
             this.selectedOrder.shippingAddress = value
+          } else if (field === 'packing_detail') {
+            this.selectedOrder.packingDetail = value
+            this.selectedOrder.packing_detail = value
           } else {
             this.selectedOrder[field] = value
           }
         }
+
+        return true
       } catch (error) {
         console.error('Direct inline save error:', error)
 
@@ -2713,6 +3193,8 @@ beforeUnmount()  {
           error.response?.data?.message ||
           'Value could not be saved.'
         )
+
+        return false
       }
     },
 
@@ -3044,7 +3526,1208 @@ beforeUnmount()  {
                 color: #6b7280;
                 font-size: 12px;
               }
-            </style>
+
+
+/* ===========================
+   CHAT NOTIFICATION BELL
+   =========================== */
+.chat-notification-wrap {
+  position: relative;
+  flex: 0 0 auto;
+}
+
+.chat-notification-button {
+  position: relative;
+  width: 40px;
+  height: 36px;
+  padding: 0;
+  border: 1px solid #0f172a;
+  border-radius: 18px;
+  background: #ffffff;
+  color: #0f172a;
+  cursor: pointer;
+  display: grid;
+  place-items: center;
+  font-size: 14px;
+  transition: transform .15s ease, background .15s ease;
+}
+
+.chat-notification-button:hover {
+  transform: translateY(-1px);
+  background: #f8fafc;
+}
+
+.chat-notification-count {
+  position: absolute;
+  top: -7px;
+  right: -7px;
+  min-width: 19px;
+  height: 19px;
+  padding: 0 5px;
+  border: 2px solid #ffffff;
+  border-radius: 999px;
+  background: #ef4444;
+  color: #ffffff;
+  font-size: 9px;
+  font-weight: 900;
+  line-height: 15px;
+  text-align: center;
+}
+
+.chat-notification-dropdown {
+  position: absolute;
+  top: calc(100% + 9px);
+  right: 0;
+  z-index: 10000;
+  width: 340px;
+  max-height: 390px;
+  overflow-y: auto;
+  border: 1px solid #dbe2ea;
+  border-radius: 12px;
+  background: #ffffff;
+  box-shadow: 0 18px 45px rgba(15, 23, 42, .16);
+}
+
+.chat-notification-head {
+  position: sticky;
+  top: 0;
+  z-index: 2;
+  padding: 11px 13px;
+  border-bottom: 1px solid #e8edf3;
+  background: #ffffff;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.chat-notification-head strong {
+  color: #0f172a;
+  font-size: 12px;
+  font-weight: 900;
+}
+
+.chat-notification-head span {
+  color: #64748b;
+  font-size: 10px;
+  font-weight: 700;
+}
+
+.chat-notification-item {
+  width: 100%;
+  padding: 10px 12px;
+  border: 0;
+  border-bottom: 1px solid #eef2f7;
+  background: #ffffff;
+  color: #0f172a;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  text-align: left;
+}
+
+.chat-notification-item:hover {
+  background: #f8fafc;
+}
+
+.chat-notification-icon {
+  flex: 0 0 34px;
+  width: 34px;
+  height: 34px;
+  border-radius: 50%;
+  background: #0f172a;
+  color: #ffffff;
+  display: grid;
+  place-items: center;
+  font-size: 12px;
+}
+
+.chat-notification-content {
+  min-width: 0;
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.chat-notification-content strong {
+  overflow: hidden;
+  color: #0f172a;
+  font-size: 11px;
+  font-weight: 900;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.chat-notification-content small {
+  overflow: hidden;
+  color: #64748b;
+  font-size: 9px;
+  font-weight: 600;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.chat-notification-badge {
+  flex: 0 0 auto;
+  min-width: 23px;
+  height: 23px;
+  padding: 0 6px;
+  border-radius: 999px;
+  background: #ef4444;
+  color: #ffffff;
+  display: grid;
+  place-items: center;
+  font-size: 9px;
+  font-weight: 900;
+}
+
+.chat-notification-empty {
+  min-height: 90px;
+  padding: 18px;
+  color: #64748b;
+  display: grid;
+  place-items: center;
+  gap: 7px;
+  font-size: 11px;
+  font-weight: 700;
+}
+
+.workflow-total-box {
+  font-size: 12px;
+  font-weight: 900;
+}
+
+/* Section bar must use the same color as its selected status */
+.collapsed-status-bar {
+  background: var(--group-color) !important;
+  color: #111827;
+}
+
+/* Dark mode notification support */
+.theme-dark .chat-notification-button,
+.theme-dark .chat-notification-dropdown,
+.theme-dark .chat-notification-head,
+.theme-dark .chat-notification-item {
+  background: #111827;
+  color: #f8fafc;
+  border-color: #334155;
+}
+
+.theme-dark .chat-notification-item:hover {
+  background: #1e293b;
+}
+
+.theme-dark .chat-notification-head strong,
+.theme-dark .chat-notification-content strong {
+  color: #f8fafc;
+}
+
+.theme-dark .chat-notification-head span,
+.theme-dark .chat-notification-content small,
+.theme-dark .chat-notification-empty {
+  color: #cbd5e1;
+}
+
+@media (max-width: 767px) {
+  .chat-notification-dropdown {
+    position: fixed;
+    top: 58px;
+    right: 10px;
+    left: 10px;
+    width: auto;
+  }
+}
+
+
+
+/* =========================================================
+   FINAL PIPELINE UI FIXES
+   ========================================================= */
+
+/* Toolbar right side must have enough room for Bell + Theme + Search */
+.board-toolbar {
+  grid-template-columns: 122px minmax(0, 1fr) auto !important;
+}
+
+/* Active/open section must use the exact pipeline/status color */
+.collapsible-active-heading {
+  margin-bottom: 0;
+  padding-left: 14px;
+  padding-right: 14px;
+  border-top: 0 !important;
+  border-radius: 3px 3px 0 0;
+  transition: background .15s ease, color .15s ease;
+}
+
+.collapsible-active-heading h1,
+.collapsible-active-heading span,
+.collapsible-active-heading .section-collapse-icon {
+  color: inherit !important;
+}
+
+.collapsible-active-heading .board-top-add-button {
+  border: 1px solid currentColor;
+}
+
+/* Hover tools for every pipeline section */
+.workflow-tab-wrap .workflow-custom-actions {
+  min-width: max-content;
+}
+
+/* Keep the tab's own status color visible */
+.workflow-total-box {
+  background: var(--group-color);
+  font-size: 12px;
+  font-weight: 900;
+}
+
+/* Better active indication without replacing the section color */
+.workflow-tab.active {
+  box-shadow:
+    0 0 0 3px color-mix(
+      in srgb,
+      var(--group-color),
+      transparent 68%
+    ) !important;
+}
+
+/* Bell sits cleanly with search controls */
+.chat-notification-wrap {
+  z-index: 500;
+}
+
+.chat-notification-button {
+  flex: 0 0 38px;
+  width: 38px;
+  height: 36px;
+}
+
+.chat-notification-dropdown {
+  z-index: 999999 !important;
+}
+
+/* Dropdown order name / last chat line */
+.chat-notification-content strong,
+.chat-notification-content small {
+  max-width: 220px;
+}
+
+/* The colored collapsed bars always use their group color */
+.collapsed-status-bar {
+  background: var(--group-color) !important;
+}
+
+/* Bell count remains visible even with many notifications */
+.chat-notification-count {
+  min-width: 20px;
+  max-width: 34px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+@media (max-width: 1150px) {
+  .board-toolbar {
+    grid-template-columns: 122px minmax(0, 1fr) !important;
+  }
+
+  .board-toolbar-actions {
+    grid-column: 1 / -1;
+    justify-content: flex-end;
+  }
+}
+
+
+
+/* =========================================================
+   PACKING DETAIL INLINE / HOVER EDITOR
+   ========================================================= */
+.packing-detail-cell {
+  overflow: visible !important;
+  position: relative;
+  z-index: 8;
+}
+
+.packing-detail-wrap {
+  position: relative;
+  width: 100%;
+  display: flex;
+  justify-content: center;
+}
+
+.packing-detail-preview {
+  max-width: 112px;
+  min-width: 72px;
+  height: 28px;
+  padding: 0 8px;
+  border: 1px solid transparent;
+  border-radius: 6px;
+  background: transparent;
+  color: #334155;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
+  font-size: 9px;
+  font-weight: 700;
+  white-space: nowrap;
+  transition: .15s ease;
+}
+
+.packing-detail-preview:hover {
+  border-color: #d7dee8;
+  background: #ffffff;
+  box-shadow: 0 4px 12px rgba(15, 23, 42, .08);
+}
+
+.packing-detail-preview i {
+  opacity: 0;
+  font-size: 8px;
+  transition: .15s ease;
+}
+
+.packing-detail-preview:hover i {
+  opacity: 1;
+}
+
+.packing-empty-text {
+  color: #94a3b8;
+  font-weight: 600;
+}
+
+.packing-detail-tooltip {
+  position: absolute;
+  left: 50%;
+  bottom: calc(100% + 8px);
+  transform: translateX(-50%);
+  z-index: 10050;
+  width: max-content;
+  max-width: 300px;
+  padding: 8px 10px;
+  border-radius: 7px;
+  background: #111827;
+  color: #ffffff;
+  box-shadow: 0 10px 28px rgba(15, 23, 42, .2);
+  font-size: 10px;
+  font-weight: 600;
+  line-height: 1.45;
+  white-space: normal;
+  word-break: break-word;
+  opacity: 0;
+  visibility: hidden;
+  pointer-events: none;
+  transition: .12s ease;
+}
+
+.packing-detail-tooltip::after {
+  content: "";
+  position: absolute;
+  top: 100%;
+  left: 50%;
+  transform: translateX(-50%);
+  border: 5px solid transparent;
+  border-top-color: #111827;
+}
+
+.packing-detail-wrap:hover .packing-detail-tooltip {
+  opacity: 1;
+  visibility: visible;
+}
+
+.packing-detail-popover {
+  position: absolute;
+  top: calc(100% + 7px);
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 10060;
+  width: 290px;
+  padding: 10px;
+  border: 1px solid #dbe2ea;
+  border-radius: 10px;
+  background: #ffffff;
+  box-shadow: 0 18px 42px rgba(15, 23, 42, .18);
+}
+
+.packing-popover-head {
+  margin-bottom: 7px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.packing-popover-head strong {
+  color: #111827;
+  font-size: 11px;
+  font-weight: 900;
+}
+
+.packing-popover-close {
+  width: 23px;
+  height: 23px;
+  padding: 0;
+  border: 0;
+  border-radius: 5px;
+  background: #f1f5f9;
+  color: #475569;
+  cursor: pointer;
+  display: grid;
+  place-items: center;
+}
+
+.packing-detail-input {
+  width: 100%;
+  min-height: 78px;
+  padding: 8px 9px;
+  border: 1px solid #cbd5e1;
+  border-radius: 7px;
+  outline: none;
+  resize: vertical;
+  color: #111827;
+  background: #ffffff;
+  font-size: 11px;
+  line-height: 1.4;
+}
+
+.packing-detail-input:focus {
+  border-color: #64748b;
+  box-shadow: 0 0 0 3px rgba(100, 116, 139, .12);
+}
+
+.packing-popover-footer {
+  margin-top: 7px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.packing-popover-footer small {
+  color: #94a3b8;
+  font-size: 9px;
+  font-weight: 600;
+}
+
+.packing-save-btn {
+  height: 28px;
+  padding: 0 10px;
+  border: 0;
+  border-radius: 6px;
+  background: #111827;
+  color: #ffffff;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 9px;
+  font-weight: 800;
+}
+
+.packing-save-btn:disabled {
+  opacity: .6;
+  cursor: wait;
+}
+
+.theme-dark .packing-detail-preview {
+  color: #e5e7eb;
+}
+
+.theme-dark .packing-detail-preview:hover,
+.theme-dark .packing-detail-popover {
+  border-color: #334155;
+  background: #111827;
+}
+
+.theme-dark .packing-popover-head strong {
+  color: #f8fafc;
+}
+
+.theme-dark .packing-detail-input {
+  border-color: #475569;
+  background: #0f172a;
+  color: #f8fafc;
+}
+
+/* AppLayout sidebar ke andar board full available width use kare */
+.factory-board-page {
+  width: 100%;
+  min-width: 0;
+}
+
+
+
+/* =========================================================
+   ONLY REQUESTED CHANGE:
+   section color = TEXT color, not full bar background
+   ========================================================= */
+
+.workflow-tab {
+  background: #ffffff !important;
+  color: var(--group-color) !important;
+  border-color: #dfe3e8 !important;
+  border-left: 4px solid var(--group-color) !important;
+}
+
+.workflow-tab-label {
+  color: var(--group-color) !important;
+}
+
+.workflow-total-box {
+  background: transparent !important;
+  color: var(--group-color) !important;
+  border-left: 1px solid #e5e7eb !important;
+}
+
+.workflow-tab.active {
+  background: #ffffff !important;
+  color: var(--group-color) !important;
+  box-shadow: 0 0 0 2px rgba(17, 24, 39, .08) !important;
+}
+
+/* Current/open section */
+.collapsible-active-heading {
+  background: #ffffff !important;
+  color: var(--active-section-color) !important;
+  border-left: 5px solid var(--active-section-color) !important;
+}
+
+.collapsible-active-heading h1,
+.collapsible-active-heading .section-collapse-icon {
+  color: var(--active-section-color) !important;
+}
+
+/* Other section bars */
+.collapsed-status-bar {
+  background: #ffffff !important;
+  color: var(--group-color) !important;
+  border: 1px solid #e5e7eb !important;
+  border-left: 5px solid var(--group-color) !important;
+}
+
+.collapsed-status-bar:hover {
+  background: #f8f9fb !important;
+}
+
+.collapsed-status-bar strong {
+  color: var(--group-color) !important;
+}
+
+.collapsed-status-bar span {
+  color: var(--group-color) !important;
+}
+
+
+
+/* =========================================================
+   FINAL CLEAN PIPELINE SPACING / COLORS
+   ========================================================= */
+
+/* Top tabs keep their own colors, but only as a light tint */
+.workflow-tab {
+  background: color-mix(
+    in srgb,
+    var(--group-color) 12%,
+    #ffffff
+  ) !important;
+  color: var(--group-color) !important;
+  border: 1px solid color-mix(
+    in srgb,
+    var(--group-color) 28%,
+    #e5e7eb
+  ) !important;
+  border-left: 4px solid var(--group-color) !important;
+  border-radius: 6px !important;
+  box-shadow: none !important;
+}
+
+.workflow-tab:hover {
+  background: color-mix(
+    in srgb,
+    var(--group-color) 18%,
+    #ffffff
+  ) !important;
+}
+
+.workflow-total-box {
+  background: color-mix(
+    in srgb,
+    var(--group-color) 17%,
+    #ffffff
+  ) !important;
+  color: var(--group-color) !important;
+  border-left: 1px solid color-mix(
+    in srgb,
+    var(--group-color) 24%,
+    #e5e7eb
+  ) !important;
+}
+
+.workflow-tab.active {
+  background: color-mix(
+    in srgb,
+    var(--group-color) 16%,
+    #ffffff
+  ) !important;
+  box-shadow: 0 0 0 2px color-mix(
+    in srgb,
+    var(--group-color) 22%,
+    transparent
+  ) !important;
+}
+
+/* Current open category */
+.collapsible-active-heading {
+  background: #ffffff !important;
+  color: var(--active-section-color) !important;
+  border-left: 4px solid var(--active-section-color) !important;
+}
+
+.collapsible-active-heading .section-collapse-icon {
+  color: var(--active-section-color) !important;
+  margin-right: 10px !important;
+}
+
+/* Other categories: clean text rows with icon, no right total */
+.collapsed-status-bars {
+  display: flex !important;
+  flex-direction: column !important;
+  gap: 50px !important;
+  padding-top: 22px !important;
+  border-top: 1px dashed #e3e7ec !important;
+}
+
+.collapsed-status-bar {
+  min-height: 24px !important;
+  padding: 0 0 0 10px !important;
+  border: 0 !important;
+  border-left: 0 !important;
+  border-radius: 0 !important;
+  background: transparent !important;
+  color: var(--group-color) !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: flex-start !important;
+  box-shadow: none !important;
+}
+
+.collapsed-status-bar:hover {
+  background: transparent !important;
+}
+
+.collapsed-status-left {
+  display: inline-flex !important;
+  align-items: center !important;
+  gap: 10px !important;
+}
+
+.collapsed-status-icon {
+  width: 12px;
+  color: var(--group-color) !important;
+  font-size: 11px !important;
+  transition: transform .15s ease;
+}
+
+.collapsed-status-bar:hover .collapsed-status-icon {
+  transform: translateX(2px);
+}
+
+.collapsed-status-bar strong {
+  color: var(--group-color) !important;
+  font-size: 16px !important;
+  font-weight: 800 !important;
+  font-style: italic !important;
+}
+
+/* Any old right-side total span is hidden defensively */
+.collapsed-status-bar > span:not(.collapsed-status-left) {
+  display: none !important;
+}
+
+
+
+/* =========================================================
+   SPACING + CHEVRON ALIGNMENT ONLY
+   ========================================================= */
+
+/* More space between each category/section */
+.collapsed-status-bars {
+  gap: 65px !important;
+  padding-top: 30px !important;
+}
+
+/* Keep every collapsed category on exactly the same left line */
+.collapsed-status-bar {
+  padding-left: 27px !important;
+  margin: 0 !important;
+}
+
+.collapsed-status-left {
+  display: grid !important;
+  grid-template-columns: 18px auto !important;
+  align-items: center !important;
+  column-gap: 10px !important;
+}
+
+.collapsed-status-icon {
+  width: 18px !important;
+  min-width: 18px !important;
+  margin: 0 !important;
+  padding: 0 !important;
+  text-align: center !important;
+}
+
+.collapsed-status-bar strong {
+  margin: 0 !important;
+}
+
+/* Active/open heading icon uses the exact same icon column */
+.collapsible-active-heading {
+  padding-left: 27px !important;
+}
+
+.collapsible-active-heading > div:first-child {
+  display: grid !important;
+  grid-template-columns: 18px auto auto !important;
+  align-items: center !important;
+  column-gap: 10px !important;
+}
+
+.collapsible-active-heading .section-collapse-icon {
+  width: 18px !important;
+  min-width: 18px !important;
+  margin: 0 !important;
+  padding: 0 !important;
+  text-align: center !important;
+}
+
+/* 20px vertical space between individual order rows */
+.board-table-body {
+  background: #ffffff !important;
+}
+
+.board-table-row {
+  margin-bottom: 20px !important;
+  border-bottom: 0 !important;
+  box-shadow: 0 1px 0 #e5e7eb !important;
+}
+
+.board-table-row:last-child {
+  margin-bottom: 0 !important;
+}
+
+
+
+/* =========================================================
+   EXCEL-LIKE RESIZABLE BOARD COLUMNS
+   ========================================================= */
+
+/* white background + black grid lines */
+.board-table-shell {
+  background: #ffffff !important;
+  border: 1px solid #111827 !important;
+  overflow-x: auto !important;
+  overflow-y: visible !important;
+}
+
+.board-table-head {
+  background: #ffffff !important;
+  color: #111827 !important;
+  border-bottom: 1px solid #111827 !important;
+}
+
+.board-table-row,
+.board-inline-add-row {
+  background: #ffffff !important;
+}
+
+/* Dynamic widths come from :style="boardGridStyle" */
+.board-table-head,
+.board-table-row,
+.board-inline-add-row {
+  min-width: max-content !important;
+  width: max-content !important;
+  grid-template-columns: unset;
+}
+
+/* Full vertical pipelines on every column boundary */
+.board-table-head .board-col,
+.board-table-row .board-col,
+.board-inline-add-row .board-col {
+  position: relative !important;
+  min-width: 0 !important;
+  border-right: 1px solid #111827 !important;
+  background: #ffffff !important;
+}
+
+.board-table-head .board-col:last-child,
+.board-table-row .board-col:last-child,
+.board-inline-add-row .board-col:last-child {
+  border-right: 0 !important;
+}
+
+/* Remove old short gray separator pseudo-lines */
+.board-table-row .board-col::after,
+.board-table-head .board-col::after,
+.board-inline-add-row .board-col::after,
+.board-table-row .board-col::before,
+.board-table-head .board-col::before,
+.board-inline-add-row .board-col::before {
+  display: none !important;
+  content: none !important;
+}
+
+/* Header resize handle */
+.resizable-head-cell {
+  position: relative !important;
+  overflow: visible !important;
+}
+
+.column-resizer {
+  position: absolute;
+  top: 0;
+  right: -4px;
+  z-index: 120;
+  width: 8px;
+  height: 100%;
+  cursor: col-resize;
+  touch-action: none;
+}
+
+.column-resizer::before {
+  content: "";
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 3px;
+  width: 1px;
+  background: #111827;
+}
+
+.column-resizer:hover::before,
+body.board-column-resizing .column-resizer::before {
+  width: 2px;
+  left: 2px;
+  background: #111827;
+}
+
+/* While dragging: Excel-like horizontal resize cursor */
+body.board-column-resizing,
+body.board-column-resizing * {
+  cursor: col-resize !important;
+  user-select: none !important;
+}
+
+/* Keep header labels centered / name left aligned */
+.board-table-head .board-col {
+  justify-content: center !important;
+  font-weight: 700 !important;
+}
+
+.board-table-head .board-col-name {
+  justify-content: flex-start !important;
+}
+
+/* Keep cells clean while width changes */
+.board-col {
+  overflow: hidden;
+}
+
+.board-col-name,
+.board-col-address,
+.board-col-track,
+.board-col-packing {
+  min-width: 0 !important;
+}
+
+.board-col-address input,
+.board-col-track input,
+.board-col-packing .packing-detail-wrap,
+.board-col-payment input {
+  max-width: 100% !important;
+}
+
+/* Keep row spacing requested earlier */
+.board-table-row {
+  margin-bottom: 20px !important;
+  border-bottom: 1px solid #d1d5db !important;
+}
+
+.board-table-row:last-child {
+  margin-bottom: 0 !important;
+}
+
+
+
+/* =========================================================
+   CHEVRON ALIGNMENT FIX ONLY
+   Open + collapsed section icons use same fixed column
+   ========================================================= */
+
+/* Collapsed rows start from exactly the same left position */
+.collapsed-status-bar {
+  padding-left: 27px !important;
+}
+
+/* Fixed icon column + fixed gap before title */
+.collapsed-status-left {
+  display: grid !important;
+  grid-template-columns: 18px auto !important;
+  align-items: center !important;
+  column-gap: 14px !important;
+  width: max-content !important;
+}
+
+.collapsed-status-icon {
+  display: block !important;
+  width: 18px !important;
+  min-width: 18px !important;
+  margin: 0 !important;
+  padding: 0 !important;
+  text-align: center !important;
+  justify-self: center !important;
+  color: #64748b !important;
+}
+
+/* Prevent > icon from touching category text */
+.collapsed-status-bar strong {
+  display: block !important;
+  margin: 0 !important;
+  padding: 0 !important;
+}
+
+/* Open section uses exactly the same 18px icon column + 14px gap */
+.collapsible-active-heading {
+  padding-left: 27px !important;
+}
+
+.collapsible-active-heading > div:first-child {
+  display: grid !important;
+  grid-template-columns: 18px auto auto !important;
+  align-items: center !important;
+  column-gap: 14px !important;
+}
+
+.collapsible-active-heading .section-collapse-icon {
+  display: block !important;
+  width: 18px !important;
+  min-width: 18px !important;
+  margin: 0 !important;
+  padding: 0 !important;
+  text-align: center !important;
+  justify-self: center !important;
+  color: #64748b !important;
+}
+
+
+
+/* =========================================================
+   FINAL FIX — VERTICAL PIPELINES + SECTION TARTEEB
+   ========================================================= */
+
+/* ---------- SECTION CHEVRONS: ONE EXACT VERTICAL LINE ---------- */
+.collapsible-active-heading {
+  padding-left: 28px !important;
+}
+
+.collapsible-active-heading > div:first-child {
+  display: flex !important;
+  align-items: center !important;
+  gap: 0 !important;
+}
+
+.section-chevron-slot {
+  flex: 0 0 28px !important;
+  width: 28px !important;
+  min-width: 28px !important;
+  height: 24px !important;
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  margin: 0 12px 0 0 !important;
+  padding: 0 !important;
+}
+
+.section-chevron-slot i {
+  width: 12px !important;
+  min-width: 12px !important;
+  margin: 0 !important;
+  padding: 0 !important;
+  text-align: center !important;
+  line-height: 1 !important;
+}
+
+/* Open heading title starts at same X as every closed title */
+.collapsible-active-heading h1 {
+  margin: 0 !important;
+  padding: 0 !important;
+}
+
+.collapsed-status-bars {
+  padding-left: 28px !important;
+}
+
+.collapsed-status-bar {
+  padding: 0 !important;
+  margin: 0 !important;
+}
+
+.collapsed-status-left {
+  display: flex !important;
+  align-items: center !important;
+  gap: 0 !important;
+  width: max-content !important;
+}
+
+.collapsed-status-left .section-chevron-slot {
+  flex: 0 0 28px !important;
+  width: 28px !important;
+  min-width: 28px !important;
+  margin-right: 12px !important;
+}
+
+.collapsed-status-bar strong {
+  margin: 0 !important;
+  padding: 0 !important;
+}
+
+/* ---------- REAL PIPELINES: HEADER + EVERY ORDER ROW ---------- */
+
+/* Outer table frame */
+.board-table-shell {
+  position: relative !important;
+  background: #ffffff !important;
+  border: 1px solid #111827 !important;
+  border-radius: 0 !important;
+  overflow-x: auto !important;
+  overflow-y: visible !important;
+}
+
+/* Header and rows share EXACT same dynamic CSS grid */
+.board-table-head,
+.board-table-row,
+.board-inline-add-row {
+  display: grid !important;
+  width: max-content !important;
+  min-width: 100% !important;
+  align-items: stretch !important;
+  column-gap: 0 !important;
+}
+
+/* White header like requested */
+.board-table-head {
+  background: #ffffff !important;
+  color: #111827 !important;
+  border-bottom: 1px solid #111827 !important;
+}
+
+/* White rows */
+.board-table-row,
+.board-inline-add-row {
+  background: #ffffff !important;
+}
+
+/* IMPORTANT:
+   Every cell itself owns the vertical pipeline.
+   This makes line continue for the full cell height. */
+.board-table-head > .board-col,
+.board-table-row > .board-col,
+.board-inline-add-row > .board-col {
+  position: relative !important;
+  height: 100% !important;
+  min-height: 100% !important;
+  border-right: 1px solid #111827 !important;
+  box-sizing: border-box !important;
+}
+
+/* Last info column does not need a right line because outer frame exists */
+.board-table-head > .board-col:last-child,
+.board-table-row > .board-col:last-child,
+.board-inline-add-row > .board-col:last-child {
+  border-right: 0 !important;
+}
+
+/* Kill any old pseudo separators so there is only ONE clean pipeline */
+.board-table-head > .board-col::before,
+.board-table-head > .board-col::after,
+.board-table-row > .board-col::before,
+.board-table-row > .board-col::after,
+.board-inline-add-row > .board-col::before,
+.board-inline-add-row > .board-col::after {
+  content: none !important;
+  display: none !important;
+}
+
+/* Horizontal row separation */
+.board-table-row {
+  border-bottom: 1px solid #d7dce2 !important;
+}
+
+/* Keep requested order spacing without breaking vertical column geometry */
+.board-table-row + .board-table-row {
+  margin-top: 20px !important;
+}
+
+/* Resize grab area sits ON TOP of the black pipeline */
+.resizable-head-cell {
+  overflow: visible !important;
+}
+
+.column-resizer {
+  position: absolute !important;
+  top: 0 !important;
+  right: -5px !important;
+  z-index: 999 !important;
+  width: 10px !important;
+  height: 100% !important;
+  cursor: col-resize !important;
+  background: transparent !important;
+}
+
+.column-resizer::before {
+  content: "" !important;
+  display: block !important;
+  position: absolute !important;
+  top: 0 !important;
+  bottom: 0 !important;
+  left: 4px !important;
+  width: 1px !important;
+  background: #111827 !important;
+}
+
+.column-resizer:hover::before,
+body.board-column-resizing .column-resizer::before {
+  width: 3px !important;
+  left: 3px !important;
+  background: #111827 !important;
+}
+
+/* Make sure fields do not paint over the pipeline */
+.board-col-status,
+.board-col-owner,
+.board-col-files,
+.board-col-packing,
+.board-col-chat,
+.board-col-payment,
+.board-col-address,
+.board-col-track {
+  overflow: visible !important;
+}
+
+.board-col-name {
+  overflow: hidden !important;
+}
+
+/* Keep input controls inside their own columns */
+.board-col input,
+.board-col select,
+.board-col textarea,
+.board-col button {
+  max-width: 100%;
+  box-sizing: border-box;
+}
+
+</style>
           </head>
           <body>
             <div class="loading-print">
@@ -3637,6 +5320,20 @@ beforeUnmount()  {
       }
     },
 
+    async openChatFromNotification(order) {
+      this.showChatNotificationMenu = false
+      this.activeGroup = order.group || this.activeGroup
+      this.activeSectionCollapsed = false
+
+      await this.openBoardChat(order)
+
+      /*
+       * Read hone ke baad bell dropdown aur board row dono
+       * foran refresh ho jayein.
+       */
+      await this.fetchOrders()
+    },
+
     async openOrderCard(order, card) {
       await this.selectOrder(order)
       this.detailOpen = true
@@ -3651,10 +5348,169 @@ beforeUnmount()  {
       }
     },
 
+    toggleRowStatusMenu(order, event) {
+      if (!order?.id) return
+
+      const id = Number(order.id)
+
+      if (this.rowStatusMenuId === id) {
+        this.rowStatusMenuId = null
+        this.rowStatusMenuOrder = null
+        return
+      }
+
+      const button = event?.currentTarget
+      const rect = button?.getBoundingClientRect?.()
+
+      if (!rect) return
+
+      const width = 230
+      const gap = 7
+      const padding = 10
+
+      let left = rect.left
+      let top = rect.bottom + gap
+
+      if (left + width > window.innerWidth - padding) {
+        left = window.innerWidth - width - padding
+      }
+
+      if (left < padding) {
+        left = padding
+      }
+
+      this.rowStatusMenuPosition = {
+        top,
+        left,
+        width
+      }
+
+      this.rowStatusMenuOrder = order
+      this.rowStatusMenuId = id
+    },
+
+    async selectRowStatus(order, status) {
+      if (!order || !status?.label) return
+
+      this.rowStatusMenuId = null
+      this.rowStatusMenuOrder = null
+
+      await this.inlineChangeStatus(
+        order,
+        status.label
+      )
+    },
+
     async openStatusForRow(order) {
       await this.selectOrder(order)
       this.detailOpen = true
       this.showStatusMenu = true
+    },
+
+    packingDetailText(order) {
+      return String(
+        order?.packing_detail ??
+        order?.packingDetail ??
+        ''
+      ).trim()
+    },
+
+    shortPackingDetail(value) {
+      const words = String(value || '')
+        .trim()
+        .split(/\s+/)
+        .filter(Boolean)
+
+      if (!words.length) return '—'
+
+      if (words.length <= 2) {
+        return words.join(' ')
+      }
+
+      return words.slice(0, 2).join(' ') + '...'
+    },
+
+    openPackingEditor(order) {
+      this.packingEditOrderId = Number(order.id)
+      this.packingEditValue = this.packingDetailText(order)
+
+      this.$nextTick(() => {
+        const textarea = document.querySelector(
+          '.packing-detail-popover .packing-detail-input'
+        )
+
+        if (textarea) {
+          textarea.focus()
+          textarea.setSelectionRange(
+            textarea.value.length,
+            textarea.value.length
+          )
+        }
+      })
+    },
+
+    closePackingEditor() {
+      this.packingEditOrderId = null
+      this.packingEditValue = ''
+      this.packingSavingOrderId = null
+    },
+
+    async savePackingDetail(order) {
+      if (!order?.id) return
+
+      this.packingSavingOrderId = Number(order.id)
+
+      const value = String(this.packingEditValue || '').trim()
+
+      try {
+        await axios.put(
+          `/api/orders/${order.id}`,
+          { notes: value },
+          { headers: this.headers() }
+        )
+
+        const noteCard = order.cards?.find(
+          card => card.type === 'notes'
+        )
+
+        if (noteCard) {
+          noteCard.noteText = value
+          noteCard.saved = true
+
+          setTimeout(() => {
+            noteCard.saved = false
+          }, 1400)
+        }
+
+        /*
+         * Detail panel mein same order open ho to uska notes card bhi
+         * instantly sync rahe.
+         */
+        if (
+          this.selectedOrder &&
+          Number(this.selectedOrder.id) === Number(order.id)
+        ) {
+          const selectedNoteCard =
+            this.selectedOrder.cards?.find(
+              card => card.type === 'notes'
+            )
+
+          if (selectedNoteCard) {
+            selectedNoteCard.noteText = value
+          }
+        }
+
+        this.closePackingEditor()
+      } catch (error) {
+        console.error('Packing detail save error:', error)
+
+        alert(
+          error.response?.data?.message ||
+          'Packing detail save nahi hua.'
+        )
+      } finally {
+        this.packingSavingOrderId = null
+      }
     },
 
     trackingSummary(value) {
@@ -3746,6 +5602,11 @@ beforeUnmount()  {
         ) {
           this.newlyCreatedOrderIds.unshift(
             Number(createdId)
+          )
+
+          localStorage.setItem(
+            'factory_pinned_new_order_ids',
+            JSON.stringify(this.newlyCreatedOrderIds)
           )
         }
 
@@ -4356,6 +6217,7 @@ async fetchClients() {
       const status = order.status || 'Pending'
       return {
         id: order.id,
+        created_at: order.created_at || null,
         user_has_seen:
           Boolean(order.user_has_seen) ||
           this.persistentSeenOrderIds.includes(Number(order.id)),
@@ -4376,6 +6238,8 @@ async fetchClients() {
         members,
         clients: order.clients || [],
         shippingAddress: order.shipping_address || '',
+        packing_detail: order.packing_detail || '',
+        packingDetail: order.packing_detail || '',
         unread_chat_count: Number(order.unread_chat_count || 0),
         last_message_at: order.last_message_at || null,
         last_message_text: order.last_message_text || '',
@@ -5001,11 +6865,125 @@ async onFileChange(event, card) {
       return 'fa-solid fa-file'
     },
 
+    minimumColumnWidth(key) {
+      const minimums = {
+        check: 36,
+        name: 180,
+        status: 95,
+        owner: 85,
+        files: 90,
+        packing: 105,
+        chat: 65,
+        payment: 90,
+        address: 130,
+        track: 85,
+        info: 36
+      }
+
+      return minimums[key] || 70
+    },
+
+    nextColumnKey(key) {
+      const order = [
+        'check',
+        'name',
+        'status',
+        'owner',
+        'files',
+        'packing',
+        'chat',
+        'payment',
+        'address',
+        'track',
+        'info'
+      ]
+
+      const index = order.indexOf(key)
+
+      if (index === -1 || index >= order.length - 1) {
+        return null
+      }
+
+      return order[index + 1]
+    },
+
+    startColumnResize(key, event) {
+      if (!key || !event) return
+
+      const nextKey = this.nextColumnKey(key)
+
+      if (!nextKey) return
+
+      this.columnResizeState = {
+        key,
+        nextKey,
+        startX: event.clientX,
+        startWidth: Number(this.columnWidths[key] || 100),
+        nextStartWidth: Number(this.columnWidths[nextKey] || 100)
+      }
+
+      document.body.classList.add('board-column-resizing')
+      document.addEventListener('mousemove', this.resizeBoardColumn)
+      document.addEventListener('mouseup', this.stopColumnResize)
+    },
+
+    resizeBoardColumn(event) {
+      if (!this.columnResizeState) return
+
+      const {
+        key,
+        nextKey,
+        startX,
+        startWidth,
+        nextStartWidth
+      } = this.columnResizeState
+
+      const requestedDelta = event.clientX - startX
+
+      const currentMin = this.minimumColumnWidth(key)
+      const nextMin = this.minimumColumnWidth(nextKey)
+
+      /*
+       * Divider move karne par:
+       * left/current column barhta hai to right/next column utna hi chhota hota hai.
+       * Is liye total table width SAME rehti hai aur blank space nahi banti.
+       */
+      const maxPositiveDelta = nextStartWidth - nextMin
+      const maxNegativeDelta = -(startWidth - currentMin)
+
+      const delta = Math.max(
+        maxNegativeDelta,
+        Math.min(requestedDelta, maxPositiveDelta)
+      )
+
+      this.columnWidths[key] = Math.round(startWidth + delta)
+      this.columnWidths[nextKey] = Math.round(nextStartWidth - delta)
+    },
+
+    stopColumnResize() {
+      if (!this.columnResizeState) return
+
+      /*
+       * Width intentionally save nahi hoti.
+       * Page refresh ke baad default column widths wapas aayengi.
+       */
+      this.columnResizeState = null
+
+      document.body.classList.remove('board-column-resizing')
+      document.removeEventListener('mousemove', this.resizeBoardColumn)
+      document.removeEventListener('mouseup', this.stopColumnResize)
+    },
+
     closeAllMenus() {
+      this.rowStatusMenuId = null
+      this.rowStatusMenuOrder = null
       this.showStatusMenu = false
       this.showPaymentMenu = false
       this.showTrackingMenu = false
       this.showDatePicker = false
+      this.showChatNotificationMenu = false
+      this.packingEditOrderId = null
+      this.packingEditValue = ''
       this.openOrderMenuId = null
     },
 
@@ -7030,7 +9008,7 @@ grid-template-columns: 32px 1fr 118px 38px;
   grid-template-columns: 180px 1fr 180px;
   align-items: center;
   gap: 20px;
-  background: #ffffff;
+  background: #f4f5f8;
 }
 
 .board-brand-mark {
@@ -7194,7 +9172,7 @@ grid-template-columns: 32px 1fr 118px 38px;
   font-size: 13px;
 }
 
-.workflow-home-box {
+.workflow-total-box {
   position: absolute;
   top: 0;
   right: 0;
@@ -10028,4 +12006,1798 @@ grid-template-columns: 32px 1fr 118px 38px;
   background: #111827;
   color: #ffffff;
 }
+
+
+/* =========================================================
+   ABSOLUTE FINAL OVERRIDE
+   This block is intentionally LAST so old CSS cannot override it.
+   ========================================================= */
+
+/* Use the live draggable widths for header + every order row */
+.board-table-head,
+.board-table-row,
+.board-inline-add-row {
+  display: grid !important;
+  grid-template-columns: var(--board-grid-columns) !important;
+  width: max-content !important;
+  min-width: 100% !important;
+  column-gap: 0 !important;
+  align-items: stretch !important;
+}
+
+/* White table/background */
+.board-table-shell,
+.board-table-head,
+.board-table-row,
+.board-inline-add-row,
+.board-table-head > .board-col,
+.board-table-row > .board-col,
+.board-inline-add-row > .board-col {
+  background: #ffffff !important;
+}
+
+/* REAL full-height vertical pipelines */
+.board-table-head > .board-col,
+.board-table-row > .board-col,
+.board-inline-add-row > .board-col {
+  position: relative !important;
+  box-sizing: border-box !important;
+  min-width: 0 !important;
+  height: 100% !important;
+  border-right: 1px solid #111111 !important;
+}
+
+/* outer right edge handled by shell */
+.board-table-head > .board-col:last-child,
+.board-table-row > .board-col:last-child,
+.board-inline-add-row > .board-col:last-child {
+  border-right: 0 !important;
+}
+
+/* Remove every old short/grey fake separator */
+.board-table-head > .board-col::before,
+.board-table-head > .board-col::after,
+.board-table-row > .board-col::before,
+.board-table-row > .board-col::after,
+.board-inline-add-row > .board-col::before,
+.board-inline-add-row > .board-col::after {
+  content: none !important;
+  display: none !important;
+}
+
+/* Header line */
+.board-table-head {
+  border-bottom: 1px solid #111111 !important;
+}
+
+/* Excel-style draggable separator exactly on the pipeline */
+.resizable-head-cell {
+  position: relative !important;
+  overflow: visible !important;
+}
+
+.column-resizer {
+  position: absolute !important;
+  top: 0 !important;
+  right: -5px !important;
+  width: 10px !important;
+  height: 100% !important;
+  z-index: 99999 !important;
+  cursor: col-resize !important;
+  background: transparent !important;
+}
+
+.column-resizer::before {
+  content: "" !important;
+  display: block !important;
+  position: absolute !important;
+  top: 0 !important;
+  bottom: 0 !important;
+  left: 4px !important;
+  width: 1px !important;
+  background: #111111 !important;
+}
+
+.column-resizer:hover::before,
+body.board-column-resizing .column-resizer::before {
+  left: 3px !important;
+  width: 3px !important;
+  background: #000000 !important;
+}
+
+/* Keep content inside its resized column */
+.board-col {
+  min-width: 0 !important;
+  box-sizing: border-box !important;
+}
+
+.board-col input,
+.board-col select,
+.board-col textarea,
+.board-col button {
+  max-width: 100% !important;
+  box-sizing: border-box !important;
+}
+
+/* Keep the chevrons in one exact vertical column */
+.collapsible-active-heading {
+  padding-left: 28px !important;
+}
+
+.collapsible-active-heading > div:first-child,
+.collapsed-status-left {
+  display: flex !important;
+  align-items: center !important;
+  gap: 0 !important;
+}
+
+.section-chevron-slot {
+  flex: 0 0 28px !important;
+  width: 28px !important;
+  min-width: 28px !important;
+  margin: 0 12px 0 0 !important;
+  padding: 0 !important;
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+}
+
+.section-chevron-slot i {
+  width: 12px !important;
+  min-width: 12px !important;
+  margin: 0 !important;
+  padding: 0 !important;
+  text-align: center !important;
+}
+
+.collapsed-status-bars {
+  padding-left: 28px !important;
+}
+
+.collapsed-status-bar {
+  padding-left: 0 !important;
+}
+
+/* Cursor while dragging */
+body.board-column-resizing,
+body.board-column-resizing * {
+  cursor: col-resize !important;
+  user-select: none !important;
+}
+
+
+
+/* =========================================================
+   TEMPORARY BALANCED COLUMN RESIZE
+   - divider movement never changes total table width
+   - neighboring column absorbs the width
+   - refresh restores defaults
+   ========================================================= */
+
+.board-table-shell {
+  width: 100% !important;
+}
+
+/* Grid width is the sum of current column widths.
+   Since two adjacent widths are changed inversely, it remains stable. */
+.board-table-head,
+.board-table-row,
+.board-inline-add-row {
+  grid-template-columns: var(--board-grid-columns) !important;
+}
+
+/* Prevent any extra ghost/blank column after INFO */
+.board-table-head::after,
+.board-table-row::after,
+.board-inline-add-row::after {
+  content: none !important;
+  display: none !important;
+}
+
+/* Last visible column should simply end at the table edge */
+.board-col-info {
+  min-width: 0 !important;
+}
+
+/* Drag interaction feedback */
+.column-resizer:hover::before,
+body.board-column-resizing .column-resizer::before {
+  background: #000000 !important;
+}
+
+/* TABLE HEADER — BLACK */
+.board-table-head {
+  background: #000000 !important;
+  color: #ffffff !important;
+}
+
+/* Header text + icons white */
+.board-table-head .board-col,
+.board-table-head span,
+.board-table-head strong,
+.board-table-head i {
+  color: #ffffff !important;
+}
+
+/* Header ki pipelines white */
+.board-table-head > .board-col:not(:last-child)::after,
+.board-table-head .column-resizer::before {
+  background: #ffffff !important;
+}
+
+/* =========================================================
+   CLEAN LAYOUT FIX — only requested visual corrections
+   ========================================================= */
+
+/* ---------- ACTIVE SECTION HEADER ---------- */
+.collapsible-active-heading {
+  min-height: 58px !important;
+  padding: 9px 18px 9px 28px !important;
+  background: #ffffff !important;
+  border: 1px solid #d7dde5 !important;
+  border-left: 4px solid var(--active-section-color) !important;
+  border-radius: 7px !important;
+  box-shadow: none !important;
+}
+
+.collapsible-active-heading > div:first-child {
+  display: flex !important;
+  align-items: center !important;
+  gap: 0 !important;
+  min-width: 0 !important;
+}
+
+.active-section-title-wrap {
+  display: flex !important;
+  flex-direction: column !important;
+  align-items: flex-start !important;
+  justify-content: center !important;
+  gap: 3px !important;
+  min-width: 0 !important;
+}
+
+.active-section-title-wrap h1 {
+  margin: 0 !important;
+  padding: 0 !important;
+  line-height: 1.05 !important;
+}
+
+.active-section-meta {
+  display: block !important;
+  margin: 0 !important;
+  padding: 0 !important;
+  color: #667085 !important;
+  font-size: 9px !important;
+  font-weight: 700 !important;
+  line-height: 1.2 !important;
+  white-space: nowrap !important;
+}
+
+/* ---------- COLLAPSED CATEGORIES: clean, NO background bar ---------- */
+.collapsed-status-bars {
+  padding-top: 22px !important;
+  padding-left: 28px !important;
+  gap: 34px !important;
+  border-top: 1px dashed #dfe3e8 !important;
+}
+
+.collapsed-status-bar {
+  min-height: 26px !important;
+  padding: 0 !important;
+  margin: 0 !important;
+  border: 0 !important;
+  background: transparent !important;
+  box-shadow: none !important;
+  justify-content: flex-start !important;
+}
+
+.collapsed-status-bar:hover {
+  background: transparent !important;
+}
+
+.collapsed-status-bar strong {
+  background: transparent !important;
+  color: var(--group-color) !important;
+  font-size: 15px !important;
+  font-weight: 800 !important;
+  font-style: italic !important;
+}
+
+/* Specifically prevent any green/delivered pill/bar background */
+.collapsed-status-bar,
+.collapsed-status-bar strong,
+.collapsed-status-left {
+  background-image: none !important;
+}
+
+/* ---------- CHEVRON ALIGNMENT ---------- */
+.section-chevron-slot {
+  flex: 0 0 28px !important;
+  width: 28px !important;
+  min-width: 28px !important;
+  margin: 0 12px 0 0 !important;
+}
+
+.collapsed-status-left {
+  display: flex !important;
+  align-items: center !important;
+  gap: 0 !important;
+}
+
+/* ---------- TABLE LAYOUT ---------- */
+/* Keep the table width stable and avoid the ugly extra empty area */
+.board-table-shell {
+  width: 100% !important;
+  max-width: 100% !important;
+  background: #ffffff !important;
+  border: 1px solid #d8dde5 !important;
+  overflow-x: auto !important;
+  overflow-y: visible !important;
+  scrollbar-gutter: stable !important;
+}
+
+.board-table-head,
+.board-table-row,
+.board-inline-add-row {
+  grid-template-columns: var(--board-grid-columns) !important;
+  width: 100% !important;
+  min-width: 0 !important;
+  max-width: 100% !important;
+  column-gap: 0 !important;
+  align-items: stretch !important;
+}
+
+/* Header stays clean */
+.board-table-head {
+  background: #ffffff !important;
+  color: #111827 !important;
+  border-bottom: 1px solid #d8dde5 !important;
+}
+
+/* Rows */
+.board-table-row,
+.board-inline-add-row {
+  background: #ffffff !important;
+}
+
+/*
+ * Short vertical pipeline:
+ * line remains in the same column boundary,
+ * but does NOT touch the top/bottom of the cell.
+ */
+.board-table-head > .board-col,
+.board-table-row > .board-col,
+.board-inline-add-row > .board-col {
+  position: relative !important;
+  border-right: 0 !important;
+  background: transparent !important;
+  min-width: 0 !important;
+  box-sizing: border-box !important;
+}
+
+/* one inset separator per column */
+.board-table-head > .board-col:not(:last-child)::after,
+.board-table-row > .board-col:not(:last-child)::after,
+.board-inline-add-row > .board-col:not(:last-child)::after {
+  content: "" !important;
+  display: block !important;
+  position: absolute !important;
+  top: 8px !important;
+  bottom: 8px !important;
+  right: 0 !important;
+  width: 1px !important;
+  background: #111111 !important;
+  pointer-events: none !important;
+}
+
+/* Header pipeline a little shorter */
+.board-table-head > .board-col:not(:last-child)::after {
+  top: 6px !important;
+  bottom: 6px !important;
+}
+
+/* Keep old pseudo lines from duplicating on LEFT */
+.board-table-head > .board-col::before,
+.board-table-row > .board-col::before,
+.board-inline-add-row > .board-col::before {
+  content: none !important;
+  display: none !important;
+}
+
+/* Resize handle stays exactly on the same boundary */
+.column-resizer {
+  position: absolute !important;
+  top: 6px !important;
+  bottom: 6px !important;
+  right: -5px !important;
+  width: 10px !important;
+  height: auto !important;
+  z-index: 99999 !important;
+  cursor: col-resize !important;
+  background: transparent !important;
+}
+
+.column-resizer::before {
+  content: "" !important;
+  display: block !important;
+  position: absolute !important;
+  top: 0 !important;
+  bottom: 0 !important;
+  left: 4px !important;
+  width: 1px !important;
+  background: #111111 !important;
+}
+
+.column-resizer:hover::before,
+body.board-column-resizing .column-resizer::before {
+  left: 3px !important;
+  width: 3px !important;
+  background: #000000 !important;
+}
+
+/* Prevent excessive row whitespace */
+.board-table-row {
+  margin: 0 !important;
+  min-height: 66px !important;
+  border-bottom: 1px solid #e5e7eb !important;
+  box-shadow: none !important;
+}
+
+.board-table-row + .board-table-row {
+  margin-top: 0 !important;
+}
+
+/* ---------- PRINT ICON ---------- */
+.board-print-button {
+  color: #111827 !important;
+}
+
+.board-print-button i,
+.board-print-button small {
+  color: #111827 !important;
+}
+
+/* Dark mode => printer white */
+.theme-dark .board-print-button,
+.theme-dark .board-print-button i,
+.theme-dark .board-print-button small {
+  color: #ffffff !important;
+}
+
+/* ---------- DARK MODE CLEANUP ---------- */
+.theme-dark .collapsible-active-heading {
+  background: #111827 !important;
+  border-color: #334155 !important;
+}
+
+.theme-dark .active-section-meta {
+  color: #cbd5e1 !important;
+}
+
+.theme-dark .collapsed-status-bar,
+.theme-dark .collapsed-status-left,
+.theme-dark .collapsed-status-bar strong {
+  background: transparent !important;
+}
+
+.theme-dark .board-table-shell,
+.theme-dark .board-table-head,
+.theme-dark .board-table-row,
+.theme-dark .board-inline-add-row {
+  background: #111827 !important;
+}
+
+.theme-dark .board-table-head > .board-col:not(:last-child)::after,
+.theme-dark .board-table-row > .board-col:not(:last-child)::after,
+.theme-dark .board-inline-add-row > .board-col:not(:last-child)::after,
+.theme-dark .column-resizer::before {
+  background: #ffffff !important;
+}
+
+
+
+/* =========================================================
+   FINAL ROW SPACING FIX
+   - clean space between each order
+   - pipelines stay inside each row
+   - resize does not break layout
+   ========================================================= */
+
+/* Table shell stays stable */
+.board-table-shell {
+  width: 100% !important;
+  max-width: 100% !important;
+  overflow-x: auto !important;
+  overflow-y: visible !important;
+  background: #ffffff !important;
+  border: 0 !important;
+}
+
+/* Header stays attached, rows use the same live column widths */
+.board-table-head,
+.board-table-row,
+.board-inline-add-row {
+  display: grid !important;
+  grid-template-columns: var(--board-grid-columns) !important;
+  width: 100% !important;
+  min-width: 0 !important;
+  max-width: 100% !important;
+  column-gap: 0 !important;
+  box-sizing: border-box !important;
+}
+
+/* Clean header */
+.board-table-head {
+  min-height: 40px !important;
+  margin: 0 0 8px 0 !important;
+  background: #4a90e2 !important;
+  color: #111827 !important;
+  border: 1px solid #d9e0e7 !important;
+  border-radius: 3px !important;
+}
+
+/* Every order becomes its own clean row/card */
+.board-table-row {
+  min-height: 72px !important;
+  margin: 0 0 8px 0 !important;
+  padding: 0 !important;
+  background: #f7f8fa !important;
+  border: 1px solid #dfe4ea !important;
+  border-radius: 3px !important;
+  box-shadow: none !important;
+  overflow: visible !important;
+}
+
+/* last row does not need extra bottom gap */
+.board-table-row:last-child {
+  margin-bottom: 0 !important;
+}
+
+/* alternate row background only slightly different */
+.board-table-row:nth-of-type(even) {
+  background: #ffffff !important;
+}
+
+/* keep all cells aligned vertically */
+.board-table-head > .board-col,
+.board-table-row > .board-col,
+.board-inline-add-row > .board-col {
+  position: relative !important;
+  min-width: 0 !important;
+  height: 100% !important;
+  box-sizing: border-box !important;
+  border-right: 0 !important;
+  background: transparent !important;
+}
+
+/* pipelines remain short and INSIDE each row/header */
+.board-table-head > .board-col:not(:last-child)::after,
+.board-table-row > .board-col:not(:last-child)::after,
+.board-inline-add-row > .board-col:not(:last-child)::after {
+  content: "" !important;
+  display: block !important;
+  position: absolute !important;
+  right: 0 !important;
+  top: 10px !important;
+  bottom: 10px !important;
+  width: 1px !important;
+  background: #111111 !important;
+  pointer-events: none !important;
+}
+
+/* header separator is a little tighter */
+.board-table-head > .board-col:not(:last-child)::after {
+  top: 7px !important;
+  bottom: 7px !important;
+}
+
+/* no duplicated old lines */
+.board-table-head > .board-col::before,
+.board-table-row > .board-col::before,
+.board-inline-add-row > .board-col::before {
+  content: none !important;
+  display: none !important;
+}
+
+/* resize handle stays on the exact separator */
+.column-resizer {
+  position: absolute !important;
+  top: 7px !important;
+  bottom: 7px !important;
+  right: -5px !important;
+  width: 10px !important;
+  height: auto !important;
+  z-index: 99999 !important;
+  cursor: col-resize !important;
+  background: transparent !important;
+}
+
+.column-resizer::before {
+  content: "" !important;
+  display: block !important;
+  position: absolute !important;
+  left: 4px !important;
+  top: 0 !important;
+  bottom: 0 !important;
+  width: 1px !important;
+  background: #111111 !important;
+}
+
+/* keep content inside resized columns */
+.board-col,
+.board-col * {
+  box-sizing: border-box;
+}
+
+.board-col input,
+.board-col select,
+.board-col textarea,
+.board-col button {
+  max-width: 100% !important;
+}
+
+/* stop long content from forcing column width */
+.board-col-name,
+.board-col-address,
+.board-col-track,
+.board-col-packing,
+.board-col-payment {
+  overflow: hidden !important;
+}
+
+.board-col-name strong,
+.board-col-name small,
+.board-col-address input,
+.board-col-track input,
+.board-col-packing .packing-detail-preview,
+.board-col-payment input {
+  min-width: 0 !important;
+  text-overflow: ellipsis !important;
+}
+
+/* dark mode keeps same clean row spacing */
+.theme-dark .board-table-shell {
+  background: #0f172a !important;
+}
+
+.theme-dark .board-table-row {
+  background: #111827 !important;
+  border-color: #334155 !important;
+}
+
+.theme-dark .board-table-row:nth-of-type(even) {
+  background: #0f172a !important;
+}
+
+.theme-dark .board-table-head > .board-col:not(:last-child)::after,
+.theme-dark .board-table-row > .board-col:not(:last-child)::after,
+.theme-dark .board-inline-add-row > .board-col:not(:last-child)::after,
+.theme-dark .column-resizer::before {
+  background: #ffffff !important;
+}
+
+
+
+/* =========================================================
+   TRUE RESPONSIVE GRID + CLEAN PIPELINES
+   ========================================================= */
+
+/* Never create horizontal empty/overflow space */
+.board-table-shell {
+  width: 100% !important;
+  max-width: 100% !important;
+  overflow-x: hidden !important;
+  overflow-y: visible !important;
+  background: #ffffff !important;
+}
+
+/* Header and every row use the SAME percentage grid */
+.board-table-head,
+.board-table-row,
+.board-inline-add-row {
+  display: grid !important;
+  grid-template-columns: var(--board-grid-columns) !important;
+  width: 100% !important;
+  min-width: 100% !important;
+  max-width: 100% !important;
+  column-gap: 0 !important;
+  align-items: stretch !important;
+  box-sizing: border-box !important;
+}
+
+/* Clean order spacing */
+.board-table-head {
+  min-height: 40px !important;
+  margin: 0 0 8px 0 !important;
+}
+
+.board-table-row {
+  min-height: 72px !important;
+  margin: 0 0 8px 0 !important;
+  padding: 0 !important;
+  border: 1px solid #dfe4ea !important;
+  border-radius: 3px !important;
+  box-shadow: none !important;
+  overflow: visible !important;
+}
+
+.board-table-row:last-child {
+  margin-bottom: 0 !important;
+}
+
+/* Every cell stays inside its assigned column */
+.board-table-head > .board-col,
+.board-table-row > .board-col,
+.board-inline-add-row > .board-col {
+  position: relative !important;
+  min-width: 0 !important;
+  width: auto !important;
+  max-width: none !important;
+  height: 100% !important;
+  box-sizing: border-box !important;
+  border-right: 0 !important;
+  overflow: hidden !important;
+}
+
+/* Columns that need popovers/buttons can still show vertically */
+.board-col-packing,
+.board-col-status,
+.board-col-owner,
+.board-col-files,
+.board-col-chat {
+  overflow: visible !important;
+}
+
+/* PIPELINES:
+   same exact column boundaries in header and every order,
+   shorter from top/bottom for clean look. */
+.board-table-head > .board-col:not(:last-child)::after,
+.board-table-row > .board-col:not(:last-child)::after,
+.board-inline-add-row > .board-col:not(:last-child)::after {
+  content: "" !important;
+  display: block !important;
+  position: absolute !important;
+  right: 0 !important;
+  top: 11px !important;
+  bottom: 11px !important;
+  width: 1px !important;
+  background: #111827 !important;
+  pointer-events: none !important;
+  z-index: 3 !important;
+}
+
+.board-table-head > .board-col:not(:last-child)::after {
+  top: 7px !important;
+  bottom: 7px !important;
+}
+
+/* Kill old duplicate separators */
+.board-table-head > .board-col::before,
+.board-table-row > .board-col::before,
+.board-inline-add-row > .board-col::before {
+  content: none !important;
+  display: none !important;
+}
+
+/* Resize handle exactly follows that same boundary */
+.column-resizer {
+  position: absolute !important;
+  top: 7px !important;
+  bottom: 7px !important;
+  right: -5px !important;
+  width: 10px !important;
+  height: auto !important;
+  z-index: 99999 !important;
+  cursor: col-resize !important;
+  background: transparent !important;
+}
+
+.column-resizer::before {
+  content: "" !important;
+  display: block !important;
+  position: absolute !important;
+  top: 0 !important;
+  bottom: 0 !important;
+  left: 4px !important;
+  width: 1px !important;
+  background: #111827 !important;
+}
+
+.column-resizer:hover::before,
+body.board-column-resizing .column-resizer::before {
+  left: 3px !important;
+  width: 3px !important;
+  background: #000000 !important;
+}
+
+/* Long content must NOT push columns wider */
+.board-col-name .inline-cell-wrap,
+.board-col-name .inline-value-button,
+.board-col-address,
+.board-col-track,
+.board-col-payment,
+.board-col-packing .packing-detail-wrap {
+  min-width: 0 !important;
+  max-width: 100% !important;
+}
+
+.board-col-name strong,
+.board-col-name small,
+.board-col-address input,
+.board-col-track input,
+.board-col-payment input,
+.packing-detail-preview {
+  overflow: hidden !important;
+  text-overflow: ellipsis !important;
+  white-space: nowrap !important;
+}
+
+/* Keep content centered/clean after resize */
+.board-col-status,
+.board-col-owner,
+.board-col-files,
+.board-col-chat,
+.board-col-payment,
+.board-col-packing,
+.board-col-track,
+.board-col-info {
+  display: flex !important;
+  align-items: center !important;
+}
+
+.board-col-status,
+.board-col-files,
+.board-col-chat,
+.board-col-payment,
+.board-col-packing,
+.board-col-track,
+.board-col-info {
+  justify-content: center !important;
+}
+
+.board-col-owner {
+  justify-content: flex-start !important;
+}
+
+/* Dark mode pipelines */
+.theme-dark .board-table-head > .board-col:not(:last-child)::after,
+.theme-dark .board-table-row > .board-col:not(:last-child)::after,
+.theme-dark .board-inline-add-row > .board-col:not(:last-child)::after,
+.theme-dark .column-resizer::before {
+  background: #ffffff !important;
+}
+
+
+
+/* =========================================================
+   PIPELINE CENTER FIX ONLY
+   Keep everything else unchanged.
+   Vertical separators are centered inside header/order rows.
+   ========================================================= */
+
+/* Remove previous full/inset separator positioning */
+.board-table-head > .board-col:not(:last-child)::after,
+.board-table-row > .board-col:not(:last-child)::after,
+.board-inline-add-row > .board-col:not(:last-child)::after {
+  content: "" !important;
+  position: absolute !important;
+  right: 0 !important;
+  top: 50% !important;
+  bottom: auto !important;
+  transform: translateY(-50%) !important;
+  width: 1px !important;
+  height: 32px !important;
+  background: #111827 !important;
+  pointer-events: none !important;
+  z-index: 3 !important;
+}
+
+/* Header separator slightly shorter */
+.board-table-head > .board-col:not(:last-child)::after {
+  height: 25px !important;
+}
+
+/* Resize handle remains on same boundary, also vertically centered */
+.column-resizer {
+  top: 50% !important;
+  bottom: auto !important;
+  transform: translateY(-50%) !important;
+  height: 32px !important;
+}
+
+.board-table-head .column-resizer {
+  height: 25px !important;
+}
+
+.column-resizer::before {
+  top: 0 !important;
+  bottom: auto !important;
+  height: 100% !important;
+}
+
+/* Dark mode keeps separator visible */
+.theme-dark .board-table-head > .board-col:not(:last-child)::after,
+.theme-dark .board-table-row > .board-col:not(:last-child)::after,
+.theme-dark .board-inline-add-row > .board-col:not(:last-child)::after,
+.theme-dark .column-resizer::before {
+  background: #ffffff !important;
+}
+
+
+
+/* =========================================================
+   SECTION BAR CLEANUP ONLY
+   - active bar slightly lower
+   - white background + black border
+   - colored left strip on every section
+   ========================================================= */
+
+/* Active/open section bar */
+.collapsible-active-heading {
+  margin-top: 12px !important;
+  margin-bottom: 12px !important;
+  background: #ffffff !important;
+  border: 1px solid #111827 !important;
+  border-left: 5px solid var(--active-section-color) !important;
+  border-radius: 6px !important;
+  box-shadow: none !important;
+}
+
+/* Keep active title clean */
+.collapsible-active-heading h1 {
+  color: var(--active-section-color) !important;
+}
+
+/* Other/collapsed sections */
+.collapsed-status-bars {
+  gap: 34px !important;
+  padding-top: 12px !important;
+}
+
+.collapsed-status-bar {
+  position: relative !important;
+  min-height: 42px !important;
+  padding: 0 14px 0 28px !important;
+  background: #ffffff !important;
+  border: 1px solid #111827 !important;
+  border-left: 5px solid var(--group-color) !important;
+  border-radius: 6px !important;
+  box-shadow: none !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: flex-start !important;
+}
+
+/* No colored full background */
+.collapsed-status-bar:hover {
+  background: #f8fafc !important;
+}
+
+.collapsed-status-left {
+  background: transparent !important;
+}
+
+/* Keep each title in its own section color */
+.collapsed-status-bar strong {
+  color: var(--group-color) !important;
+  background: transparent !important;
+}
+
+/* Chevron stays aligned */
+.collapsed-status-bar .section-chevron-slot {
+  margin-right: 12px !important;
+}
+
+/* Dark mode */
+.theme-dark .collapsible-active-heading,
+.theme-dark .collapsed-status-bar {
+  background: #111827 !important;
+  border-color: #ffffff !important;
+}
+
+.theme-dark .collapsed-status-bar:hover {
+  background: #172033 !important;
+}
+
+
+
+/* =========================================================
+   UNIFORM SECTION BARS — FINAL
+   All open/closed bars same size and same clean style.
+   ========================================================= */
+
+/* OPEN / ACTIVE BAR */
+.collapsible-active-heading {
+  width: 100% !important;
+  height: 58px !important;
+  min-height: 58px !important;
+  max-height: 58px !important;
+  margin: 12px 0 !important;
+  padding: 8px 16px 8px 28px !important;
+
+  background: #ffffff !important;
+  border: 1px solid #111111 !important;
+  border-left: 5px solid #111111 !important;
+  border-radius: 6px !important;
+  box-shadow: none !important;
+  box-sizing: border-box !important;
+}
+
+/* CLOSED BARS CONTAINER */
+.collapsed-status-bars {
+  width: 100% !important;
+  padding: 0 !important;
+  margin: 0 !important;
+  gap: 12px !important;
+}
+
+/* CLOSED BAR — EXACT SAME SIZE AS OPEN BAR */
+.collapsed-status-bar {
+  width: 100% !important;
+  height: 58px !important;
+  min-height: 58px !important;
+  max-height: 58px !important;
+  margin: 0 !important;
+  padding: 8px 16px 8px 28px !important;
+
+  background: #ffffff !important;
+  border: 1px solid #111111 !important;
+  border-left: 5px solid #111111 !important;
+  border-radius: 6px !important;
+  box-shadow: none !important;
+  box-sizing: border-box !important;
+
+  display: flex !important;
+  align-items: center !important;
+  justify-content: flex-start !important;
+}
+
+/* ALL SECTION TEXT BLACK */
+.collapsible-active-heading h1,
+.collapsible-active-heading .active-section-meta,
+.collapsed-status-bar strong {
+  color: #111111 !important;
+}
+
+/* active title/meta alignment */
+.active-section-title-wrap {
+  justify-content: center !important;
+}
+
+.active-section-meta {
+  margin-top: 2px !important;
+  color: #111111 !important;
+}
+
+/* ALL CHEVRONS BLACK */
+.collapsible-active-heading .section-chevron-slot,
+.collapsed-status-bar .section-chevron-slot,
+.collapsible-active-heading .section-chevron-slot i,
+.collapsed-status-bar .section-chevron-slot i {
+  color: #111111 !important;
+}
+
+/* remove colored hover/background */
+.collapsed-status-bar:hover,
+.collapsible-active-heading:hover {
+  background: #ffffff !important;
+}
+
+/* Make sure no group color leaks into text/background */
+.collapsed-status-left,
+.collapsed-status-bar strong {
+  background: transparent !important;
+}
+
+/* DARK MODE: requested bars still clean; white surface / black content */
+.theme-dark .collapsible-active-heading,
+.theme-dark .collapsed-status-bar {
+  background: #ffffff !important;
+  border-color: #111111 !important;
+  border-left-color: #111111 !important;
+}
+
+.theme-dark .collapsible-active-heading h1,
+.theme-dark .collapsible-active-heading .active-section-meta,
+.theme-dark .collapsed-status-bar strong,
+.theme-dark .collapsible-active-heading .section-chevron-slot,
+.theme-dark .collapsed-status-bar .section-chevron-slot,
+.theme-dark .collapsible-active-heading .section-chevron-slot i,
+.theme-dark .collapsed-status-bar .section-chevron-slot i {
+  color: #111111 !important;
+}
+
+
+
+/* =========================================================
+   PROFESSIONAL WORKFLOW TABS + SECTION COLOR SYNC
+   ========================================================= */
+
+/* ---------- TOP WORKFLOW TABS ---------- */
+.workflow-tabs {
+  display: flex !important;
+  align-items: center !important;
+  gap: 10px !important;
+  flex-wrap: wrap !important;
+}
+
+.workflow-tab-wrap {
+  flex: 0 0 auto !important;
+}
+
+.workflow-tab {
+  min-width: 122px !important;
+  height: 42px !important;
+  padding: 0 !important;
+
+  display: grid !important;
+  grid-template-columns: 1fr 42px !important;
+  align-items: stretch !important;
+
+  background: #ffffff !important;
+  border: 1px solid #d9dee7 !important;
+  border-left: 4px solid var(--group-color) !important;
+  border-radius: 7px !important;
+
+  color: var(--group-color) !important;
+  box-shadow: 0 1px 2px rgba(15, 23, 42, .04) !important;
+  overflow: hidden !important;
+  transition: .16s ease !important;
+}
+
+.workflow-tab:hover {
+  transform: translateY(-1px) !important;
+  border-color: #cbd5e1 !important;
+  box-shadow: 0 5px 14px rgba(15, 23, 42, .08) !important;
+  background: #ffffff !important;
+}
+
+.workflow-tab.active {
+  border-color: var(--group-color) !important;
+  box-shadow:
+    0 0 0 2px color-mix(in srgb, var(--group-color) 18%, transparent),
+    0 5px 14px rgba(15, 23, 42, .08) !important;
+  background: #ffffff !important;
+}
+
+.workflow-tab-label {
+  display: flex !important;
+  align-items: center !important;
+  padding: 0 11px !important;
+
+  color: var(--group-color) !important;
+  background: #ffffff !important;
+
+  font-size: 9px !important;
+  font-weight: 900 !important;
+  letter-spacing: .025em !important;
+  white-space: nowrap !important;
+}
+
+.workflow-total-box {
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+
+  background: color-mix(
+    in srgb,
+    var(--group-color) 12%,
+    #ffffff
+  ) !important;
+
+  color: var(--group-color) !important;
+  border-left: 1px solid color-mix(
+    in srgb,
+    var(--group-color) 25%,
+    #e5e7eb
+  ) !important;
+
+  font-size: 14px !important;
+  font-weight: 900 !important;
+}
+
+/* Plus/add-section button matches the tabs */
+.workflow-add-button {
+  width: 42px !important;
+  height: 42px !important;
+  border: 1px dashed #94a3b8 !important;
+  border-radius: 7px !important;
+  background: #ffffff !important;
+  color: #0f172a !important;
+}
+
+.workflow-add-button:hover {
+  background: #f8fafc !important;
+  border-color: #475569 !important;
+}
+
+/* ---------- SECTION BARS ---------- */
+/* Open section: white card, but text + left strip use its exact section color */
+.collapsible-active-heading {
+  background: #ffffff !important;
+  border: 1px solid #111827 !important;
+  border-left: 5px solid var(--active-section-color) !important;
+  box-shadow: none !important;
+}
+
+.collapsible-active-heading h1 {
+  color: var(--active-section-color) !important;
+}
+
+.collapsible-active-heading .active-section-meta {
+  color: var(--active-section-color) !important;
+  opacity: .78 !important;
+}
+
+.collapsible-active-heading .section-chevron-slot,
+.collapsible-active-heading .section-chevron-slot i {
+  color: var(--active-section-color) !important;
+}
+
+/* Closed sections: exact group color on text + left strip */
+.collapsed-status-bar {
+  background: #ffffff !important;
+  border: 1px solid #111827 !important;
+  border-left: 5px solid var(--group-color) !important;
+  box-shadow: none !important;
+}
+
+.collapsed-status-bar:hover {
+  background: #fbfcfd !important;
+}
+
+.collapsed-status-bar strong,
+.collapsed-status-bar .section-chevron-slot,
+.collapsed-status-bar .section-chevron-slot i,
+.collapsed-status-bar .collapsed-status-icon {
+  color: var(--group-color) !important;
+}
+
+/* Make sure no old black override wins */
+.collapsed-status-left,
+.collapsed-status-bar strong {
+  background: transparent !important;
+}
+
+/* ---------- DARK MODE ---------- */
+.theme-dark .workflow-tab,
+.theme-dark .workflow-tab-label,
+.theme-dark .workflow-add-button {
+  background: #111827 !important;
+}
+
+.theme-dark .workflow-tab {
+  border-color: #334155 !important;
+  border-left-color: var(--group-color) !important;
+}
+
+.theme-dark .workflow-total-box {
+  background: color-mix(
+    in srgb,
+    var(--group-color) 18%,
+    #111827
+  ) !important;
+}
+
+.theme-dark .collapsible-active-heading,
+.theme-dark .collapsed-status-bar {
+  background: #111827 !important;
+  border-color: #ffffff !important;
+}
+
+.theme-dark .collapsible-active-heading {
+  border-left-color: var(--active-section-color) !important;
+}
+
+.theme-dark .collapsed-status-bar {
+  border-left-color: var(--group-color) !important;
+}
+
+
+
+
+
+/* ===== Status dropdown reference style ===== */
+.board-table-shell,
+.board-table-row,
+.row-status-cell,
+.status-ref-wrap {
+  overflow: visible !important;
+}
+
+.board-table-row {
+  position: relative !important;
+  z-index: 1 !important;
+}
+
+.board-table-row:has(.status-ref-menu) {
+  z-index: 5000 !important;
+}
+
+.row-status-cell {
+  position: relative !important;
+  z-index: 30 !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+}
+
+.status-ref-wrap {
+  position: relative !important;
+  width: 160px !important;
+  max-width: 100% !important;
+}
+
+.status-ref-trigger {
+  width: 160px !important;
+  max-width: 100% !important;
+  height: 38px !important;
+  padding: 0 13px !important;
+
+  display: grid !important;
+  grid-template-columns: 8px minmax(0, 1fr) 18px !important;
+  align-items: center !important;
+  gap: 10px !important;
+
+  background: #e9e9e9 !important;
+  border: 1px solid #b8b8b8 !important;
+  border-radius: 10px !important;
+
+  color: #2f3540 !important;
+  cursor: pointer !important;
+  box-shadow: inset 0 1px 0 rgba(255,255,255,.65) !important;
+}
+
+.status-ref-trigger.open {
+  background: #eeeeee !important;
+}
+
+.status-ref-dot {
+  display: block !important;
+  width: 8px !important;
+  height: 8px !important;
+  min-width: 8px !important;
+  border-radius: 50% !important;
+}
+
+.status-ref-label,
+.status-ref-option-label {
+  min-width: 0 !important;
+  overflow: hidden !important;
+  white-space: nowrap !important;
+  text-overflow: ellipsis !important;
+}
+
+.status-ref-label {
+  color: #31343a !important;
+  font-size: 12px !important;
+  font-weight: 500 !important;
+  text-align: left !important;
+}
+
+.status-ref-chevron {
+  color: #111827 !important;
+  font-size: 13px !important;
+  transition: transform .15s ease !important;
+}
+
+.status-ref-chevron.rotate {
+  transform: rotate(180deg) !important;
+}
+
+.status-ref-menu {
+  position: absolute !important;
+  top: calc(100% + 7px) !important;
+  left: 0 !important;
+  z-index: 2147483647 !important;
+
+  width: 240px !important;
+  max-height: 310px !important;
+  overflow-y: auto !important;
+  overflow-x: hidden !important;
+
+  padding: 9px !important;
+  background: #ffffff !important;
+  border: 1px solid #e0e3e7 !important;
+  border-radius: 12px !important;
+
+  box-shadow:
+    0 18px 42px rgba(15,23,42,.14),
+    0 3px 10px rgba(15,23,42,.05) !important;
+}
+
+.status-ref-option {
+  width: 100% !important;
+  min-height: 40px !important;
+  padding: 0 10px !important;
+
+  display: grid !important;
+  grid-template-columns: 8px minmax(0,1fr) 14px !important;
+  align-items: center !important;
+  gap: 10px !important;
+
+  border: 0 !important;
+  border-radius: 8px !important;
+  background: transparent !important;
+
+  color: #666b73 !important;
+  text-align: left !important;
+  cursor: pointer !important;
+}
+
+.status-ref-option:hover,
+.status-ref-option.active {
+  background: #f5f6f8 !important;
+}
+
+.status-ref-option-label {
+  color: #666b73 !important;
+  font-size: 12px !important;
+  font-weight: 500 !important;
+}
+
+.status-ref-check {
+  color: #111827 !important;
+  font-size: 10px !important;
+}
+
+/* Keep packing centered and clean */
+.board-col-packing {
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+}
+
+.packing-clean-input,
+.packing-inline-input {
+  margin: 0 !important;
+  align-self: center !important;
+}
+
+/* Dark mode */
+.theme-dark .status-ref-trigger {
+  background: #1f2937 !important;
+  border-color: #475569 !important;
+}
+
+.theme-dark .status-ref-label,
+.theme-dark .status-ref-chevron {
+  color: #f8fafc !important;
+}
+
+.theme-dark .status-ref-menu {
+  background: #111827 !important;
+  border-color: #334155 !important;
+}
+
+.theme-dark .status-ref-option:hover,
+.theme-dark .status-ref-option.active {
+  background: #1f2937 !important;
+}
+
+.theme-dark .status-ref-option-label,
+.theme-dark .status-ref-check {
+  color: #f8fafc !important;
+}
+
+
+/* =========================================================
+   STATUS DROPDOWN OUTSIDE ROW / TABLE
+   ========================================================= */
+
+.status-ref-wrap {
+  position: relative !important;
+  width: 160px !important;
+  max-width: 100% !important;
+}
+
+.status-ref-trigger {
+  width: 160px !important;
+  max-width: 100% !important;
+  height: 38px !important;
+  padding: 0 13px !important;
+  display: grid !important;
+  grid-template-columns: 8px minmax(0,1fr) 18px !important;
+  align-items: center !important;
+  gap: 10px !important;
+  background: #e9e9e9 !important;
+  border: 1px solid #b8b8b8 !important;
+  border-radius: 10px !important;
+  color: #2f3540 !important;
+  cursor: pointer !important;
+}
+
+.status-ref-trigger.open {
+  background: #eeeeee !important;
+  border-color: #9aa1aa !important;
+}
+
+.status-ref-dot {
+  display: block !important;
+  width: 8px !important;
+  height: 8px !important;
+  min-width: 8px !important;
+  border-radius: 50% !important;
+}
+
+.status-ref-label {
+  min-width: 0 !important;
+  overflow: hidden !important;
+  text-overflow: ellipsis !important;
+  white-space: nowrap !important;
+  text-align: left !important;
+  color: #31343a !important;
+  font-size: 12px !important;
+  font-weight: 500 !important;
+}
+
+.status-ref-chevron {
+  color: #111827 !important;
+  font-size: 13px !important;
+  transition: transform .15s ease !important;
+}
+
+.status-ref-chevron.rotate {
+  transform: rotate(180deg) !important;
+}
+
+/* IMPORTANT: menu is teleported to body, so it can never push rows down */
+.status-ref-menu-portal {
+  position: fixed !important;
+  z-index: 2147483647 !important;
+  max-height: 310px !important;
+  overflow-y: auto !important;
+  overflow-x: hidden !important;
+  padding: 9px !important;
+  margin: 0 !important;
+
+  background: #ffffff !important;
+  border: 1px solid #e0e3e7 !important;
+  border-radius: 12px !important;
+
+  box-shadow:
+    0 18px 42px rgba(15,23,42,.16),
+    0 4px 12px rgba(15,23,42,.06) !important;
+}
+
+.status-ref-menu-portal .status-ref-option {
+  width: 100% !important;
+  min-height: 40px !important;
+  padding: 0 10px !important;
+
+  display: grid !important;
+  grid-template-columns: 8px minmax(0,1fr) 14px !important;
+  align-items: center !important;
+  gap: 10px !important;
+
+  border: 0 !important;
+  border-radius: 8px !important;
+  background: transparent !important;
+  color: #666b73 !important;
+  text-align: left !important;
+  cursor: pointer !important;
+}
+
+.status-ref-menu-portal .status-ref-option:hover,
+.status-ref-menu-portal .status-ref-option.active {
+  background: #f5f6f8 !important;
+}
+
+.status-ref-option-label {
+  min-width: 0 !important;
+  overflow: hidden !important;
+  white-space: nowrap !important;
+  text-overflow: ellipsis !important;
+  color: #666b73 !important;
+  font-size: 12px !important;
+  font-weight: 500 !important;
+}
+
+.status-ref-check {
+  color: #111827 !important;
+  font-size: 10px !important;
+}
+
+/* smooth open/close */
+.status-ref-menu-enter-active,
+.status-ref-menu-leave-active {
+  transition: opacity .14s ease, transform .14s ease !important;
+  transform-origin: top left !important;
+}
+
+.status-ref-menu-enter-from,
+.status-ref-menu-leave-to {
+  opacity: 0 !important;
+  transform: translateY(-4px) scale(.985) !important;
+}
+
+.theme-dark .status-ref-menu-portal {
+  background: #111827 !important;
+  border-color: #334155 !important;
+}
+
+.theme-dark .status-ref-menu-portal .status-ref-option:hover,
+.theme-dark .status-ref-menu-portal .status-ref-option.active {
+  background: #1f2937 !important;
+}
+
+.theme-dark .status-ref-option-label,
+.theme-dark .status-ref-check {
+  color: #f8fafc !important;
+}
+
+
+
+/* START-ONLY ORDER STATE */
+.working-locked-label {
+  display: inline-flex !important;
+  align-items: center !important;
+  gap: 5px !important;
+  padding: 4px 9px !important;
+  border-radius: 999px !important;
+  background: #eef2f7 !important;
+  color: #475467 !important;
+  font-size: 9px !important;
+  font-weight: 700 !important;
+  white-space: nowrap !important;
+}
+
+.working-locked-label i {
+  font-size: 8px !important;
+}
+
+
+
+/* =========================================================
+   WORKING STATUS DROPDOWN — FINAL
+   ========================================================= */
+.status-fixed-dropdown {
+  position: fixed !important;
+  z-index: 2147483647 !important;
+  display: block !important;
+
+  padding: 8px !important;
+  max-height: 310px !important;
+  overflow-y: auto !important;
+  overflow-x: hidden !important;
+
+  background: #ffffff !important;
+  border: 1px solid #d9dee5 !important;
+  border-radius: 12px !important;
+
+  box-shadow:
+    0 18px 42px rgba(15,23,42,.18),
+    0 4px 12px rgba(15,23,42,.07) !important;
+}
+
+.status-fixed-option {
+  width: 100% !important;
+  min-height: 38px !important;
+  padding: 0 10px !important;
+
+  display: grid !important;
+  grid-template-columns: 8px minmax(0,1fr) 14px !important;
+  align-items: center !important;
+  gap: 10px !important;
+
+  border: 0 !important;
+  border-radius: 8px !important;
+  background: transparent !important;
+
+  color: #5f6670 !important;
+  text-align: left !important;
+  cursor: pointer !important;
+}
+
+.status-fixed-option:hover,
+.status-fixed-option.active {
+  background: #f3f4f6 !important;
+}
+
+.status-fixed-dot {
+  width: 8px !important;
+  height: 8px !important;
+  min-width: 8px !important;
+  border-radius: 50% !important;
+}
+
+.status-fixed-label {
+  color: #5f6670 !important;
+  font-size: 12px !important;
+  font-weight: 500 !important;
+}
+
+.status-fixed-check {
+  color: #111827 !important;
+  font-size: 10px !important;
+}
+
+.theme-dark .status-fixed-dropdown {
+  background: #111827 !important;
+  border-color: #334155 !important;
+}
+
+.theme-dark .status-fixed-option:hover,
+.theme-dark .status-fixed-option.active {
+  background: #1f2937 !important;
+}
+
+.theme-dark .status-fixed-label,
+.theme-dark .status-fixed-check {
+  color: #ffffff !important;
+}
+/* MAIN TABLE HEADER BAR */
+.board-table-header,
+.board-grid-header {
+    background: #000 !important;
+    color: #fff !important;
+}
+
+/* Header ke tamam text white */
+.board-table-header *,
+.board-grid-header * {
+    color: #fff !important;
+}
+
+/* Header ki pipeline white/light */
+.board-table-header .board-col,
+.board-grid-header .board-col {
+    border-right-color: rgba(255, 255, 255, 0.65) !important;
+}
+/* ===== MAIN TABLE HEADER BLACK ONLY ===== */
+
+.factory-board-page .board-table-head {
+  background: #000000 !important;
+  background-color: #000000 !important;
+  color: #ffffff !important;
+  border-color: #000000 !important;
+}
+
+/* All header cells black + text white */
+.factory-board-page .board-table-head > .board-col {
+  background: #000000 !important;
+  background-color: #000000 !important;
+  color: #ffffff !important;
+}
+
+/* Header text + icons white */
+.factory-board-page .board-table-head > .board-col *,
+.factory-board-page .board-table-head i {
+  color: #ffffff !important;
+}
+
+/* Vertical lines white */
+.factory-board-page
+.board-table-head
+> .board-col:not(:last-child)::after {
+  background: #ffffff !important;
+}
+
+/* Resize lines white */
+.factory-board-page .board-table-head .column-resizer::before {
+  background: #ffffff !important;
+}
+/* ===== PAGE BACKGROUND ===== */
+.factory-board-page {
+  background: #f4f5f8 !important;
+  min-height: 100vh;
+}
+
+
+/* =========================================================
+   REUSABLE HEADER PAGE SPACING
+   ========================================================= */
+.factory-board-page {
+  background: #f4f5f8 !important;
+}
+
+.factory-board-page .board-toolbar {
+  padding-top: 20px !important;
+}
+
+/* Old header is no longer used; keep it harmless if referenced elsewhere */
+.factory-board-page .board-brand-header {
+  display: none !important;
+}
+
 </style>

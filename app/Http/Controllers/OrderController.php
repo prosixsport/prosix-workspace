@@ -92,6 +92,7 @@ public function index()
         'client_ids' => 'nullable|array',
         'client_ids.*' => 'exists:clients,id',
         'shipping_address' => 'nullable|string',
+        'packing_detail' => 'nullable|string',
     ]);
 
     $user = auth()->user();
@@ -120,6 +121,7 @@ if ($user->role !== 'super_admin' && !$user->can_create_orders && $user->role !=
         'payment_balance'  => $request->payment_balance ?? 0,
         'notes'            => $request->notes ?? '',
         'shipping_address' => $request->shipping_address,
+        'packing_detail'   => $request->packing_detail ?? '',
         'created_by'       => $user->id,
     ]);
 
@@ -220,6 +222,7 @@ public function update(Request $request, Order $order)
         'payment_balance' => 'nullable|numeric',
         'notes' => 'nullable|string',
         'shipping_address' => 'nullable|string',
+        'packing_detail' => 'nullable|string',
 
         'member_ids' => 'nullable|array',
         'member_ids.*' => 'exists:users,id',
@@ -246,6 +249,7 @@ if ($isSuperAdmin || $user->can_create_orders) {
             'payment_balance',
             'notes',
             'shipping_address',
+            'packing_detail',
         ]));
 
         if ($request->has('member_ids')) {
@@ -284,6 +288,7 @@ if ($isSuperAdmin || $user->can_create_orders) {
     'status',
     'status_color',
     'trk',
+    'packing_detail',
 ];
 
 if ($user->can_create_orders) {
@@ -293,6 +298,7 @@ if ($user->can_create_orders) {
         'payment_received',
         'payment_balance',
         'shipping_address',
+        'packing_detail',
         'ship_date',
     ]);
 }
