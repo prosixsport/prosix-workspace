@@ -173,7 +173,7 @@
                     :value="normalizeStatus(order.status)"
                     :disabled="!canEditStatus || savingOrderId === order.id"
                     :style="statusSelectStyle(order.status)"
-                    @change="changeOrderStatus(order, $event.target.value)"
+                    @change="handleStatusSelect(order, $event)"
                   >
                     <option
                       v-for="status in statusDefinitions"
@@ -182,17 +182,14 @@
                     >
                       {{ status.name }}
                     </option>
-                  </select>
 
-                  <button
-                    v-if="canEditStatus"
-                    type="button"
-                    class="manage-status-mini"
-                    title="Add / Edit statuses"
-                    @click.stop="openStatusManager(order)"
-                  >
-                    <i class="fa-solid fa-pen"></i>
-                  </button>
+                    <option
+                      v-if="canEditStatus"
+                      value="__customize__"
+                    >
+                      ⚙ Customize Statuses...
+                    </option>
+                  </select>
                 </div>
 
                 <small
@@ -427,7 +424,7 @@
                   :value="normalizeStatus(selectedOrder.status)"
                   :disabled="!canEditStatus || savingOrderId === selectedOrder.id"
                   :style="statusSelectStyle(selectedOrder.status)"
-                  @change="changeOrderStatus(selectedOrder, $event.target.value)"
+                  @change="handleStatusSelect(selectedOrder, $event)"
                 >
                   <option
                     v-for="status in statusDefinitions"
@@ -436,17 +433,14 @@
                   >
                     {{ status.name }}
                   </option>
-                </select>
 
-                <button
-                  v-if="canEditStatus"
-                  type="button"
-                  class="manage-status-mini modal-manage-status"
-                  @click="openStatusManager(selectedOrder)"
-                >
-                  <i class="fa-solid fa-pen"></i>
-                  Manage
-                </button>
+                  <option
+                    v-if="canEditStatus"
+                    value="__customize__"
+                  >
+                    ⚙ Customize Statuses...
+                  </option>
+                </select>
               </div>
             </div>
 
@@ -1057,6 +1051,22 @@ export default {
       if (this.selectedOrder) {
         this.selectedOrder._statusMenu = false
       }
+    },
+
+    async handleStatusSelect(order, event) {
+      const value = String(event?.target?.value || '')
+
+      if (value === '__customize__') {
+        // Keep the actual order status selected in the field.
+        if (event?.target) {
+          event.target.value = this.normalizeStatus(order.status)
+        }
+
+        this.openStatusManager(order)
+        return
+      }
+
+      await this.changeOrderStatus(order, value)
     },
 
     async changeOrderStatus(order, value) {
@@ -2403,6 +2413,185 @@ export default {
   .placeorder-controls-card {
     grid-template-columns: 1fr !important;
   }
+}
+
+
+
+/* =========================================================
+   FINAL CLEAN PLACE ORDERS UI
+   - no external edit button
+   - Customize lives inside status dropdown
+   - compact status/remark controls
+   - larger readable page typography
+   ========================================================= */
+
+/* General page typography */
+.place-orders-page .page-head h1 {
+  font-size: 25px !important;
+  line-height: 1.15 !important;
+}
+
+.place-orders-page .page-head > div > span {
+  font-size: 12px !important;
+}
+
+.place-orders-page .eyebrow {
+  font-size: 10px !important;
+  font-weight: 900 !important;
+  letter-spacing: .11em !important;
+}
+
+.place-orders-page .tabs button {
+  min-height: 34px !important;
+  padding: 0 13px !important;
+  font-size: 11px !important;
+  font-weight: 800 !important;
+}
+
+.place-orders-page .search-box input {
+  font-size: 12px !important;
+}
+
+.place-orders-page .print-selected-btn,
+.place-orders-page .view-btn {
+  font-size: 11px !important;
+  font-weight: 850 !important;
+}
+
+.place-orders-page .orders-table th {
+  padding-top: 13px !important;
+  padding-bottom: 13px !important;
+  font-size: 10px !important;
+  font-weight: 950 !important;
+  letter-spacing: .04em !important;
+}
+
+.place-orders-page .orders-table td {
+  padding-top: 11px !important;
+  padding-bottom: 11px !important;
+  font-size: 12px !important;
+}
+
+.place-orders-page .id-cell,
+.place-orders-page .order-no,
+.place-orders-page .email-cell {
+  font-size: 11px !important;
+}
+
+.place-orders-page .customer-cell strong {
+  font-size: 12px !important;
+  font-weight: 850 !important;
+}
+
+.place-orders-page .customer-cell small {
+  margin-top: 4px !important;
+  font-size: 9px !important;
+}
+
+.place-orders-page .file-count,
+.place-orders-page .no-files {
+  font-size: 9px !important;
+}
+
+/* Status: compact, clean, single control */
+.place-orders-page .status-cell {
+  min-width: 165px !important;
+}
+
+.place-orders-page .status-select-shell {
+  width: 155px !important;
+  gap: 0 !important;
+}
+
+.place-orders-page .status-select-pro {
+  width: 155px !important;
+  height: 37px !important;
+  padding: 0 29px 0 28px !important;
+  border-radius: 9px !important;
+  font-size: 11px !important;
+  font-weight: 800 !important;
+  line-height: 37px !important;
+}
+
+.place-orders-page .status-select-dot {
+  width: 7px !important;
+  height: 7px !important;
+  left: 11px !important;
+}
+
+.place-orders-page .status-select-pro option {
+  font-size: 12px !important;
+  font-weight: 650 !important;
+  background: #fff !important;
+  color: #101828 !important;
+}
+
+/* Old pencil/edit control must never appear */
+.place-orders-page .manage-status-mini,
+.place-orders-page .modal-manage-status {
+  display: none !important;
+}
+
+/* Remark: slightly smaller than before, still proper input */
+.place-orders-page .remark-cell {
+  min-width: 270px !important;
+}
+
+.place-orders-page .remark-field-pro,
+.place-orders-page .remark-readonly-pro {
+  width: 255px !important;
+  height: 37px !important;
+  padding: 0 10px !important;
+  border-radius: 9px !important;
+  gap: 8px !important;
+}
+
+.place-orders-page .remark-field-pro > i,
+.place-orders-page .remark-readonly-pro > i {
+  font-size: 11px !important;
+}
+
+.place-orders-page .remark-field-pro input {
+  height: 34px !important;
+  font-size: 11px !important;
+}
+
+.place-orders-page .remark-readonly-pro {
+  font-size: 11px !important;
+}
+
+/* Modal status/remark controls */
+.place-orders-page .modal-status-select-shell {
+  width: 100% !important;
+}
+
+.place-orders-page .modal-status-select {
+  width: 100% !important;
+  height: 39px !important;
+  font-size: 11px !important;
+}
+
+.place-orders-page .modal-remark-wrap input {
+  height: 39px !important;
+  font-size: 11px !important;
+}
+
+/* Make manager modal crisp and readable */
+.status-manager-head h2 {
+  font-size: 21px !important;
+}
+
+.status-manager-head p {
+  font-size: 11px !important;
+}
+
+.status-form-field input[type="text"],
+.status-edit-name input {
+  font-size: 12px !important;
+}
+
+.status-definition-row {
+  font-size: 11px !important;
 }
 
 </style>
