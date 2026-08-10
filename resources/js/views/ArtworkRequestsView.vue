@@ -591,40 +591,32 @@
           </div>
 
           <div class="board-col board-col-owner">
-            <div class="board-avatar-stack">
+            <div class="board-avatar-stack owner-compact-stack">
               <button
-                v-for="owner in visibleOrderOwners(order)"
-                :key="owner.id"
+                v-if="loggedInOrderOwner(order)"
                 type="button"
-                class="board-avatar"
-                :style="{
-                  background:
-                    owner.profile_photo_url
-                      ? '#ffffff'
-                      : owner.color
-                }"
-                :title="`${owner.name} · ${formatOwnerRole(owner.role)}`"
-                @click.stop="openProfile(owner)"
+                class="board-avatar owner-current-avatar"
+                :title="loggedInOrderOwner(order).name"
+                @click.stop="openProfile(loggedInOrderOwner(order))"
               >
                 <img
-                  v-if="owner.profile_photo_url"
-                  :src="owner.profile_photo_url"
-                  :alt="owner.name"
+                  v-if="loggedInOrderOwner(order).profile_photo_url"
+                  :src="loggedInOrderOwner(order).profile_photo_url"
+                  :alt="loggedInOrderOwner(order).name"
                 />
-
                 <span v-else>
-                  {{ owner.initial }}
+                  {{ initial(loggedInOrderOwner(order).name) }}
                 </span>
               </button>
 
               <button
-                v-if="hiddenOrderOwnersCount(order) > 0"
+                v-if="otherOrderOwnersCount(order) > 0"
                 type="button"
                 class="board-avatar board-avatar-more"
-                :title="hiddenOrderOwnersNames(order)"
+                :title="otherOrderOwnersNames(order)"
                 @click.stop="openSingleOrderMembers(order)"
               >
-                +{{ hiddenOrderOwnersCount(order) }}
+                +{{ otherOrderOwnersCount(order) }}
               </button>
 
               <button
@@ -2442,6 +2434,57 @@ beforeUnmount()  {
         availableIds.length > 0 &&
         availableIds.every(id => assignedIds.has(id))
       )
+    },
+
+    loggedInOrderOwner(order) {
+      const owners = Array.isArray(order?.owners)
+        ? order.owners
+        : []
+
+      const currentId = Number(this.currentUser?.id)
+
+      const assignedCurrentUser = owners.find(
+        owner => Number(owner.id) === currentId
+      )
+
+      if (assignedCurrentUser) {
+        return assignedCurrentUser
+      }
+
+      if (this.currentUser?.id) {
+        return {
+          id: this.currentUser.id,
+          name: this.currentUser.name || 'User',
+          role: this.currentUser.role,
+          profile_photo_url:
+            this.currentUser.profile_photo_url || null
+        }
+      }
+
+      return null
+    },
+
+    otherOrderOwners(order) {
+      const owners = Array.isArray(order?.owners)
+        ? order.owners
+        : []
+
+      const currentId = Number(this.currentUser?.id)
+
+      return owners.filter(
+        owner => Number(owner.id) !== currentId
+      )
+    },
+
+    otherOrderOwnersCount(order) {
+      return this.otherOrderOwners(order).length
+    },
+
+    otherOrderOwnersNames(order) {
+      return this.otherOrderOwners(order)
+        .map(owner => owner.name)
+        .filter(Boolean)
+        .join(', ')
     },
 
     visibleOrderOwners(order) {
@@ -4866,6 +4909,133 @@ body.board-column-resizing .column-resizer::before {
 .board-col button {
   max-width: 100%;
   box-sizing: border-box;
+}
+
+
+
+/* =========================================================
+   FINAL OWNER COLUMN
+   Logged-in user only + remaining count + add button
+========================================================= */
+
+.factory-board-page .board-col-owner {
+  min-width: 0 !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: flex-start !important;
+  padding: 0 8px !important;
+  overflow: hidden !important;
+}
+
+.factory-board-page .owner-compact-stack {
+  width: 100% !important;
+  min-width: 0 !important;
+  height: 100% !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: flex-start !important;
+  gap: 0 !important;
+  padding: 0 !important;
+  margin: 0 !important;
+  overflow: visible !important;
+}
+
+.factory-board-page .owner-compact-stack .owner-current-avatar {
+  position: relative !important;
+  z-index: 3 !important;
+  width: 30px !important;
+  height: 30px !important;
+  min-width: 30px !important;
+  max-width: 30px !important;
+  padding: 0 !important;
+  margin: 0 !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  border: 2px solid #ffffff !important;
+  border-radius: 50% !important;
+  background: #ffffff !important;
+  overflow: hidden !important;
+  cursor: pointer !important;
+}
+
+.factory-board-page .owner-compact-stack .owner-current-avatar img {
+  width: 100% !important;
+  height: 100% !important;
+  display: block !important;
+  object-fit: cover !important;
+  border-radius: 50% !important;
+}
+
+.factory-board-page .owner-compact-stack .owner-current-avatar > span {
+  width: 100% !important;
+  height: 100% !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  background: #0f172a !important;
+  color: #ffffff !important;
+  font-size: 10px !important;
+  font-weight: 800 !important;
+}
+
+.factory-board-page .owner-compact-stack .board-avatar-more {
+  position: relative !important;
+  z-index: 4 !important;
+  width: 24px !important;
+  height: 24px !important;
+  min-width: 24px !important;
+  max-width: 24px !important;
+  margin-left: -7px !important;
+  padding: 0 !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  border: 2px solid #ffffff !important;
+  border-radius: 50% !important;
+  background: #273142 !important;
+  color: #ffffff !important;
+  font-size: 8px !important;
+  font-weight: 800 !important;
+  line-height: 1 !important;
+  cursor: pointer !important;
+}
+
+.factory-board-page .owner-compact-stack .board-avatar-add {
+  width: 30px !important;
+  height: 30px !important;
+  min-width: 30px !important;
+  max-width: 30px !important;
+  margin-left: 7px !important;
+  padding: 0 !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  border: 1px dashed #94a3b8 !important;
+  border-radius: 50% !important;
+  background: transparent !important;
+  color: #64748b !important;
+  font-size: 10px !important;
+  cursor: pointer !important;
+}
+
+.factory-board-page .owner-compact-stack .board-avatar-add:hover {
+  background: #f8fafc !important;
+  border-color: #64748b !important;
+  color: #111827 !important;
+}
+
+.factory-board-page.theme-dark .owner-compact-stack .owner-current-avatar {
+  border-color: #111827 !important;
+}
+
+.factory-board-page.theme-dark .owner-compact-stack .board-avatar-more {
+  border-color: #111827 !important;
+}
+
+.factory-board-page.theme-dark .owner-compact-stack .board-avatar-add:hover {
+  background: #1f2937 !important;
+  color: #ffffff !important;
 }
 
 </style>
