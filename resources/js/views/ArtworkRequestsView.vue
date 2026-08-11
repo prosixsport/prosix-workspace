@@ -653,34 +653,51 @@
             </div>
 
             <div class="board-row-files">
-              <button
-                v-for="file in rowFiles(order).slice(0, 4)"
+              <!-- ONLY 3 THUMBNAILS IN OUTER BOARD -->
+              <div
+                v-for="file in rowFiles(order).slice(0, 3)"
                 :key="file.id || file.url || file.name"
-                type="button"
-                class="board-row-file-thumb"
+                class="board-row-file-thumb-wrap"
                 :title="file.name"
                 @click.stop="openRowFile(order, file)"
               >
-                <img
-                  v-if="file.isImage && !file.imageError"
-                  :src="file.url"
-                  :alt="file.name"
-                  @error="file.imageError = true"
-                />
+                <div class="board-row-file-thumb">
+                  <img
+                    v-if="file.isImage && !file.imageError"
+                    :src="file.url"
+                    :alt="file.name"
+                    @error="file.imageError = true"
+                  />
 
-                <i
-                  v-else
-                  :class="getFileIcon(file.name)"
-                ></i>
+                  <i
+                    v-else
+                    :class="getFileIcon(file.name)"
+                  ></i>
+                </div>
+
+                <button
+                  v-if="canDeleteFile(file) && !file.uploading"
+                  type="button"
+                  class="board-row-file-remove"
+                  title="Delete file"
+                  @click.stop="removeRowFile(order, file)"
+                >
+                  <i class="fa-solid fa-xmark"></i>
+                </button>
+              </div>
+
+              <!-- ALL EXTRA FILES COME IN COUNT -->
+              <button
+                v-if="rowFiles(order).length > 3"
+                type="button"
+                class="board-more-files board-more-files-button"
+                :title="`${rowFiles(order).length - 3} more files - click to view all`"
+                @click.stop="openRowViewAll(order)"
+              >
+                +{{ rowFiles(order).length - 3 }}
               </button>
 
-              <span
-                v-if="rowFiles(order).length > 4"
-                class="board-more-files"
-              >
-                +{{ rowFiles(order).length - 4 }}
-              </span>
-
+              <!-- ADD BUTTON ALWAYS VISIBLE FOR USERS WHO CAN UPLOAD -->
               <button
                 v-if="canUploadFiles"
                 type="button"
@@ -1323,14 +1340,14 @@
                     <span>{{ card.title }}</span>
                   </div>
                   <div v-if="card.files && card.files.length" class="card-files-preview">
-                    <div v-for="(file, fi) in card.files" :key="fi" class="file-thumb">
+                    <div v-for="(file, fi) in card.files" :key="file.id || file.url || fi" class="file-thumb">
                       <img v-if="file.isImage && !file.imageError" :src="file.url" class="file-img" @click.stop="openPreviewFile(file)" @error="file.imageError = true" />
-                   <div v-else class="file-icon-box" @click.stop="openPreviewFile(file)" style="cursor:pointer;">
-  <i :class="getFileIcon(file.name)" class="file-type-icon"></i>
-  <span class="file-name-small">{{ file.name }}</span>
-</div>
+                      <div v-else class="file-icon-box" @click.stop="openPreviewFile(file)" style="cursor:pointer;">
+                        <i :class="getFileIcon(file.name)" class="file-type-icon"></i>
+                        <span class="file-name-small">{{ file.name }}</span>
+                      </div>
                       <span v-if="file.uploading" class="uploading-label">Uploading...</span>
-                <button v-if="canDeleteFile(file) && !file.uploading" class="file-remove-btn" @click.stop="removeFile(card, fi)">
+                      <button v-if="canDeleteFile(file) && !file.uploading" class="file-remove-btn" @click.stop="removeFile(card, fi)">
                         <i class="fa-solid fa-xmark"></i>
                       </button>
                     </div>
@@ -1383,6 +1400,143 @@
       </div>
     </div>
       </div>
+
+
+    <!-- FILES VIEW ALL MODAL -->
+    <div
+      v-if="viewAllCard"
+      class="files-modal-overlay"
+      @click.self="viewAllCard = null"
+    >
+      <div class="files-modal">
+        <div class="files-modal-header">
+          <div>
+            <h3>{{ viewAllCard.title || 'Files' }}</h3>
+            <p>{{ (viewAllCard.files || []).length }} file(s)</p>
+          </div>
+
+          <div class="files-modal-header-actions">
+            <button
+              v-if="viewAllCard.files && viewAllCard.files.length"
+              type="button"
+              class="files-modal-download-all"
+              @click="downloadAllFiles(viewAllCard)"
+            >
+              <i class="fa-solid fa-download"></i>
+              Download All
+            </button>
+
+            <button
+              type="button"
+              class="files-modal-close"
+              title="Close"
+              @click="viewAllCard = null"
+            >
+              <i class="fa-solid fa-xmark"></i>
+            </button>
+          </div>
+        </div>
+
+        <div v-if="viewAllCard.files && viewAllCard.files.length" class="files-modal-grid">
+          <div
+            v-for="(file, index) in viewAllCard.files"
+            :key="file.id || file.url || index"
+            class="files-modal-item"
+          >
+            <button
+              type="button"
+              class="files-modal-preview"
+              title="Click to view"
+              @click="openPreviewFile(file)"
+            >
+              <img
+                v-if="file.isImage && !file.imageError"
+                :src="file.url"
+                :alt="file.name"
+                @error="file.imageError = true"
+              />
+              <span v-else class="files-modal-icon">
+                <i :class="getFileIcon(file.name)"></i>
+              </span>
+            </button>
+
+            <div class="files-modal-item-info">
+              <strong :title="file.name">{{ file.name }}</strong>
+              <small>{{ formatFileSize(file.size) }}</small>
+            </div>
+
+            <div class="files-modal-item-actions">
+              <button type="button" title="View" @click="openPreviewFile(file)">
+                <i class="fa-solid fa-eye"></i>
+              </button>
+              <button type="button" title="Download" @click="downloadSingleFile(file)">
+                <i class="fa-solid fa-download"></i>
+              </button>
+              <button
+                v-if="canDeleteFile(file) && !file.uploading"
+                type="button"
+                class="danger"
+                title="Delete"
+                @click="removeFile(viewAllCard, index)"
+              >
+                <i class="fa-solid fa-trash"></i>
+              </button>
+            </div>
+          </div>
+        </div>
+
+        <div v-else class="files-modal-empty">
+          <i class="fa-regular fa-folder-open"></i>
+          <span>No files available</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- SINGLE FILE PREVIEW MODAL -->
+    <div
+      v-if="previewFile"
+      class="image-preview-overlay"
+      @click.self="previewFile = null"
+    >
+      <div class="image-preview-modal universal-preview-modal">
+        <div class="preview-modal-topbar">
+          <strong :title="previewFile.name">{{ previewFile.name }}</strong>
+          <div>
+            <button type="button" title="Download" @click="downloadSingleFile(previewFile)">
+              <i class="fa-solid fa-download"></i>
+            </button>
+            <button type="button" title="Close" @click="previewFile = null">
+              <i class="fa-solid fa-xmark"></i>
+            </button>
+          </div>
+        </div>
+
+        <div class="preview-modal-body">
+          <img
+            v-if="previewFile.isImage"
+            :src="previewFile.url"
+            :alt="previewFile.name"
+            class="image-preview-full"
+          />
+
+          <iframe
+            v-else-if="canEmbedPreview(previewFile)"
+            :src="previewEmbedUrl(previewFile)"
+            class="file-preview-frame"
+            frameborder="0"
+          ></iframe>
+
+          <div v-else class="file-preview-doc">
+            <i :class="getFileIcon(previewFile.name)"></i>
+            <strong>{{ previewFile.name }}</strong>
+            <span>This file cannot be previewed directly in the browser.</span>
+            <button type="button" class="download-all-btn" @click="openFileNewTab(previewFile)">
+              <i class="fa-solid fa-arrow-up-right-from-square me-1"></i>Open File
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
 
 
 
@@ -1803,7 +1957,6 @@
               {{ initial(read.user?.name || read.name || 'U') }}
             </span>
           </div>
-
           <div class="viewed-person-info">
             <strong>
               {{ read.user?.name || read.name || 'Member' }}
@@ -1842,7 +1995,6 @@
         </div>
       </div>
     </div>
-
   </div>
   </AppLayout>
 </template>
@@ -2161,9 +2313,9 @@ filteredOrders() {
     })
     .sort((a, b) => {
       /*
-       * 1) Jis order mein unread chat aaye woh sab se upar.
-       *    Chat view hote hi unread count 0 ho jata hai aur row apni normal
-       *    pinned/A-Z position par wapas chali jati hai.
+       * 1)Jis order mein unread chat aaye woh sab se upar.
+       *   Chat view hote hi unread count 0 ho jata hai aur row apni normal
+       *   pinned/A-Z position par wapas chali jati hai.
        */
       const aUnread = Number(a.unread_chat_count || 0) > 0
       const bUnread = Number(b.unread_chat_count || 0) > 0
@@ -2180,7 +2332,6 @@ filteredOrders() {
           return bTime - aTime
         }
       }
-
       /*
        * 2) Is browser se newly-created orders refresh ke baad bhi top par.
        *    IDs localStorage mein persist hoti hain.
@@ -2201,6 +2352,7 @@ filteredOrders() {
       /*
        * 3) Baqi orders A-Z.
        */
+
       return String(a.name || '').localeCompare(
         String(b.name || ''),
         'en',
@@ -2221,12 +2373,14 @@ filteredOrders() {
           return bTime - aTime
         })
     },
+
     totalUnreadChatCount() {
       return this.unreadChatOrders.reduce(
         (total, order) => total + Number(order.unread_chat_count || 0),
         0
       )
     },
+
     unreadOrdersCount() { return this.orders.filter(o => !o.user_has_seen).length },
 
     rowStatusOrder() {
@@ -2277,6 +2431,7 @@ filteredOrders() {
        * Divider move = one column grows, next one shrinks.
        * No blank area, no horizontal layout break.
        */
+
       const columns = keys
         .map(key => {
           const percent =
@@ -3204,7 +3359,38 @@ beforeUnmount()  {
           )
       }
 
-      this.previewFile = normalized
+      this.openPreviewFile(normalized)
+    },
+
+    async openRowViewAll(order) {
+      await this.selectOrder(order)
+      this.viewAllCard = {
+        title: `${order.name || 'Order'} - All Files`,
+        type: 'all_order_files',
+        files: this.rowFiles(this.selectedOrder || order)
+      }
+    },
+
+    async removeRowFile(order, file) {
+      if (!this.canDeleteFile(file) || !file?.id) return
+      if (!confirm(`Delete ${file.name || 'this file'}?`)) return
+
+      try {
+        await axios.delete(`/api/order-files/${file.id}`, { headers: this.headers() })
+
+        ;(order.cards || []).forEach(card => {
+          card.files = (card.files || []).filter(item => Number(item.id) !== Number(file.id))
+        })
+
+        if (this.selectedOrder && Number(this.selectedOrder.id) === Number(order.id)) {
+          ;(this.selectedOrder.cards || []).forEach(card => {
+            card.files = (card.files || []).filter(item => Number(item.id) !== Number(file.id))
+          })
+        }
+      } catch (e) {
+        console.error('removeRowFile error:', e)
+        alert(e.response?.data?.message || 'File delete nahi hui')
+      }
     },
 
     triggerRowFileUpload(order) {
@@ -6558,28 +6744,92 @@ async saveTracking() {
 
 openPreviewFile(file) {
   if (!file?.url) return
-  const ext = (file.name || '').split('.').pop().toLowerCase()
-  const officeExts = ['doc', 'docx', 'xls', 'xlsx', 'ppt', 'pptx']
-  const browserExts = ['pdf', 'csv', 'txt']
 
-  if (officeExts.includes(ext)) {
-    // Google Docs Viewer se open karo — download nahi hoga
-    const fullUrl = file.url.startsWith('http')
-      ? file.url
-      : window.location.origin + file.url
-    const viewerUrl = `https://docs.google.com/viewer?url=${encodeURIComponent(fullUrl)}&embedded=false`
-    window.open(viewerUrl, '_blank')
-    return
+  this.previewFile = {
+    ...file,
+    isImage:
+      file.isImage ??
+      /\.(jpg|jpeg|png|gif|webp|svg)$/i.test(file.name || '')
   }
-
-  if (browserExts.includes(ext)) {
-    window.open(file.url, '_blank')
-    return
-  }
-
-  this.previewFile = file
 },
-    safeFileName(name) { return String(name || 'file').replace(/[^a-z0-9_.-]/gi, '_') },
+
+    fileExtension(file) {
+      return String(file?.name || '')
+        .split('.')
+        .pop()
+        .toLowerCase()
+    },
+
+    absoluteFileUrl(file) {
+      if (!file?.url) return ''
+      return file.url.startsWith('http')
+        ? file.url
+        : window.location.origin + file.url
+    },
+
+    canEmbedPreview(file) {
+      const ext = this.fileExtension(file)
+      return [
+        'pdf', 'txt', 'csv',
+        'doc', 'docx', 'xls', 'xlsx', 'ppt', 'pptx'
+      ].includes(ext)
+    },
+
+    previewEmbedUrl(file) {
+      const ext = this.fileExtension(file)
+      const fullUrl = this.absoluteFileUrl(file)
+
+      if (['doc', 'docx', 'xls', 'xlsx', 'ppt', 'pptx'].includes(ext)) {
+        return `https://docs.google.com/viewer?url=${encodeURIComponent(fullUrl)}&embedded=true`
+      }
+
+      return file?.url || ''
+    },
+
+    openFileNewTab(file) {
+      if (!file?.url) return
+      window.open(this.absoluteFileUrl(file), '_blank', 'noopener,noreferrer')
+    },
+
+    async downloadSingleFile(file) {
+      if (!file?.url) return
+
+      try {
+        const response = await fetch(file.url)
+        if (!response.ok) throw new Error('Download request failed')
+
+        const blob = await response.blob()
+        const blobUrl = URL.createObjectURL(blob)
+        const a = document.createElement('a')
+        a.href = blobUrl
+        a.download = this.safeFileName(file.name || 'file')
+        document.body.appendChild(a)
+        a.click()
+        a.remove()
+        URL.revokeObjectURL(blobUrl)
+      } catch (e) {
+        console.error('downloadSingleFile error:', e)
+
+        const a = document.createElement('a')
+        a.href = file.url
+        a.download = this.safeFileName(file.name || 'file')
+        a.target = '_blank'
+        a.rel = 'noopener'
+        document.body.appendChild(a)
+        a.click()
+        a.remove()
+      }
+    },
+
+    formatFileSize(bytes) {
+      const size = Number(bytes || 0)
+      if (!size) return ''
+      if (size < 1024) return `${size} B`
+      if (size < 1024 * 1024) return `${(size / 1024).toFixed(1)} KB`
+      return `${(size / (1024 * 1024)).toFixed(1)} MB`
+    },
+
+        safeFileName(name) { return String(name || 'file').replace(/[^a-z0-9_.-]/gi, '_') },
     zipBaseName() {
       const d = new Date()
       const month = d.toLocaleString('en-US', { month: 'long' }).toLowerCase()
@@ -6717,11 +6967,60 @@ openPreviewFile(file) {
         const res = await axios.get('/api/orders', { headers: this.headers() })
         const list = Array.isArray(res.data) ? res.data : (res.data?.data || [])
         this.orders = list.map(order => this.formatOrder(order))
+
+        // Load file thumbnails for every board row as well.
+        // This keeps the 3 thumbnail previews visible after a full page refresh.
+        await this.loadBoardOrderFiles()
+
         if (this.selectedOrder) {
           const fresh = this.orders.find(o => Number(o.id) === Number(this.selectedOrder.id))
           if (fresh) this.selectedOrder = fresh
         }
       } catch (e) { console.error('fetchOrders error:', e) } finally { this.loadingOrders = false }
+    },
+
+    async loadBoardOrderFiles() {
+      if (!Array.isArray(this.orders) || !this.orders.length) return
+
+      await Promise.all(
+        this.orders.map(async order => {
+          try {
+            const res = await axios.get(`/api/orders/${order.id}/files`, {
+              headers: this.headers()
+            })
+
+            const files = Array.isArray(res.data)
+              ? res.data
+              : (res.data?.data || [])
+
+            const normalizedFiles = files.map(file => ({
+              ...this.normalizeOrderFile(file),
+              cardType: file.card_type
+            }))
+
+            order.invoiceFiles = normalizedFiles.filter(
+              file => file.cardType === 'invoice_files'
+            )
+
+            ;(order.cards || []).forEach(card => {
+              if (card.type === 'notes') return
+
+              if (card.type === 'order_files') {
+                card.files = normalizedFiles.filter(file =>
+                  file.cardType === 'order_files' ||
+                  file.cardType === 'chat_files'
+                )
+              } else {
+                card.files = normalizedFiles.filter(
+                  file => file.cardType === card.type
+                )
+              }
+            })
+          } catch (error) {
+            console.error(`Board files load error for order ${order.id}:`, error)
+          }
+        })
+      )
     },
 
     async fetchMembers() {
@@ -10512,6 +10811,20 @@ grid-template-columns: 32px 1fr 118px 38px;
 
 .board-row-file-thumb i {
   font-size: 15px;
+}
+
+.board-file-count-overlay {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(15, 23, 42, .72);
+  color: #fff;
+  font-size: 10px;
+  font-weight: 900;
+  line-height: 1;
+  pointer-events: none;
 }
 
 .board-row-file-add {
@@ -17278,6 +17591,294 @@ body.board-column-resizing .column-resizer::before {
   background: #111827 !important;
   border-color: #475569 !important;
   color: #f8fafc !important;
+}
+
+
+/* ================= FILES: 5 THUMBS + DELETE + VIEW ALL ================= */
+.board-row-file-thumb-wrap {
+  position: relative;
+  width: 42px;
+  height: 42px;
+  flex: 0 0 42px;
+  cursor: pointer;
+}
+
+.board-row-file-thumb-wrap .board-row-file-thumb {
+  width: 100%;
+  height: 100%;
+  margin: 0;
+}
+
+.board-row-file-remove {
+  position: absolute;
+  top: -6px;
+  right: -6px;
+  width: 18px;
+  height: 18px;
+  border: 0;
+  border-radius: 50%;
+  background: #ef4444;
+  color: #fff;
+  display: grid;
+  place-items: center;
+  font-size: 10px;
+  cursor: pointer;
+  z-index: 4;
+  opacity: 0;
+  transform: scale(.85);
+  transition: .15s ease;
+}
+
+.board-row-file-thumb-wrap:hover .board-row-file-remove {
+  opacity: 1;
+  transform: scale(1);
+}
+
+.board-more-files {
+  border: 0;
+  background: transparent;
+  cursor: pointer;
+}
+
+.detail-more-files {
+  min-width: 42px;
+  height: 42px;
+  border: 1px dashed #94a3b8;
+  border-radius: 8px;
+  background: #f8fafc;
+  color: #172b4d;
+  font-size: 12px;
+  font-weight: 800;
+  cursor: pointer;
+}
+
+.files-modal-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 1000000;
+  background: rgba(15, 23, 42, .72);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+  backdrop-filter: blur(3px);
+}
+
+.files-modal {
+  width: min(1050px, 96vw);
+  max-height: 90vh;
+  background: #fff;
+  border-radius: 16px;
+  box-shadow: 0 28px 90px rgba(0,0,0,.35);
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+}
+
+.files-modal-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 16px 18px;
+  border-bottom: 1px solid #e5e7eb;
+}
+
+.files-modal-header h3 { margin: 0; color: #0f172a; font-size: 18px; }
+.files-modal-header p { margin: 3px 0 0; color: #64748b; font-size: 12px; }
+.files-modal-header-actions { display: flex; align-items: center; gap: 8px; }
+
+.files-modal-download-all,
+.files-modal-close {
+  border: 0;
+  border-radius: 9px;
+  height: 36px;
+  padding: 0 12px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+  cursor: pointer;
+  font-weight: 800;
+}
+
+.files-modal-download-all { background: #172b4d; color: #fff; }
+.files-modal-close { width: 36px; padding: 0; background: #f1f5f9; color: #0f172a; }
+
+.files-modal-grid {
+  padding: 18px;
+  overflow: auto;
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+  gap: 14px;
+}
+
+.files-modal-item {
+  border: 1px solid #e5e7eb;
+  border-radius: 12px;
+  overflow: hidden;
+  background: #fff;
+}
+
+.files-modal-preview {
+  width: 100%;
+  height: 135px;
+  border: 0;
+  background: #f8fafc;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  overflow: hidden;
+}
+
+.files-modal-preview img { width: 100%; height: 100%; object-fit: contain; }
+.files-modal-icon i { font-size: 46px; color: #64748b; }
+.files-modal-item-info { padding: 10px 11px 7px; min-width: 0; }
+.files-modal-item-info strong { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: #0f172a; font-size: 12px; }
+.files-modal-item-info small { color: #94a3b8; font-size: 10px; }
+.files-modal-item-actions { display: flex; gap: 6px; padding: 0 10px 10px; }
+.files-modal-item-actions button { width: 32px; height: 30px; border: 1px solid #e2e8f0; border-radius: 7px; background: #fff; color: #334155; cursor: pointer; }
+.files-modal-item-actions button:hover { background: #f1f5f9; }
+.files-modal-item-actions button.danger { color: #ef4444; }
+.files-modal-empty { min-height: 260px; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 10px; color: #94a3b8; }
+.files-modal-empty i { font-size: 42px; }
+
+.universal-preview-modal {
+  width: min(1100px, 96vw);
+  height: min(800px, 92vh);
+  padding: 0;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+}
+
+.preview-modal-topbar {
+  min-height: 52px;
+  padding: 10px 12px 10px 16px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  border-bottom: 1px solid #e5e7eb;
+}
+
+.preview-modal-topbar strong { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: #0f172a; }
+.preview-modal-topbar > div { display: flex; gap: 7px; }
+.preview-modal-topbar button { width: 34px; height: 34px; border: 0; border-radius: 8px; background: #f1f5f9; color: #0f172a; cursor: pointer; }
+.preview-modal-body { flex: 1; min-height: 0; display: flex; align-items: center; justify-content: center; background: #eef2f7; overflow: auto; }
+.file-preview-frame { width: 100%; height: 100%; background: #fff; }
+
+@media (max-width: 700px) {
+  .files-modal-overlay { padding: 10px; }
+  .files-modal-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); padding: 10px; gap: 10px; }
+  .files-modal-download-all span { display: none; }
+  .universal-preview-modal { width: 98vw; height: 90vh; }
+}
+
+
+/* =========================================================
+   OUTER BOARD FILES: 4 THUMBNAILS + EXTRA COUNT + ADD BUTTON
+   Detail page / View All is NOT limited.
+   ========================================================= */
+.board-col-files .board-row-files {
+  display: flex;
+  align-items: center;
+  justify-content: flex-start;
+  gap: 3px;
+  width: 100%;
+  min-width: 0;
+  overflow: visible;
+  flex-wrap: nowrap;
+}
+
+.board-col-files .board-row-file-thumb-wrap {
+  position: relative;
+  width: 28px !important;
+  height: 32px !important;
+  min-width: 28px !important;
+  flex: 0 0 28px !important;
+}
+
+.board-col-files .board-row-file-thumb-wrap .board-row-file-thumb {
+  width: 28px !important;
+  height: 32px !important;
+  min-width: 28px !important;
+  padding: 0 !important;
+  border: 1px solid #d8dee9;
+  border-radius: 5px;
+  background: #fff;
+  overflow: hidden;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+}
+
+.board-col-files .board-row-file-thumb img {
+  width: 100% !important;
+  height: 100% !important;
+  display: block;
+  object-fit: cover;
+}
+
+.board-col-files .board-row-file-thumb i {
+  font-size: 13px !important;
+}
+
+.board-col-files .board-more-files-button {
+  width: 28px !important;
+  height: 32px !important;
+  min-width: 28px !important;
+  flex: 0 0 28px !important;
+  margin: 0 !important;
+  padding: 0 !important;
+  border: 1px dashed #9aa8bc;
+  border-radius: 5px;
+  background: #f8fafc;
+  color: #172b4d;
+  font-size: 10px;
+  line-height: 1;
+  font-weight: 900;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+}
+
+.board-col-files .board-more-files-button:hover {
+  background: #eef2ff;
+  border-color: #64748b;
+}
+
+.board-col-files .board-row-file-add {
+  width: 30px !important;
+  height: 32px !important;
+  min-width: 30px !important;
+  flex: 0 0 30px !important;
+  margin: 0 !important;
+  padding: 0 !important;
+  border: 1px dashed #aab6c7;
+  border-radius: 5px;
+  background: #fff;
+  color: #172b4d;
+  display: inline-flex !important;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+}
+
+.board-col-files .board-row-file-add i {
+  font-size: 14px !important;
+}
+
+.board-col-files .board-row-file-remove {
+  width: 14px !important;
+  height: 14px !important;
+  min-width: 14px !important;
+  right: -3px !important;
+  top: -4px !important;
+  font-size: 8px !important;
 }
 
 </style>
