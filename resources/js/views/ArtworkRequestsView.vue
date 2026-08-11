@@ -470,12 +470,14 @@
         </div>
 
 
-        <div v-if="loadingOrders" class="board-empty-state">
-          <i class="fa-solid fa-spinner fa-spin"></i>
-          Loading orders...
+        <div v-if="loadingOrders && orders.length === 0" class="board-empty-state prosix-loading-state">
+          <div class="prosix-loader-logo-wrap">
+            <img src="/public/assets/images/P LOGO BLACK.png" alt="Prosix" class="prosix-loader-logo" />
+          </div>
+          <span>Loading orders...</span>
         </div>
 
-        <div v-else-if="filteredOrders.length === 0" class="board-empty-state">
+        <div v-else-if="!loadingOrders && filteredOrders.length === 0" class="board-empty-state">
           No orders found in this section.
         </div>
 
@@ -2492,9 +2494,11 @@ async mounted() {
   this.loadCustomStatuses()
   this.loadBoardGroups()
   this.loadDefaultBoardGroupOverrides()
-  await this.fetchOrders()
-  await this.fetchMembers()
-await this.fetchClients()
+  await Promise.all([
+    this.fetchOrders(),
+    this.fetchMembers(),
+    this.fetchClients()
+  ])
   if ('Notification' in window) {
     Notification.requestPermission()
   }
@@ -10349,6 +10353,39 @@ grid-template-columns: 32px 1fr 118px 38px;
   justify-content: center;
   gap: 8px;
   font-size: 13px;
+}
+
+/* PROSIX ORDER LOADER */
+.prosix-loading-state {
+  flex-direction: column;
+  gap: 10px;
+}
+
+.prosix-loader-logo-wrap {
+  width: 28px;
+  height: 28px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  animation: prosixLoaderPulse 1.15s ease-in-out infinite;
+}
+
+.prosix-loader-logo {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  display: block;
+}
+
+.prosix-loading-state span {
+  color: #9ca3af;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+@keyframes prosixLoaderPulse {
+  0%, 100% { transform: scale(.86); opacity: .45; }
+  50% { transform: scale(1.08); opacity: 1; }
 }
 
 /* INLINE ADD */
