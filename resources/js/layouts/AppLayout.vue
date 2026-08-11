@@ -31,11 +31,10 @@
 
 
         <!-- SIDEBAR -->
-        <aside
-            v-if="$route.path !== '/orders'"
-            class="prosix-sidebar"
-            :class="{ 'sidebar-open': sidebarOpen }"
-        >
+      <aside
+    class="prosix-sidebar"
+    :class="{ 'sidebar-open': sidebarOpen }"
+>
 
             <!-- MOBILE CLOSE -->
             <button
@@ -319,14 +318,9 @@
         <!-- =========================
              MAIN CONTENT
         ========================== -->
-        <main
-            class="prosix-main"
-            :class="{
-                'orders-full-width': $route.path === '/orders'
-            }"
-        >
-            <slot />
-        </main>
+       <main class="prosix-main">
+    <slot />
+</main>
 
     </div>
 </template>
