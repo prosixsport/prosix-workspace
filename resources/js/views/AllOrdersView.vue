@@ -648,7 +648,6 @@
                     <small>working</small>
                   </div>
 
-                  <!-- ONLY SUPER ADMIN CAN STOP A RUNNING ORDER -->
                   <button
                     v-if="isSuperAdmin"
                     type="button"
@@ -3032,8 +3031,6 @@ beforeUnmount()  {
     async stopWorking(order) {
       if (!order?.id) return
 
-      // IMPORTANT: Stop Work is ONLY for Super Admin.
-      // Even Admin/Member with other order permissions cannot use it.
       if (!this.isSuperAdmin) {
         alert('Only Super Admin can stop this work.')
         return
@@ -3101,12 +3098,6 @@ beforeUnmount()  {
 
     async releaseOrder(order) {
       if (!order?.id) return
-
-      // Same Super Admin only rule for every release call.
-      if (!this.isSuperAdmin) {
-        alert('Only Super Admin can stop this work.')
-        return
-      }
 
       try {
         await axios.post(
@@ -18675,7 +18666,55 @@ body.board-column-resizing .column-resizer::before {
 
 
 /* =========================================================
+   SAME BACKGROUND AS P LOGO AREA - CLEAN FINAL OVERRIDE
+   Exact color: #f4f5f8
+========================================================= */
+
+.factory-board-page,
+.factory-board-page.theme-light,
+.factory-board-page.theme-light .factory-board,
+.factory-board,
+.board-detail-overlay,
+.board-detail-overlay .board-detail-panel,
+.board-detail-overlay .clean-detail-panel,
+.board-detail-overlay .orders-right,
+.board-detail-overlay .detail-body,
+.board-detail-overlay .cards-area {
+  background: #f4f5f8 !important;
+  background-color: #f4f5f8 !important;
+}
+
+/* Remove any outer detail shadow/border that makes the two grays look different */
+.board-detail-overlay .board-detail-panel,
+.board-detail-overlay .clean-detail-panel,
+.board-detail-overlay .orders-right {
+  box-shadow: none !important;
+  border-color: transparent !important;
+}
+
+/* Actual content cards remain clean white */
+.board-detail-overlay .order-card,
+.board-detail-overlay .detail-topbar-wrapper,
+.board-detail-overlay .detail-topbar,
+.board-detail-overlay .card-preview-area,
+.board-detail-overlay .card-footer-inner {
+  background: #ffffff !important;
+  background-color: #ffffff !important;
+}
+
+/* Header remains black */
+.board-detail-overlay .clean-detail-header,
+.board-detail-overlay .detail-header {
+  background: #000000 !important;
+  background-color: #000000 !important;
+  background-image: none !important;
+}
+
+
+
+/* =========================================================
    SUPER ADMIN ONLY - STOP WORK BUTTON
+   (Background/colors above are left untouched)
 ========================================================= */
 
 .row-working-control {
@@ -18690,35 +18729,21 @@ body.board-column-resizing .column-resizer::before {
   min-width: 24px !important;
   height: 24px !important;
   padding: 0 !important;
-
   display: inline-flex !important;
   align-items: center !important;
   justify-content: center !important;
-
   border: 1px solid #111827 !important;
   border-radius: 50% !important;
-
   background: #111827 !important;
   color: #ffffff !important;
-
   cursor: pointer !important;
   flex-shrink: 0 !important;
-
   font-size: 8px !important;
-  transition:
-    transform .15s ease,
-    background .15s ease,
-    color .15s ease !important;
 }
 
 .superadmin-stop-working-btn:hover {
-  transform: scale(1.08) !important;
   background: #ffffff !important;
   color: #111827 !important;
-}
-
-.superadmin-stop-working-btn:active {
-  transform: scale(.95) !important;
 }
 
 </style>
