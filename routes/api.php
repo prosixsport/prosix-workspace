@@ -101,19 +101,49 @@ Route::middleware('auth:sanctum')->group(function () {
     |--------------------------------------------------------------------------
     */
 
-  Route::middleware('auth:sanctum')
-    ->prefix('place-orders')
-    ->group(function () {
-        Route::get('/', [PlaceOrderController::class, 'index']);
-        Route::get('/unread-count', [PlaceOrderController::class, 'unreadCount']);
+    Route::prefix('place-orders')->group(function () {
 
-        Route::get('/statuses', [PlaceOrderController::class, 'statuses']);
-        Route::post('/statuses', [PlaceOrderController::class, 'storeStatus']);
-        Route::put('/statuses/{id}', [PlaceOrderController::class, 'updateStatusDefinition']);
-        Route::delete('/statuses/{id}', [PlaceOrderController::class, 'destroyStatus']);
+        Route::get('/', [
+            PlaceOrderController::class,
+            'index'
+        ]);
 
-        Route::post('/{id}/mark-read', [PlaceOrderController::class, 'markRead']);
-        Route::put('/{id}', [PlaceOrderController::class, 'update']);
+        Route::get('/unread-count', [
+            PlaceOrderController::class,
+            'unreadCount'
+        ]);
+
+        // Status routes MUST stay before /{id}
+        Route::get('/statuses', [
+            PlaceOrderController::class,
+            'statuses'
+        ]);
+
+        Route::post('/statuses', [
+            PlaceOrderController::class,
+            'storeStatus'
+        ]);
+
+        Route::put('/statuses/{id}', [
+            PlaceOrderController::class,
+            'updateStatusDefinition'
+        ]);
+
+        Route::delete('/statuses/{id}', [
+            PlaceOrderController::class,
+            'destroyStatus'
+        ]);
+
+        Route::post('/{id}/mark-read', [
+            PlaceOrderController::class,
+            'markRead'
+        ]);
+
+        Route::put('/{id}', [
+            PlaceOrderController::class,
+            'update'
+        ]);
+
     });
 
     /*
@@ -144,24 +174,33 @@ Route::middleware('auth:sanctum')->group(function () {
 
     /*
     |--------------------------------------------------------------------------
-    | Artwork Requests
+    | Artwork Requests - Prosix.com Sync
     |--------------------------------------------------------------------------
+    |
+    | CRM frontend in routes ko call karega.
+    | ArtworkRequestController in requests ko Prosix.com ke
+    | /api/crm/artwork-requests endpoints par forward karega.
+    |
     */
 
-    Route::get('/artwork-requests', [
-        ArtworkRequestController::class,
-        'index'
-    ]);
+    Route::prefix('artwork-requests')->group(function () {
 
-    Route::get('/artwork-requests/unread-count', [
-        ArtworkRequestController::class,
-        'unreadCount'
-    ]);
+        Route::get('/', [
+            ArtworkRequestController::class,
+            'index'
+        ]);
 
-    Route::post('/artwork-requests/{id}/mark-read', [
-        ArtworkRequestController::class,
-        'markRead'
-    ]);
+        Route::get('/unread-count', [
+            ArtworkRequestController::class,
+            'unreadCount'
+        ]);
+
+        Route::post('/{id}/mark-read', [
+            ArtworkRequestController::class,
+            'markRead'
+        ]);
+
+    });
 
     /*
     |--------------------------------------------------------------------------
