@@ -623,26 +623,42 @@
 
                 <div
                   v-else
-                  class="row-working-user"
-                  :title="workingDesigner(order).name + ' is working'"
+                  class="row-working-control"
                 >
-                  <span class="row-working-live-dot"></span>
-
-                  <img
-                    v-if="workingDesigner(order).profile_photo_url"
-                    :src="workingDesigner(order).profile_photo_url"
-                    :alt="workingDesigner(order).name"
-                  />
-
-                  <span
-                    v-else
-                    class="row-working-avatar-fallback"
+                  <div
+                    class="row-working-user"
+                    :title="workingDesigner(order).name + ' is working'"
                   >
-                    {{ initial(workingDesigner(order).name) }}
-                  </span>
+                    <span class="row-working-live-dot"></span>
 
-                  <strong>{{ workingDesigner(order).name }}</strong>
-                  <small>working</small>
+                    <img
+                      v-if="workingDesigner(order).profile_photo_url"
+                      :src="workingDesigner(order).profile_photo_url"
+                      :alt="workingDesigner(order).name"
+                    />
+
+                    <span
+                      v-else
+                      class="row-working-avatar-fallback"
+                    >
+                      {{ initial(workingDesigner(order).name) }}
+                    </span>
+
+                    <strong>{{ workingDesigner(order).name }}</strong>
+                    <small>working</small>
+                  </div>
+
+                  <!-- ONLY SUPER ADMIN CAN STOP A RUNNING ORDER -->
+                  <button
+                    v-if="isSuperAdmin"
+                    type="button"
+                    class="superadmin-stop-working-btn"
+                    title="Stop Work - Super Admin Only"
+                    aria-label="Stop Work"
+                    @click.stop="stopWorking(order)"
+                  >
+                    <i class="fa-solid fa-stop"></i>
+                  </button>
                 </div>
               </div>
             </div>
@@ -3016,6 +3032,22 @@ beforeUnmount()  {
     async stopWorking(order) {
       if (!order?.id) return
 
+      // IMPORTANT: Stop Work is ONLY for Super Admin.
+      // Even Admin/Member with other order permissions cannot use it.
+      if (!this.isSuperAdmin) {
+        alert('Only Super Admin can stop this work.')
+        return
+      }
+
+      const workerName =
+        this.workingDesigner(order)?.name || 'this user'
+
+      const confirmed = window.confirm(
+        `Stop work on "${order.name}" for ${workerName}?`
+      )
+
+      if (!confirmed) return
+
       try {
         await axios.post(
           `/api/orders/${order.id}/release`,
@@ -3069,6 +3101,12 @@ beforeUnmount()  {
 
     async releaseOrder(order) {
       if (!order?.id) return
+
+      // Same Super Admin only rule for every release call.
+      if (!this.isSuperAdmin) {
+        alert('Only Super Admin can stop this work.')
+        return
+      }
 
       try {
         await axios.post(
@@ -18637,48 +18675,50 @@ body.board-column-resizing .column-resizer::before {
 
 
 /* =========================================================
-   SAME BACKGROUND AS P LOGO AREA - CLEAN FINAL OVERRIDE
-   Exact color: #f4f5f8
+   SUPER ADMIN ONLY - STOP WORK BUTTON
 ========================================================= */
 
-.factory-board-page,
-.factory-board-page.theme-light,
-.factory-board-page.theme-light .factory-board,
-.factory-board,
-.board-detail-overlay,
-.board-detail-overlay .board-detail-panel,
-.board-detail-overlay .clean-detail-panel,
-.board-detail-overlay .orders-right,
-.board-detail-overlay .detail-body,
-.board-detail-overlay .cards-area {
-  background: #f4f5f8 !important;
-  background-color: #f4f5f8 !important;
+.row-working-control {
+  display: inline-flex !important;
+  align-items: center !important;
+  gap: 6px !important;
+  max-width: 100% !important;
 }
 
-/* Remove any outer detail shadow/border that makes the two grays look different */
-.board-detail-overlay .board-detail-panel,
-.board-detail-overlay .clean-detail-panel,
-.board-detail-overlay .orders-right {
-  box-shadow: none !important;
-  border-color: transparent !important;
+.superadmin-stop-working-btn {
+  width: 24px !important;
+  min-width: 24px !important;
+  height: 24px !important;
+  padding: 0 !important;
+
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+
+  border: 1px solid #111827 !important;
+  border-radius: 50% !important;
+
+  background: #111827 !important;
+  color: #ffffff !important;
+
+  cursor: pointer !important;
+  flex-shrink: 0 !important;
+
+  font-size: 8px !important;
+  transition:
+    transform .15s ease,
+    background .15s ease,
+    color .15s ease !important;
 }
 
-/* Actual content cards remain clean white */
-.board-detail-overlay .order-card,
-.board-detail-overlay .detail-topbar-wrapper,
-.board-detail-overlay .detail-topbar,
-.board-detail-overlay .card-preview-area,
-.board-detail-overlay .card-footer-inner {
+.superadmin-stop-working-btn:hover {
+  transform: scale(1.08) !important;
   background: #ffffff !important;
-  background-color: #ffffff !important;
+  color: #111827 !important;
 }
 
-/* Header remains black */
-.board-detail-overlay .clean-detail-header,
-.board-detail-overlay .detail-header {
-  background: #000000 !important;
-  background-color: #000000 !important;
-  background-image: none !important;
+.superadmin-stop-working-btn:active {
+  transform: scale(.95) !important;
 }
 
 </style>
