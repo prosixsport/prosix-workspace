@@ -1,253 +1,1153 @@
-
 <template>
-  <div class="orders-layout" :class="{ 'left-open': mobileLeftOpen, 'chat-open': showChat }" @click="closeAllMenus">
-    <!-- MOBILE TOP BAR -->
-    <div class="mobile-topbar">
-      <button class="mobile-menu-btn" @click.stop="mobileLeftOpen = !mobileLeftOpen">
-        <i class="fa-solid fa-bars"></i>
-      </button>
-      <span class="mobile-order-name">{{ selectedOrder ? selectedOrder.name : 'Orders' }}</span>
-      <button v-if="selectedOrder && !isClient" class="mobile-chat-btn"> @click.stop="toggleChat" :class="{ active: showChat }">
-        <i class="fa-solid fa-comments"></i>
-        <span v-if="unreadChatCount > 0" class="chat-badge">{{ unreadChatCount }}</span>
-      </button>
-    </div>
-
-    <!-- OVERLAY for mobile left panel -->
-    <div class="mobile-overlay" v-if="mobileLeftOpen" @click="mobileLeftOpen = false"></div>
-<div class="resize-bar"
-     :style="{ left: leftWidth + 'px' }"
-     @mousedown.stop="startResize">
-  <div class="resize-handle">
-    <i class="fa-solid fa-angles-right"></i>
-  </div>
-</div>
-
-    <!-- LEFT PANEL -->
-<div class="orders-left" :class="{ 'sidebar-light': sidebarLightMode }" :style="desktopLeftStyle">
-
-      <div class="orders-left-header">
-        <button class="back-btn" type="button" title="Back to dashboard" @click.stop="$router.push('/dashboard')">
-          <i class="fa-solid fa-arrow-left"></i>
-        </button>
-        <span class="orders-title">All Orders</span>
-        <button class="sidebar-mode-btn" @click.stop="sidebarLightMode = !sidebarLightMode">
-  <i :class="sidebarLightMode ? 'fa-solid fa-moon' : 'fa-solid fa-sun'"></i>
-</button>
-        <span v-if="unreadOrdersCount > 0" class="order-notify-pill">{{ unreadOrdersCount }} new</span>
-      </div>
-
-      <div class="orders-tabs">
-        <button
-          v-for="group in groups"
-          :key="group.key"
-          class="orders-tab"
-          :class="{ active: activeGroup === group.key }"
-          @click="activeGroup = group.key"
-        >{{ group.label }}</button>
-      </div>
-
-      <div class="list-head">
-<div class="col-chk">
-  <input
-    type="checkbox"
-    v-model="selectAll"
-    @change="toggleSelectAll"
-    @click.stop
-  />
-
-</div>
-        <div class="col-task">Task</div>
-        <!-- <div class="col-owner">OWNER</div> -->
-        <div class="col-actions"></div>
-      </div>
-<div v-if="(isSuperAdmin || currentUser?.can_create_orders === true) && selectedOrders.length > 1" class="bulk-actions" @click.stop>
-        <strong>{{ selectedOrders.length }}</strong>
-
-  <button class="bulk-btn" @click="openBulkMembersModal" :disabled="bulkActionLoading">
-    <i class="fa-solid fa-users"></i> Edit Members
-  </button>
-
-  <button class="bulk-btn" @click="bulkDuplicateOrders" :disabled="bulkActionLoading">
-    <i class="fa-solid fa-copy"></i> Duplicate
-  </button>
-
-  <button class="bulk-btn danger" @click="bulkDeleteOrders" :disabled="bulkActionLoading">
-    <i class="fa-solid fa-trash"></i> Delete
-  </button>
-
-</div>
-
-<div class="order-search-box">
-  <i class="fa-solid fa-magnifying-glass"></i>
-  <input
-    v-model="searchOrder"
-    type="text"
-    placeholder="Search order..."
-    @click.stop
-  />
-</div>
-
-
-
-
-
-
-<div class="add-filter-row">
-  <div v-if="canCreateOrder" class="add-row" @click="addNewOrder">
-    <i class="fa-solid fa-plus me-1"></i> Add New Order
-  </div>
-
- <select
-    v-if="currentUser?.role !== 'client'"
-    v-model="selectedClient"
-    class="client-filter-select"
->
-    <option value="">All Clients</option>
-
-    <option
-        v-for="client in availableClients"
-        :key="client.id"
-        :value="client.id"
-    >
-        {{ client.name }}
-    </option>
-</select>
-</div>
-
-
-      <div v-if="loadingOrders" class="orders-loading">Loading orders...</div>
-      <div v-else-if="filteredOrders.length === 0" class="orders-empty-list">No orders found</div>
-
-      <div
-        v-for="order in filteredOrders"
-        :key="order.id"
-        class="list-row"
-        :class="{
-          active: selectedOrder?.id === order.id,
-          unread: !order.user_has_seen,
-          seen: order.user_has_seen
-        }"
-        @click="selectOrderAndClose(order)"
-      >
-<div class="col-chk">
-  <input
-    type="checkbox"
-    :value="order.id"
-    v-model="selectedOrders"
-    @click.stop
-  />
-</div>
-
-        <div class="col-task">
-          <span v-if="!order.user_has_seen" class="unread-dot"></span>
-          <i v-if="order.hasChildren" class="fa-solid fa-chevron-right row-arrow"></i>
-<div class="order-title-wrap">
-  <div class="order-title-line">
-    <span>{{ order.name }}</span>
-
-    <span v-if="Number(order.unread_chat_count || 0) > 0" class="order-chat-count">
-      {{ order.unread_chat_count }}
-    </span>
-  </div>
-
-<div
-  v-if="Number(order.unread_chat_count || 0) > 0 && order.last_message_text"
-  class="order-last-chat"
->
-    <i class="fa-solid fa-comments"></i>
-    <span>
-      {{ order.last_message_sender ? order.last_message_sender + ': ' : '' }}
-      {{ shortLastMessage(order.last_message_text) }}
-    </span>
-    <small>{{ order.last_message_time }}</small>
-  </div>
-</div>
-        </div>
-    <div class="col-owner owner-status-images">
-  <span
-    class="owner-status-badge"
-    :style="{ background: order.statusColor }"
+  <AppLayout>
+  <div
+    class="factory-board-page"
+    :class="`theme-${boardTheme}`"
+    @click="closeAllMenus"
   >
-    {{ order.status }}
-  </span>
+    <!-- REUSABLE PAGE HEADER -->
+ <PageHeader
+  title="Factory Order Management"
+  subtitle="Track production, manage orders and keep your workflow organized."
+  :user="currentUser"
+  :photo="currentUser?.profile_photo_url"
+  @profile="openProfile"
+/>
 
-  <div class="avatar-stack">
-    <div
-      v-for="(av, i) in order.owners.slice(0, 2)"
-      :key="i"
-      class="av"
-      :class="{ 'has-photo': av.profile_photo_url }"
-      :style="{ background: av.profile_photo_url ? '#fff' : av.color }"
-      :title="av.name"
-      @click.stop="openProfile(av)"
-    >
-      <img v-if="av.profile_photo_url" :src="av.profile_photo_url" class="avatar-img" />
-      <span v-else>{{ av.initial }}</span>
-    </div>
+    <!-- STATUS NAVIGATION -->
+    <section class="board-toolbar">
+      <button
+        type="button"
+        class="summary-home-card"
+        :class="{ active: activeGroup === 'all' }"
+        @click="
+          activeGroup = 'all';
+          activeSectionCollapsed = false
+        "
+      >
+        <span class="summary-home-icon">
+          <i class="fa-solid fa-house"></i>
+        </span>
 
-    <div v-if="order.owners.length > 2" class="av av-count">
-      +{{ order.owners.length - 2 }}
-    </div>
-  </div>
-</div>
-        <div class="order-actions-wrap" @click.stop>
-<button
-  v-if="selectedOrders.includes(order.id)"
-  class="order-dots-btn"
-  @click="toggleOrderMenu(order.id)"
->
-            <i class="fa-solid fa-ellipsis"></i>
+        <span>
+          <small>To Open</small>
+          <strong>{{ unreadOrdersCount }}</strong>
+        </span>
+      </button>
+
+      <div class="workflow-tabs">
+        <div
+          v-for="group in boardGroups"
+          :key="group.key"
+          class="workflow-tab-wrap"
+        >
+          <button
+            type="button"
+            class="workflow-tab"
+            :class="{ active: activeGroup === group.key }"
+            :style="{
+              '--group-color': group.color,
+              background: softColor(group.color, 0.12),
+              color: group.color
+            }"
+            @click="
+              activeGroup = group.key;
+              activeSectionCollapsed = false
+            "
+          >
+            <span class="workflow-tab-label">{{ group.label }}</span>
+
+            <span
+              class="workflow-total-box"
+              :style="{
+                background: softColor(group.color, 0.18),
+                color: group.color
+              }"
+            >
+              {{ countForGroup(group.key) }}
+            </span>
           </button>
-          <div v-if="openOrderMenuId === order.id" class="order-menu">
-            <div class="order-menu-item" @click="openOrderInfo(order)">
-              <i class="fa-solid fa-circle-info"></i> Info
+
+          <div
+            class="workflow-custom-actions"
+            @click.stop
+          >
+            <label
+              class="workflow-color-action"
+              title="Change section color"
+            >
+              <i class="fa-solid fa-palette"></i>
+
+              <input
+                type="color"
+                :value="group.color"
+                @input="changeWorkflowGroupColor(group, $event.target.value)"
+              />
+            </label>
+
+            <button
+              type="button"
+              title="Edit section name"
+              @click="editWorkflowGroup(group)"
+            >
+              <i class="fa-solid fa-pen"></i>
+            </button>
+
+            <button
+              type="button"
+              class="danger"
+              title="Delete section"
+              @click="deleteWorkflowGroup(group)"
+            >
+              <i class="fa-solid fa-trash"></i>
+            </button>
+          </div>
+        </div>
+
+        <button
+          v-if="canCreateOrder"
+          type="button"
+          class="workflow-add-button"
+          title="Add another order section"
+          @click="addWorkflowGroup"
+        >
+          <i class="fa-solid fa-plus"></i>
+        </button>
+      </div>
+
+      <div class="board-toolbar-actions">
+        <!-- CHAT + NEW ORDER NOTIFICATIONS -->
+        <div class="chat-notification-wrap" @click.stop>
+          <button
+            type="button"
+            class="chat-notification-button"
+            title="Notifications"
+            @click="toggleNotificationMenu"
+          >
+            <i class="fa-solid fa-bell"></i>
+
+            <span
+              v-if="totalBellNotificationCount > 0"
+              class="chat-notification-count"
+            >
+              {{ totalBellNotificationCount > 99 ? '99+' : totalBellNotificationCount }}
+            </span>
+          </button>
+
+          <div
+            v-if="showChatNotificationMenu"
+            class="chat-notification-dropdown notification-center-dropdown"
+          >
+            <div class="chat-notification-head notification-center-head">
+              <div>
+                <strong>Notifications</strong>
+                <small>{{ totalBellNotificationCount }} unread</small>
+              </div>
             </div>
-<template v-if="isSuperAdmin || currentUser?.can_create_orders === true">
-                  <div class="order-menu-item" @click="openEditOrder(order)"><i class="fa-solid fa-pen"></i> Edit</div>
-              <div class="order-menu-item" @click="duplicateOrder(order)"><i class="fa-solid fa-copy"></i> Duplicate</div>
-              <div class="order-menu-item danger" @click="deleteOrder(order)"><i class="fa-solid fa-trash"></i> Delete</div>
+
+            <div class="notification-tabs">
+              <button
+                type="button"
+                :class="{ active: notificationTab === 'chats' }"
+                @click.stop="notificationTab = 'chats'"
+              >
+                <i class="fa-solid fa-comments"></i>
+                Chats
+                <span v-if="totalUnreadChatCount > 0">
+                  {{ totalUnreadChatCount }}
+                </span>
+              </button>
+
+              <button
+                type="button"
+                :class="{ active: notificationTab === 'orders' }"
+                @click.stop="notificationTab = 'orders'"
+              >
+                <i class="fa-solid fa-folder-plus"></i>
+                Orders
+                <span v-if="unreadOrderNotificationCount > 0">
+                  {{ unreadOrderNotificationCount }}
+                </span>
+              </button>
+            </div>
+
+            <!-- CHAT NOTIFICATIONS -->
+            <div v-if="notificationTab === 'chats'" class="notification-list">
+              <button
+                v-for="order in unreadChatOrders"
+                :key="'chat-notification-' + order.id"
+                type="button"
+                class="chat-notification-item"
+                @click="openChatFromNotification(order)"
+              >
+                <span class="chat-notification-icon">
+                  <i class="fa-solid fa-comments"></i>
+                </span>
+
+                <span class="chat-notification-content">
+                  <strong>{{ order.name }}</strong>
+                  <small>
+                    {{ order.last_message_sender || 'New message' }}
+                    <template v-if="order.last_message_text">
+                      · {{ shortLastMessage(order.last_message_text) }}
+                    </template>
+                  </small>
+                </span>
+
+                <span class="chat-notification-badge">
+                  {{ order.unread_chat_count }}
+                </span>
+              </button>
+
+              <div
+                v-if="unreadChatOrders.length === 0"
+                class="chat-notification-empty"
+              >
+                <i class="fa-regular fa-comment-dots"></i>
+                No unread chats
+              </div>
+            </div>
+
+            <!-- NEW / UNOPENED ORDER NOTIFICATIONS -->
+            <div v-else class="notification-list">
+              <button
+                v-for="order in unreadOrderNotifications"
+                :key="'order-notification-' + order.id"
+                type="button"
+                class="chat-notification-item order-notification-item"
+                @click="openOrderFromNotification(order)"
+              >
+                <span class="chat-notification-icon order-notification-icon">
+                  <i class="fa-solid fa-folder-plus"></i>
+                </span>
+
+                <span class="chat-notification-content">
+                  <strong>{{ order.name }}</strong>
+                  <small>
+                    New order
+                    <template v-if="order.po">
+                      · {{ order.po }}
+                    </template>
+                    <template v-if="order.created_at">
+                      · {{ notificationTime(order.created_at) }}
+                    </template>
+                  </small>
+                </span>
+
+                <span class="order-notification-new-dot"></span>
+              </button>
+
+              <div
+                v-if="unreadOrderNotifications.length === 0"
+                class="chat-notification-empty"
+              >
+                <i class="fa-regular fa-folder-open"></i>
+                No new order notifications
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <button
+          type="button"
+          class="theme-toggle-button"
+          :title="boardTheme === 'light' ? 'Switch to dark mode' : 'Switch to light mode'"
+          @click.stop="toggleBoardTheme"
+        >
+          <i
+            :class="boardTheme === 'light'
+              ? 'fa-solid fa-moon'
+              : 'fa-solid fa-sun'"
+          ></i>
+
+          <span>
+            {{ boardTheme === 'light' ? 'Dark' : 'Light' }}
+          </span>
+        </button>
+
+        <div class="board-search">
+          <i class="fa-solid fa-magnifying-glass"></i>
+        <input
+          v-model="searchOrder"
+          type="text"
+          placeholder="Search orders..."
+          @click.stop
+        />
+        </div>
+      </div>
+    </section>
+
+    <!-- BOARD -->
+    <main class="factory-board">
+      <section
+        class="board-section-heading collapsible-active-heading"
+        :class="{ collapsed: activeSectionCollapsed }"
+        :style="{
+          '--active-section-color': activeBoardGroup.color,
+          background: '#ffffff',
+          color: activeBoardGroup.color,
+          borderLeftColor: activeBoardGroup.color
+        }"
+        @click="activeSectionCollapsed = !activeSectionCollapsed"
+      >
+        <div>
+          <span class="section-chevron-slot">
+            <i
+              class="fa-solid section-collapse-icon"
+              :class="
+                activeSectionCollapsed
+                  ? 'fa-chevron-right'
+                  : 'fa-chevron-down'
+              "
+            ></i>
+          </span>
+
+          <div class="active-section-title-wrap">
+            <h1>{{ activeBoardGroup.label }}</h1>
+
+            <span class="active-section-meta">
+              {{ unreadOrdersCount }} TO OPEN
+              · {{ filteredOrders.length }} TOTAL
+            </span>
+          </div>
+        </div>
+
+        <div class="board-heading-actions" @click.stop>
+          <button
+            v-if="canCreateOrder"
+            type="button"
+            class="board-top-add-button"
+            @click="startInlineOrder"
+          >
+            <i class="fa-solid fa-plus"></i>
+            Add Order
+          </button>
+
+          <button
+            type="button"
+            class="board-print-button"
+            :style="{ color: readableTextColor(activeBoardGroup.color) }"
+            title="Print"
+            @click="printVisibleOrders"
+          >
+            <i class="fa-solid fa-print"></i>
+            <small>PRINT</small>
+          </button>
+        </div>
+      </section>
+
+
+      <section
+        v-if="selectedOrders.length > 0"
+        class="board-bulk-toolbar"
+        @click.stop
+      >
+        <div class="bulk-selected-count">
+          <strong>{{ selectedOrders.length }}</strong>
+          <span>Selected</span>
+        </div>
+
+        <button
+          v-if="hasFullOrderAccess || currentUser?.can_create_orders === true"
+          type="button"
+          @click="openBulkMembersModal"
+        >
+          <i class="fa-solid fa-users"></i>
+          Add Members
+        </button>
+
+        <button
+          v-if="hasFullOrderAccess || currentUser?.can_create_orders === true"
+          type="button"
+          @click="openBulkClientsModal"
+        >
+          <i class="fa-solid fa-user-tie"></i>
+          Add Client
+        </button>
+
+        <button
+          v-if="hasFullOrderAccess || currentUser?.can_create_orders === true"
+          type="button"
+          @click="bulkDuplicateOrders"
+        >
+          <i class="fa-solid fa-copy"></i>
+          Duplicate
+        </button>
+
+        <button
+          v-if="hasFullOrderAccess || currentUser?.can_create_orders === true"
+          type="button"
+          class="danger"
+          @click="bulkDeleteOrders"
+        >
+          <i class="fa-solid fa-trash"></i>
+          Delete
+        </button>
+
+        <button
+          type="button"
+          class="clear"
+          @click="clearBulkSelection"
+        >
+          <i class="fa-solid fa-xmark"></i>
+          Clear
+        </button>
+      </section>
+
+      <section
+        v-show="!activeSectionCollapsed"
+        class="board-table-shell"
+      >
+        <div class="board-table-head" :style="boardGridStyle">
+          <div class="board-col board-col-check resizable-head-cell">
+            <input
+              type="checkbox"
+              v-model="selectAll"
+              @change="toggleSelectAll"
+              @click.stop
+            />
+            <span
+              class="column-resizer"
+              title="Drag to resize"
+              @mousedown.stop.prevent="startColumnResize('check', $event)"
+            ></span>
+          </div>
+
+          <div class="board-col board-col-name resizable-head-cell">
+            ORDER NAME
+            <span
+              class="column-resizer"
+              title="Drag to resize"
+              @mousedown.stop.prevent="startColumnResize('name', $event)"
+            ></span>
+          </div>
+
+          <div class="board-col board-col-status resizable-head-cell">
+            STATUS
+            <span
+              class="column-resizer"
+              title="Drag to resize"
+              @mousedown.stop.prevent="startColumnResize('status', $event)"
+            ></span>
+          </div>
+
+          <div class="board-col board-col-owner resizable-head-cell">
+            OWNER
+            <span
+              class="column-resizer"
+              title="Drag to resize"
+              @mousedown.stop.prevent="startColumnResize('owner', $event)"
+            ></span>
+          </div>
+
+          <div class="board-col board-col-files resizable-head-cell">
+            FILES
+            <span
+              class="column-resizer"
+              title="Drag to resize"
+              @mousedown.stop.prevent="startColumnResize('files', $event)"
+            ></span>
+          </div>
+
+          <div class="board-col board-col-packing resizable-head-cell">
+            PACKING DETAIL
+            <span
+              class="column-resizer"
+              title="Drag to resize"
+              @mousedown.stop.prevent="startColumnResize('packing', $event)"
+            ></span>
+          </div>
+
+          <div class="board-col board-col-chat resizable-head-cell">
+            CHAT
+            <span
+              class="column-resizer"
+              title="Drag to resize"
+              @mousedown.stop.prevent="startColumnResize('chat', $event)"
+            ></span>
+          </div>
+
+          <div class="board-col board-col-payment resizable-head-cell">
+            PAYMENT
+            <span
+              class="column-resizer"
+              title="Drag to resize"
+              @mousedown.stop.prevent="startColumnResize('payment', $event)"
+            ></span>
+          </div>
+
+          <div class="board-col board-col-address resizable-head-cell">
+            ADDRESS
+            <span
+              class="column-resizer"
+              title="Drag to resize"
+              @mousedown.stop.prevent="startColumnResize('address', $event)"
+            ></span>
+          </div>
+
+          <div class="board-col board-col-track resizable-head-cell">
+            TRK#
+            <span
+              class="column-resizer"
+              title="Drag to resize"
+              @mousedown.stop.prevent="startColumnResize('track', $event)"
+            ></span>
+          </div>
+
+          <div class="board-col board-col-info">
+            <i class="fa-regular fa-circle-question"></i>
+          </div>
+        </div>
+
+        <!-- INLINE ADD ORDER -->
+        <div
+          v-if="canCreateOrder && inlineAddOpen"
+          class="board-inline-add-row board-inline-add-top"
+          :style="boardGridStyle"
+        >
+          <div class="board-col board-col-check"></div>
+
+          <div class="board-col board-inline-add-main">
+            <template v-if="inlineAddOpen">
+              <input
+                ref="inlineOrderInput"
+                v-model="inlineOrderName"
+                type="text"
+                placeholder="WRITE ORDER NAME AND PRESS ENTER"
+                @keyup.enter="createInlineOrder"
+                @keyup.esc="cancelInlineOrder"
+              />
+
+              <button
+                type="button"
+                class="inline-save-button"
+                :disabled="inlineOrderSaving || !inlineOrderName.trim()"
+                @click="createInlineOrder"
+              >
+                <i
+                  :class="inlineOrderSaving
+                    ? 'fa-solid fa-spinner fa-spin'
+                    : 'fa-solid fa-check'"
+                ></i>
+              </button>
+
+              <button
+                type="button"
+                class="inline-cancel-button"
+                @click="cancelInlineOrder"
+              >
+                <i class="fa-solid fa-xmark"></i>
+              </button>
             </template>
+          </div>
+        </div>
+
+
+        <div v-if="loadingOrders && orders.length === 0" class="board-empty-state prosix-loading-state">
+          <div class="prosix-loader-logo-wrap">
+            <img src="/public/assets/images/P LOGO BLACK.png" alt="Prosix" class="prosix-loader-logo" />
+          </div>
+          <span>Loading orders...</span>
+        </div>
+
+        <div v-else-if="!loadingOrders && filteredOrders.length === 0" class="board-empty-state">
+          No orders found in this section.
+        </div>
+
+        <div
+          v-for="order in filteredOrders"
+          :key="order.id"
+          class="board-table-row"
+          :class="{
+            unread: !order.user_has_seen,
+            opened: order.user_has_seen,
+            selected: selectedOrders.includes(order.id)
+          }"
+          :style="boardGridStyle"
+          @click="openBoardOrder(order)"
+        >
+          <div class="board-col board-col-check">
+            <input
+              type="checkbox"
+              :value="order.id"
+              v-model="selectedOrders"
+              @click.stop
+            />
+          </div>
+
+          <div class="board-col board-col-name">
+            <span v-if="!order.user_has_seen" class="board-new-dot"></span>
+
+            <div class="inline-cell-wrap">
+              <input
+                v-if="isEditingCell(order.id, 'name')"
+                v-model="inlineEditValue"
+                class="board-inline-cell-input"
+                type="text"
+                @click.stop
+                @keyup.enter="saveInlineCell(order, 'name')"
+                @keyup.esc="cancelInlineCell"
+                @blur="saveInlineCell(order, 'name')"
+              />
+
+              <button
+                v-else
+                type="button"
+                class="inline-value-button name-value"
+                title="Click to edit order name"
+                @click.stop="startInlineCell(order, 'name', order.name)"
+              >
+                <strong>{{ order.name }}</strong>
+                <small>{{ order.po || 'N/A' }}</small>
+
+              </button>
+
+              <div class="order-working-actions">
+                <button
+                  v-if="!workingDesigner(order)"
+                  type="button"
+                  class="start-working-btn"
+                  title="Start Order"
+                  aria-label="Start Order"
+                  @click.stop="startWorking(order)"
+                >
+                  <i class="fa-solid fa-play"></i>
+                </button>
+
+                <div
+                  v-else
+                  class="row-working-user"
+                  :title="workingDesigner(order).name + ' is working'"
+                >
+                  <span class="row-working-live-dot"></span>
+
+                  <img
+                    v-if="workingDesigner(order).profile_photo_url"
+                    :src="workingDesigner(order).profile_photo_url"
+                    :alt="workingDesigner(order).name"
+                  />
+
+                  <span
+                    v-else
+                    class="row-working-avatar-fallback"
+                  >
+                    {{ initial(workingDesigner(order).name) }}
+                  </span>
+
+                  <strong>{{ workingDesigner(order).name }}</strong>
+                  <small>working</small>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div class="board-col board-col-status row-status-cell" @click.stop>
+            <div class="status-ref-wrap">
+              <button
+                type="button"
+                class="status-ref-trigger"
+                :class="{ open: rowStatusMenuId === Number(order.id) }"
+                :style="{
+                  '--status-fill': order.statusColor || '#e5e7eb',
+                  '--status-text': readableTextColor(order.statusColor || '#e5e7eb')
+                }"
+                @click.stop="toggleRowStatusMenu(order, $event)"
+              >
+<span class="status-ref-label">
+                  {{ order.status }}
+                </span>
+
+                <i
+                  class="fa-solid fa-chevron-down status-ref-chevron"
+                  :class="{ rotate: rowStatusMenuId === Number(order.id) }"
+                ></i>
+              </button>
+            </div>
+          </div>
+
+          <div class="board-col board-col-owner">
+            <div class="board-avatar-stack owner-compact-stack">
+              <button
+                v-if="loggedInOrderOwner(order)"
+                type="button"
+                class="board-avatar owner-current-avatar"
+                :title="loggedInOrderOwner(order).name"
+                @click.stop="openProfile(loggedInOrderOwner(order))"
+              >
+                <img
+                  v-if="loggedInOrderOwner(order).profile_photo_url"
+                  :src="loggedInOrderOwner(order).profile_photo_url"
+                  :alt="loggedInOrderOwner(order).name"
+                />
+                <span v-else>
+                  {{ initial(loggedInOrderOwner(order).name) }}
+                </span>
+              </button>
+
+              <button
+                v-if="otherOrderOwnersCount(order) > 0"
+                type="button"
+                class="board-avatar board-avatar-more"
+                :title="otherOrderOwnersNames(order)"
+                @click.stop="openSingleOrderMembers(order)"
+              >
+                +{{ otherOrderOwnersCount(order) }}
+              </button>
+
+              <button
+                v-if="
+                  hasFullOrderAccess ||
+                  currentUser?.can_create_orders === true
+                "
+                type="button"
+                class="board-avatar board-avatar-add"
+                title="Add or manage members"
+                @click.stop="openSingleOrderMembers(order)"
+              >
+                <i class="fa-solid fa-plus"></i>
+              </button>
+            </div>
+          </div>
+
+          <div
+            class="board-col board-col-files board-files-drop-zone"
+            :class="{
+              'row-file-drag-active':
+                rowFileDragOrderId === Number(order.id)
+            }"
+            @dragenter.prevent.stop="onRowFileDragEnter(order)"
+            @dragover.prevent.stop="onRowFileDragOver($event, order)"
+            @dragleave.prevent.stop="onRowFileDragLeave($event, order)"
+            @drop.prevent.stop="onRowFileDrop($event, order)"
+          >
+            <div
+              v-if="rowFileDragOrderId === Number(order.id)"
+              class="row-file-drop-label"
+            >
+              Drop files
+            </div>
+
+            <div class="board-row-files">
+              <!-- ONLY 3 THUMBNAILS IN OUTER BOARD -->
+              <div
+                v-for="file in rowFiles(order).slice(0, 3)"
+                :key="file.id || file.url || file.name"
+                class="board-row-file-thumb-wrap"
+                :title="file.name"
+                @click.stop="openRowFile(order, file)"
+              >
+                <div class="board-row-file-thumb">
+                  <img
+                    v-if="file.isImage && !file.imageError"
+                    :src="file.url"
+                    :alt="file.name"
+                    @error="file.imageError = true"
+                  />
+
+                  <i
+                    v-else
+                    :class="getFileIcon(file.name)"
+                  ></i>
+                </div>
+
+                <button
+                  v-if="canDeleteFile(file) && !file.uploading"
+                  type="button"
+                  class="board-row-file-remove"
+                  title="Delete file"
+                  @click.stop="removeRowFile(order, file)"
+                >
+                  <i class="fa-solid fa-xmark"></i>
+                </button>
+              </div>
+
+              <!-- ALL EXTRA FILES COME IN COUNT -->
+              <button
+                v-if="rowFiles(order).length > 3"
+                type="button"
+                class="board-more-files board-more-files-button"
+                :title="`${rowFiles(order).length - 3} more files - click to view all`"
+                @click.stop="openRowViewAll(order)"
+              >
+                +{{ rowFiles(order).length - 3 }}
+              </button>
+
+              <!-- ADD BUTTON ALWAYS VISIBLE FOR USERS WHO CAN UPLOAD -->
+              <button
+                v-if="canUploadFiles"
+                type="button"
+                class="board-row-file-add"
+                title="Add files"
+                @click.stop="triggerRowFileUpload(order)"
+              >
+                <i class="fa-solid fa-plus"></i>
+              </button>
+            </div>
+          </div>
+
+          <div class="board-col board-col-packing">
+            <input
+              class="packing-clean-input"
+              :value="packingDetailText(order)"
+              type="text"
+              placeholder="Add packing detail"
+              :title="packingDetailText(order) || 'Add packing detail'"
+              @click.stop
+              @keydown.enter.prevent="savePackingInline(order, $event)"
+              @blur="savePackingInline(order, $event, true)"
+            />
+          </div>
+
+          <div class="board-col board-col-chat">
+            <button
+              type="button"
+              class="board-chat-button"
+              @click.stop="openBoardChat(order)"
+            >
+              <i class="fa-solid fa-comments"></i>
+
+              <span v-if="Number(order.unread_chat_count || 0) > 0">
+                {{ order.unread_chat_count }}
+              </span>
+            </button>
+          </div>
+
+          <div class="board-col board-col-payment">
+            <input
+              class="board-inline-cell-input payment-input-inline"
+              :value="order.payment || '0 % Paid'"
+              type="text"
+              title="Click and edit payment"
+              @click.stop
+              @change="saveDirectInlineField(order, 'payment', $event.target.value)"
+            />
+          </div>
+
+          <div class="board-col board-col-address">
+            <input
+              class="board-inline-cell-input"
+              :value="order.shippingAddress || ''"
+              type="text"
+              placeholder="Add address"
+              title="Click and edit address"
+              @click.stop
+              @change="saveDirectInlineField(order, 'shipping_address', $event.target.value)"
+            />
+          </div>
+
+          <div class="board-col board-col-track">
+            <input
+              class="board-inline-cell-input"
+              :value="trackingSummary(order.trk)"
+              type="text"
+              placeholder="Tracking #"
+              title="Click and edit tracking"
+              @click.stop
+              @change="saveDirectInlineField(order, 'trk', $event.target.value)"
+            />
+          </div>
+
+          <div class="board-col board-col-info">
+            <button
+              type="button"
+              title="Order details"
+              @click.stop="openOrderInfo(order)"
+            >
+              <i class="fa-regular fa-circle-question"></i>
+            </button>
+          </div>
+        </div>
+
+      </section>
+
+      <!-- COLLAPSED STATUS BARS -->
+      <section class="collapsed-status-bars">
+        <button
+          v-for="group in boardGroups.filter(group => group.key !== activeGroup)"
+          :key="group.key"
+          type="button"
+          class="collapsed-status-bar"
+          :style="{
+            '--group-color': group.color,
+            background: '#ffffff',
+            color: group.color,
+            borderLeftColor: group.color
+          }"
+          @click="
+            activeGroup = group.key;
+            activeSectionCollapsed = false
+          "
+        >
+          <span class="collapsed-status-left">
+            <span class="section-chevron-slot">
+              <i class="fa-solid fa-chevron-right collapsed-status-icon"></i>
+            </span>
+            <strong>{{ group.label }}</strong>
+          </span>
+        </button>
+      </section>
+    </main>
+    <!-- ROW STATUS DROPDOWN -->
+    <div
+      v-if="rowStatusMenuId && rowStatusMenuOrder"
+      class="status-fixed-dropdown monday-status-menu"
+      :style="rowStatusMenuStyle"
+      @click.stop
+    >
+      <div class="monday-status-menu-head">
+        <div>
+          <strong>Change Status</strong>
+          <small>{{ rowStatusMenuOrder?.name }}</small>
+        </div>
+
+        <button
+          type="button"
+          class="monday-status-close"
+          title="Close"
+          @click.stop="closeRowStatusMenu"
+        >
+          <i class="fa-solid fa-xmark"></i>
+        </button>
+      </div>
+
+      <div class="monday-status-options">
+        <div
+          v-for="status in statusOptions"
+          :key="'status-fixed-' + status.label"
+          class="monday-status-row"
+          :class="{
+            active: status.label === rowStatusMenuOrder.status,
+            editing: rowStatusEditingLabel === status.label
+          }"
+        >
+          <!-- NORMAL VIEW -->
+          <template v-if="rowStatusEditingLabel !== status.label">
+            <button
+              type="button"
+              class="monday-status-select"
+              @click.stop="selectRowStatus(rowStatusMenuOrder, status)"
+            >
+              <span
+                class="monday-status-dot"
+                :style="{ background: status.color }"
+              ></span>
+
+              <span class="monday-status-name">
+                {{ status.label }}
+              </span>
+
+              <i
+                v-if="status.label === rowStatusMenuOrder.status"
+                class="fa-solid fa-check monday-status-check"
+              ></i>
+            </button>
+
+            <div
+              v-if="status.custom"
+              class="monday-status-actions"
+            >
+              <button
+                type="button"
+                title="Edit status"
+                @click.stop="startRowStatusEdit(status)"
+              >
+                <i class="fa-solid fa-pen"></i>
+              </button>
+
+              <button
+                type="button"
+                class="danger"
+                title="Delete status"
+                @click.stop="deleteRowCustomStatus(status)"
+              >
+                <i class="fa-solid fa-trash"></i>
+              </button>
+            </div>
+          </template>
+
+          <!-- INLINE EDIT -->
+          <div
+            v-else
+            class="monday-status-edit-row"
+          >
+            <label
+              class="monday-status-color-button"
+              title="Change color"
+            >
+              <span :style="{ background: rowStatusEditColor }"></span>
+
+              <input
+                v-model="rowStatusEditColor"
+                type="color"
+              />
+            </label>
+
+            <input
+              v-model="rowStatusEditName"
+              type="text"
+              class="monday-status-edit-input"
+              placeholder="Status name"
+              @keydown.enter.prevent="saveRowStatusEdit(status)"
+              @keydown.esc.prevent="cancelRowStatusEdit"
+            />
+
+            <button
+              type="button"
+              class="monday-status-save-edit"
+              title="Save"
+              @click.stop="saveRowStatusEdit(status)"
+            >
+              <i class="fa-solid fa-check"></i>
+            </button>
+
+            <button
+              type="button"
+              class="monday-status-cancel-edit"
+              title="Cancel"
+              @click.stop="cancelRowStatusEdit"
+            >
+              <i class="fa-solid fa-xmark"></i>
+            </button>
           </div>
         </div>
       </div>
 
+      <!-- ADD CUSTOM STATUS -->
+      <div class="monday-status-add">
+        <div class="monday-status-add-title">
+          <span class="monday-status-add-icon">
+            <i class="fa-solid fa-plus"></i>
+          </span>
 
+          <div>
+            <strong>Add Custom Status</strong>
+            <small>Create your own label and color</small>
+          </div>
+        </div>
+
+        <div class="monday-status-add-form">
+          <label
+            class="monday-status-add-color"
+            title="Choose color"
+          >
+            <span :style="{ background: customStatusColor }"></span>
+
+            <input
+              v-model="customStatusColor"
+              type="color"
+            />
+          </label>
+
+          <input
+            v-model="customStatusLabel"
+            type="text"
+            class="monday-status-add-input"
+            placeholder="e.g. Waiting Approval"
+            @keydown.enter.prevent="addCustomRowStatus(rowStatusMenuOrder)"
+          />
+
+          <button
+            type="button"
+            class="monday-status-add-button"
+            :disabled="!customStatusLabel.trim()"
+            @click.stop="addCustomRowStatus(rowStatusMenuOrder)"
+          >
+            Add
+          </button>
+        </div>
+      </div>
     </div>
 
     <!-- RIGHT PANEL -->
-    <div class="orders-right" v-if="selectedOrder">
+    <div v-if="selectedOrder && detailOpen" class="board-detail-overlay" @click.self="closeBoardDetail">
+      <div class="orders-right board-detail-panel clean-detail-panel">
 
       <!-- HEADER -->
-      <div class="detail-header">
-        <div class="header-left-p">
-          <img src="/public/assets/images/P LOGO WHITE.png" alt="Prosix P" class="left-p-logo" />
+      <div class="detail-header clean-detail-header">
+        <button
+          type="button"
+          class="board-detail-back"
+          title="Back to orders"
+          @click.stop="closeBoardDetail"
+        >
+          <i class="fa-solid fa-arrow-left"></i>
+          <span>Back to Orders</span>
+        </button>
+
+        <div
+          v-if="selectedOrder"
+          class="clean-detail-order-name"
+        >
+          <i class="fa-solid fa-folder-open"></i>
+
+          <div>
+            <small>Order</small>
+            <strong>{{ selectedOrder.name }}</strong>
+          </div>
         </div>
-        <div class="header-center-logo">
-          <img src="/public/assets/images/PROSIX SPORTS LOGO PNG WHITE.png" alt="Prosix" class="prosix-main-logo" />
-        </div>
-        <div class="header-right-icons">
-<button
-    v-if="!isClient"
-    class="header-icon-btn"
-    @click.stop="toggleChat"
-    :class="{ active: showChat }">
-                <i class="fa-solid fa-comments"></i>
-            <span v-if="unreadChatCount > 0" class="chat-badge">{{ unreadChatCount }}</span>
+
+        <button
+          v-if="!isClient"
+          type="button"
+          class="clean-detail-chat-button"
+          :class="{ active: showChat }"
+          @click.stop="toggleChat"
+        >
+          <i class="fa-solid fa-comments"></i>
+          <span>Chat</span>
+
+          <strong v-if="unreadChatCount > 0">
+            {{ unreadChatCount }}
+          </strong>
+        </button>
+
+        <div
+          v-if="selectedOrder"
+          class="detail-pipeline-strip"
+        >
+          <span class="detail-pipeline-label">
+            Pipeline
+          </span>
+
+          <button
+            v-for="group in boardGroups"
+            :key="group.key"
+            type="button"
+            class="detail-pipeline-step"
+            :class="{
+              active:
+                selectedOrder.group === group.key ||
+                (
+                  group.key === 'delivered' &&
+                  String(
+                    selectedOrder.status || ''
+                  ).toLowerCase() === 'delivered'
+                )
+            }"
+            :style="{
+              '--pipeline-color': group.color,
+              background:
+                (
+                  selectedOrder.group === group.key ||
+                  (
+                    group.key === 'delivered' &&
+                    String(
+                      selectedOrder.status || ''
+                    ).toLowerCase() === 'delivered'
+                  )
+                )
+                  ? group.color
+                  : 'rgba(255,255,255,.08)'
+            }"
+            @click.stop="moveSelectedOrderToPipeline(group)"
+          >
+            <span
+              :style="{ background: group.color }"
+            ></span>
+
+            {{ group.label }}
           </button>
-          <button class="user-avatar-top" type="button" title="Open profile" @click.stop="openProfile(currentUser)">
-            <img v-if="userPhoto" :src="userPhoto" class="avatar-img" />
-            <span v-else>{{ userInitial }}</span>
-          </button>
         </div>
- <div v-if="selectedOrder" class="current-order-title">
-  <i class="fa-solid fa-folder-open"></i>
-  <span>{{ selectedOrder.name }}</span>
-</div>
-
-
-
-
       </div>
 
  <!-- INFO BAR -->
@@ -342,7 +1242,7 @@
               </div>
             </div>
           </div>
-          <div v-if="isSuperAdmin" class="detail-info-item invoice-info-item" style="position:relative" @click.stop>
+          <div v-if="hasFullOrderAccess" class="detail-info-item invoice-info-item" style="position:relative" @click.stop>
             <button class="invoice-btn" @click="triggerInvoiceUpload">
               <i class="fa-solid fa-file-invoice me-1"></i>Add Invoice
             </button>
@@ -442,7 +1342,7 @@
               <div class="payment-read-row balance-row">
                 <span>Balance</span><strong>${{ selectedOrder.paymentBalance || 0 }}</strong>
               </div>
-<div v-if="isSuperAdmin || currentUser?.can_create_orders === true" class="payment-admin-editor">
+<div v-if="canEditWorkflowFields" class="payment-admin-editor">
                     <div class="payment-field">
                   <label class="payment-label">Paid %</label>
                   <div class="payment-percent-row">
@@ -498,16 +1398,31 @@
               </div>
 
               <template v-else>
-                <div class="card-preview-area" @dragover.prevent @drop="onDrop($event, card)">
+                <div
+                  class="card-preview-area"
+                  :class="{ 'drag-drop-active': dragActiveCardType === card.type }"
+                  @dragenter.prevent.stop="onDragEnter(card)"
+                  @dragover.prevent.stop="onDragOver($event, card)"
+                  @dragleave.prevent.stop="onDragLeave($event, card)"
+                  @drop.prevent.stop="onDrop($event, card)"
+                >
+                  <div
+                    v-if="dragActiveCardType === card.type"
+                    class="drag-drop-overlay"
+                  >
+                    <i class="fa-solid fa-cloud-arrow-up"></i>
+                    <strong>Drop files here</strong>
+                    <span>{{ card.title }}</span>
+                  </div>
                   <div v-if="card.files && card.files.length" class="card-files-preview">
-                    <div v-for="(file, fi) in card.files" :key="fi" class="file-thumb">
+                    <div v-for="(file, fi) in card.files" :key="file.id || file.url || fi" class="file-thumb">
                       <img v-if="file.isImage && !file.imageError" :src="file.url" class="file-img" @click.stop="openPreviewFile(file)" @error="file.imageError = true" />
-                   <div v-else class="file-icon-box" @click.stop="openPreviewFile(file)" style="cursor:pointer;">
-  <i :class="getFileIcon(file.name)" class="file-type-icon"></i>
-  <span class="file-name-small">{{ file.name }}</span>
-</div>
+                      <div v-else class="file-icon-box" @click.stop="openPreviewFile(file)" style="cursor:pointer;">
+                        <i :class="getFileIcon(file.name)" class="file-type-icon"></i>
+                        <span class="file-name-small">{{ file.name }}</span>
+                      </div>
                       <span v-if="file.uploading" class="uploading-label">Uploading...</span>
-                <button v-if="canDeleteFile(file) && !file.uploading" class="file-remove-btn" @click.stop="removeFile(card, fi)">
+                      <button v-if="canDeleteFile(file) && !file.uploading" class="file-remove-btn" @click.stop="removeFile(card, fi)">
                         <i class="fa-solid fa-xmark"></i>
                       </button>
                     </div>
@@ -559,269 +1474,604 @@
         />
       </div>
     </div>
+      </div>
 
-    <!-- ADD ORDER MODAL -->
-    <div v-if="showAddModal" class="modal-overlay" @click.self="showAddModal = false">
-      <div class="add-order-modal">
-        <div class="view-all-header">
-          <h5>{{ editingOrderId ? 'Edit Order' : 'Add New Order' }}</h5>
-          <button class="modal-close" @click="closeOrderModal"><i class="fa-solid fa-xmark"></i></button>
+
+    <!-- FILES VIEW ALL MODAL -->
+    <div
+      v-if="viewAllCard"
+      class="files-modal-overlay"
+      @click.self="viewAllCard = null"
+    >
+      <div class="files-modal">
+        <div class="files-modal-header">
+          <div>
+            <h3>{{ viewAllCard.title || 'Files' }}</h3>
+            <p>{{ (viewAllCard.files || []).length }} file(s)</p>
+          </div>
+
+          <div class="files-modal-header-actions">
+            <button
+              v-if="viewAllCard.files && viewAllCard.files.length"
+              type="button"
+              class="files-modal-download-all"
+              @click="downloadAllFiles(viewAllCard)"
+            >
+              <i class="fa-solid fa-download"></i>
+              Download All
+            </button>
+
+            <button
+              type="button"
+              class="files-modal-close"
+              title="Close"
+              @click="viewAllCard = null"
+            >
+              <i class="fa-solid fa-xmark"></i>
+            </button>
+          </div>
         </div>
-        <div class="add-order-body">
-          <div class="field-group">
-            <label>Order Name <span class="req">*</span></label>
-            <input v-model="newOrder.name" class="field-input" placeholder="e.g. DUNBAR FOOTBALL UNIFORMS PO" @keyup.enter="confirmAddOrder" @input="newOrder.name = $event.target.value.toUpperCase()" ref="orderNameInput" />
-          </div>
-          <div class="field-row">
-            <div class="field-group">
-              <label>P.O #</label>
-              <input v-model="newOrder.po" class="field-input" placeholder="e.g. 002030" />
-            </div>
-            <div class="field-group">
-              <label>Ship Date</label>
-              <input v-model="newOrder.shipDate" type="date" class="field-input" />
+
+        <div v-if="viewAllCard.files && viewAllCard.files.length" class="files-modal-grid">
+          <div
+            v-for="(file, index) in viewAllCard.files"
+            :key="file.id || file.url || index"
+            class="files-modal-item"
+          >
+            <button
+              type="button"
+              class="files-modal-preview"
+              title="Click to view"
+              @click="openPreviewFile(file)"
+            >
+              <img
+                v-if="file.isImage && !file.imageError"
+                :src="file.url"
+                :alt="file.name"
+                @error="file.imageError = true"
+              />
+              <span v-else class="files-modal-icon">
+                <i :class="getFileIcon(file.name)"></i>
+              </span>
+            </button>
+
+            <div class="files-modal-item-info">
+              <strong :title="file.name">{{ file.name }}</strong>
+              <small>{{ formatFileSize(file.size) }}</small>
             </div>
 
-          </div>
-          <div class="field-row">
-            <div class="field-group">
-              <label>Status</label>
-              <select v-model="newOrder.status" class="field-input">
-                <option value="Pending">Pending</option>
-                <option value="Designing">Designing</option>
-                <option value="In Production">In Production</option>
-                <option value="Completed">Completed</option>
-                <option value="Shipped">Shipped</option>
-                <option value="Delivered">Delivered</option>
-              </select>
+            <div class="files-modal-item-actions">
+              <button type="button" title="View" @click="openPreviewFile(file)">
+                <i class="fa-solid fa-eye"></i>
+              </button>
+              <button type="button" title="Download" @click="downloadSingleFile(file)">
+                <i class="fa-solid fa-download"></i>
+              </button>
+              <button
+                v-if="canDeleteFile(file) && !file.uploading"
+                type="button"
+                class="danger"
+                title="Delete"
+                @click="removeFile(viewAllCard, index)"
+              >
+                <i class="fa-solid fa-trash"></i>
+              </button>
             </div>
-            <div class="field-group">
-              <label>Payment %</label>
-              <input v-model="newOrder.payment" class="field-input" placeholder="e.g. 50 % Paid" />
-            </div>
           </div>
-          <div class="field-group">
-            <label>TRK #</label>
-            <input v-model="newOrder.trk" class="field-input" placeholder="e.g. 03316566200" />
-          </div>
-           <div class="field-group">
-  <label>Shipping Address</label>
-
-  <textarea
-    v-model="newOrder.shippingAddress"
-    class="field-input"
-    rows="3"
-    placeholder="Shipping Address"
-  ></textarea>
-</div>
-<div v-if="!isClient" class="field-group">
-                <label>Add Members</label>
-            <div class="member-select-actions">
-              <button type="button" class="select-all-members-btn" @click="selectAllMembers"><i class="fa-solid fa-check-double me-1"></i>Select All</button>
-              <button type="button" class="select-all-members-btn clear" @click="clearSelectedMembers">Clear</button>
-            </div>
-            <Multiselect v-model="newOrder.selectedMembers" :options="availableMembers" :multiple="true" placeholder="Select members" label="name" track-by="id" />
-          </div>
-<div v-if="!isClient" class="field-group">
-      <label>Assign Clients</label>
-
-  <Multiselect
-    v-model="newOrder.selectedClients"
-    :options="availableClients"
-    :multiple="true"
-    placeholder="Select clients"
-    label="name"
-    track-by="id"
-  />
-</div>
-
-
         </div>
-        <div class="add-order-footer">
-          <button class="btn-cancel" @click="closeOrderModal">Cancel</button>
-          <button class="btn-create" @click="confirmAddOrder" :disabled="savingOrder || !newOrder.name.trim()">
-            <span v-if="savingOrder"><i class="fa-solid fa-spinner fa-spin me-1"></i>Saving...</span>
-            <span v-else><i class="fa-solid fa-plus me-1"></i>{{ editingOrderId ? 'Update Order' : 'Create Order' }}</span>
+
+        <div v-else class="files-modal-empty">
+          <i class="fa-regular fa-folder-open"></i>
+          <span>No files available</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- SINGLE FILE PREVIEW MODAL -->
+    <div
+      v-if="previewFile"
+      class="image-preview-overlay"
+      @click.self="previewFile = null"
+    >
+      <div class="image-preview-modal universal-preview-modal">
+        <div class="preview-modal-topbar">
+          <strong :title="previewFile.name">{{ previewFile.name }}</strong>
+          <div>
+            <button type="button" title="Download" @click="downloadSingleFile(previewFile)">
+              <i class="fa-solid fa-download"></i>
+            </button>
+            <button type="button" title="Close" @click="previewFile = null">
+              <i class="fa-solid fa-xmark"></i>
+            </button>
+          </div>
+        </div>
+
+        <div class="preview-modal-body">
+          <img
+            v-if="previewFile.isImage"
+            :src="previewFile.url"
+            :alt="previewFile.name"
+            class="image-preview-full"
+          />
+
+          <iframe
+            v-else-if="canEmbedPreview(previewFile)"
+            :src="previewEmbedUrl(previewFile)"
+            class="file-preview-frame"
+            frameborder="0"
+          ></iframe>
+
+          <div v-else class="file-preview-doc">
+            <i :class="getFileIcon(previewFile.name)"></i>
+            <strong>{{ previewFile.name }}</strong>
+            <span>This file cannot be previewed directly in the browser.</span>
+            <button type="button" class="download-all-btn" @click="openFileNewTab(previewFile)">
+              <i class="fa-solid fa-arrow-up-right-from-square me-1"></i>Open File
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+
+
+
+    <!-- PROFILE SETTINGS MODAL -->
+    <div
+      v-if="profileModal"
+      class="profile-settings-overlay"
+      @click.self="closeProfile"
+    >
+      <div class="profile-settings-modal">
+        <button
+          type="button"
+          class="profile-settings-close"
+          @click="closeProfile"
+        >
+          <i class="fa-solid fa-xmark"></i>
+        </button>
+
+        <div class="profile-settings-heading">
+          <h3>Profile Settings</h3>
+          <p>Update your photo and personal details.</p>
+        </div>
+
+        <div class="profile-settings-photo-section">
+          <label class="profile-photo-circle">
+            <img
+              v-if="profileForm.preview"
+              :src="profileForm.preview"
+              alt="Profile"
+            />
+
+            <span v-else>
+              {{ initial(profileForm.name || profileUser?.name || 'U') }}
+            </span>
+
+            <input
+              v-if="isOwnProfile(profileUser)"
+              type="file"
+              accept="image/*"
+              @change="onProfilePhotoChange"
+            />
+
+            <i
+              v-if="isOwnProfile(profileUser)"
+              class="fa-solid fa-camera"
+            ></i>
+          </label>
+
+          <small v-if="isOwnProfile(profileUser)">
+            Click photo to change
+          </small>
+        </div>
+
+        <div class="profile-settings-field">
+          <label>Name</label>
+
+          <input
+            v-model="profileForm.name"
+            type="text"
+            :readonly="!isOwnProfile(profileUser)"
+          />
+        </div>
+
+        <div class="profile-settings-field">
+          <label>About</label>
+
+          <textarea
+            v-model="profileForm.about"
+            rows="4"
+            :readonly="!isOwnProfile(profileUser)"
+            placeholder="Write something about yourself..."
+          ></textarea>
+        </div>
+
+        <div class="profile-settings-actions">
+          <button
+            type="button"
+            class="profile-settings-cancel"
+            @click="closeProfile"
+          >
+            Cancel
+          </button>
+
+          <button
+            v-if="isOwnProfile(profileUser)"
+            type="button"
+            class="profile-settings-save"
+            @click="saveProfile"
+          >
+            <i class="fa-solid fa-floppy-disk"></i>
+            Save Changes
           </button>
         </div>
       </div>
     </div>
-<!-- BULK MEMBERS MODAL -->
-<div v-if="bulkMembersModal" class="modal-overlay" @click.self="closeBulkMembersModal">
-  <div class="add-order-modal">
-    <div class="view-all-header">
-      <h5>Edit Members For {{ selectedOrders.length }} Orders</h5>
-      <button class="modal-close" @click="closeBulkMembersModal">
-        <i class="fa-solid fa-xmark"></i>
-      </button>
-    </div>
 
-    <div class="add-order-body">
-      <div class="field-group">
-        <label>Select Members</label>
+    <!-- MEMBER SELECTION MODAL -->
+    <div
+      v-if="bulkMembersModal"
+      class="member-select-overlay"
+      @click.self="closeBulkMembersModal"
+    >
+      <div class="member-select-modal">
+        <div class="member-select-header">
+          <div>
+            <h3>Add Members</h3>
+            <p>
+              Apply members to
+              {{ selectedOrders.length }}
+              selected order(s)
+            </p>
+          </div>
 
-        <div class="member-select-actions">
-          <button type="button" class="select-all-members-btn" @click="bulkSelectedMembers = [...availableMembers]">
-            <i class="fa-solid fa-check-double me-1"></i>Select All
+          <button
+            type="button"
+            @click="closeBulkMembersModal"
+          >
+            <i class="fa-solid fa-xmark"></i>
           </button>
-          <button type="button" class="select-all-members-btn clear" @click="bulkSelectedMembers = []">
-            Clear
+        </div>
+
+        <div class="member-select-toolbar">
+          <button
+            type="button"
+            @click="selectAllAvailableMembers"
+          >
+            <i class="fa-solid fa-users"></i>
+            {{
+              bulkSelectedMembers.length === availableMembers.length &&
+              availableMembers.length
+                ? 'Clear All'
+                : 'Select All Members'
+            }}
           </button>
+
+          <span>
+            {{ bulkSelectedMembers.length }}
+            selected
+          </span>
         </div>
 
         <Multiselect
           v-model="bulkSelectedMembers"
           :options="availableMembers"
           :multiple="true"
-          placeholder="Select members"
+          :close-on-select="false"
+          :clear-on-select="false"
+          :preserve-search="true"
           label="name"
           track-by="id"
-        />
+          placeholder="Search and select members"
+          class="member-multiselect"
+        >
+          <template #option="{ option }">
+            <div class="member-option-row">
+              <div class="member-option-avatar">
+                <img
+                  v-if="option.profile_photo_url"
+                  :src="option.profile_photo_url"
+                  alt=""
+                />
 
-        <small style="color:#6b7280;font-weight:700;margin-top:6px;">
-Saving will update the selected members for all selected orders.
-        </small>
-      </div>
-    </div>
-
-    <div class="add-order-footer">
-      <button class="btn-cancel" @click="closeBulkMembersModal">Cancel</button>
-
-      <button class="btn-create" @click="bulkUpdateMembers" :disabled="bulkSaving">
-        <span v-if="bulkSaving">
-          <i class="fa-solid fa-spinner fa-spin me-1"></i>Saving...
-        </span>
-        <span v-else>
-          <i class="fa-solid fa-floppy-disk me-1"></i>Save Members
-        </span>
-      </button>
-    </div>
-  </div>
-</div>
-    <!-- PROFILE MODAL -->
-    <div v-if="profileModal" class="modal-overlay" @click.self="closeProfile">
-      <div class="profile-modal" @click.stop>
-        <button class="profile-close" @click="closeProfile"><i class="fa-solid fa-xmark"></i></button>
-        <div class="profile-photo-wrap">
-          <img v-if="profileForm.preview" :src="profileForm.preview" class="profile-photo" />
-          <div v-else class="profile-photo-empty">{{ profileUser?.name ? profileUser.name.charAt(0).toUpperCase() : '?' }}</div>
-        </div>
-        <input v-if="isOwnProfile(profileUser)" type="file" accept="image/*" class="form-control form-control-sm mt-2" @change="onProfilePhotoChange" />
-        <div class="profile-field">
-          <label>Name</label>
-          <input v-model="profileForm.name" :readonly="!isOwnProfile(profileUser)" class="form-control form-control-sm" />
-        </div>
-        <div class="profile-field">
-          <label>Email</label>
-          <input :value="profileUser?.email || ''" readonly class="form-control form-control-sm" />
-        </div>
-        <div class="profile-field">
-          <label>Role</label>
-          <input :value="profileUser?.role || ''" readonly class="form-control form-control-sm" />
-        </div>
-        <div class="profile-field">
-          <label>About</label>
-          <textarea v-model="profileForm.about" :readonly="!isOwnProfile(profileUser)" class="form-control" rows="4" placeholder="Write something about yourself..."></textarea>
-        </div>
-        <button v-if="isOwnProfile(profileUser)" class="btn btn-primary w-100 mt-3" @click="saveProfile">Save Profile</button>
-      </div>
-    </div>
-
-    <!-- VIEW ALL MODAL -->
-    <div v-if="viewAllCard" class="modal-overlay" @click.self="viewAllCard = null">
-      <div class="view-all-modal">
-        <div class="view-all-header">
-          <h5>{{ viewAllCard.title }}</h5>
-          <div class="view-all-head-actions">
-            <button v-if="viewAllCard.files && viewAllCard.files.length" class="download-all-btn" @click="downloadAllFiles(viewAllCard)">
-            <i class="fa-solid fa-file-zipper me-1"></i> Download All
-            </button>
-            <button v-if="canUploadFiles && viewAllCard.type !== 'notes'" class="upload-small-btn" @click="triggerUpload(viewAllCard)">
-            <i class="fa-solid fa-upload me-1"></i> Upload
-            </button>
-            <input v-if="canUploadFiles && viewAllCard.type !== 'notes'" type="file" multiple :ref="'fileInput_modal_' + viewAllCard.title" class="hidden-file-input" @change="onFileChange($event, viewAllCard)" />
-            <button class="modal-close" @click="viewAllCard = null"><i class="fa-solid fa-xmark"></i></button>
-          </div>
-        </div>
-        <div class="view-all-body">
-          <div v-if="viewAllCard.files && viewAllCard.files.length" class="view-all-grid">
-            <div v-for="(file, fi) in viewAllCard.files" :key="fi" class="view-file-item">
-              <img v-if="file.isImage && !file.imageError" :src="file.url" class="view-file-img clickable-file-preview" @click="openPreviewFile(file)" @error="file.imageError = true" />
-              <div v-else class="view-file-doc clickable-file-preview" @click="openPreviewFile(file)">
-                <i :class="getFileIcon(file.name)" class="view-file-icon"></i>
+                <span v-else>
+                  {{ initial(option.name) }}
+                </span>
               </div>
-              <span class="view-file-name">{{ file.name }}</span>
-              <div class="view-file-actions">
-                <a :href="file.url" :download="file.name" class="vf-btn download-btn"><i class="fa-solid fa-download"></i></a>
-             <button v-if="canDeleteFile(file)"
-                class="vf-btn remove-btn"
-                @click="removeFile(viewAllCard, fi)"><i class="fa-solid fa-trash"></i>
-             </button>
+
+              <div>
+                <strong>{{ option.name }}</strong>
+                <small>{{ option.email || option.role }}</small>
               </div>
             </div>
+          </template>
+
+          <template #tag="{ option, remove }">
+            <span class="member-selected-tag">
+              {{ option.name }}
+
+              <button
+                type="button"
+                @click.stop="remove(option)"
+              >
+                ×
+              </button>
+            </span>
+          </template>
+        </Multiselect>
+
+        <div class="member-selected-preview">
+          <div
+            v-for="member in bulkSelectedMembers"
+            :key="member.id"
+            class="member-preview-chip"
+          >
+            <img
+              v-if="member.profile_photo_url"
+              :src="member.profile_photo_url"
+              alt=""
+            />
+
+            <span v-else>
+              {{ initial(member.name) }}
+            </span>
+
+            <strong>{{ member.name }}</strong>
           </div>
-          <div v-else class="view-all-empty">
-            <i class="fa-solid fa-inbox" style="font-size:40px;opacity:0.3"></i>
-            <p>No files uploaded yet</p>
-            <button v-if="canUploadFiles && viewAllCard.type !== 'notes'" class="upload-btn-big" @click="triggerUpload(viewAllCard)">
-                  <i class="fa-solid fa-upload me-2"></i>Upload Files
-            </button>
-          </div>
+        </div>
+
+        <div class="member-select-footer">
+          <button
+            type="button"
+            class="member-cancel-button"
+            @click="closeBulkMembersModal"
+          >
+            Cancel
+          </button>
+
+          <button
+            type="button"
+            class="member-save-button"
+            :disabled="bulkSaving"
+            @click="bulkUpdateMembers"
+          >
+            <i
+              :class="
+                bulkSaving
+                  ? 'fa-solid fa-spinner fa-spin'
+                  : 'fa-solid fa-check'
+              "
+            ></i>
+
+            {{
+              bulkSaving
+                ? 'Saving...'
+                : 'Apply Members'
+            }}
+          </button>
         </div>
       </div>
     </div>
 
-    <!-- ORDER INFO MODAL -->
-    <div v-if="orderInfoModal" class="modal-overlay" @click.self="closeOrderInfo">
-      <div class="order-info-modal" @click.stop>
-        <div class="view-all-header">
-          <h5>Order Info</h5>
-          <button class="modal-close" @click="closeOrderInfo"><i class="fa-solid fa-xmark"></i></button>
-        </div>
-        <div class="order-info-body">
-          <div class="order-info-title">
-            <strong>{{ infoOrder?.name || 'Order' }}</strong>
-            <span>{{ infoOrder?.po || 'N/A' }}</span>
+
+    <!-- CLIENT SELECTION MODAL -->
+    <div
+      v-if="bulkClientsModal"
+      class="member-select-overlay"
+      @click.self="closeBulkClientsModal"
+    >
+      <div class="member-select-modal">
+        <div class="member-select-header">
+          <div>
+            <h3>Add Clients</h3>
+            <p>
+              Apply clients to
+              {{ selectedOrders.length }}
+              selected order(s)
+            </p>
           </div>
-          <div class="read-info-section">
-            <h6>Seen by</h6>
-            <div v-if="orderReadInfo.length" class="read-info-list">
-              <div v-for="read in orderReadInfo" :key="read.user_id || read.email || read.name" class="read-info-row">
-                <div class="read-user">
-                  <div class="read-user-avatar">{{ initial(read.name || read.email || 'U') }}</div>
-                  <div>
-                    <strong>{{ read.name || 'User' }}</strong>
-                    <small>{{ read.email || '' }}</small>
-                  </div>
-                </div>
-                <span class="read-time">{{ formatReadDate(read.read_at) }}</span>
+
+          <button
+            type="button"
+            @click="closeBulkClientsModal"
+          >
+            <i class="fa-solid fa-xmark"></i>
+          </button>
+        </div>
+
+        <div class="member-select-toolbar">
+          <button
+            type="button"
+            @click="selectAllAvailableClients"
+          >
+            <i class="fa-solid fa-user-tie"></i>
+            {{
+              bulkSelectedClients.length === availableClients.length &&
+              availableClients.length
+                ? 'Clear All'
+                : 'Select All Clients'
+            }}
+          </button>
+
+          <span>
+            {{ bulkSelectedClients.length }}
+            selected
+          </span>
+        </div>
+
+        <Multiselect
+          v-model="bulkSelectedClients"
+          :options="availableClients"
+          :multiple="true"
+          :close-on-select="false"
+          :clear-on-select="false"
+          :preserve-search="true"
+          label="name"
+          track-by="id"
+          placeholder="Search and select clients"
+          class="member-multiselect"
+        >
+          <template #option="{ option }">
+            <div class="member-option-row">
+              <div class="member-option-avatar client-avatar">
+                <i class="fa-solid fa-user-tie"></i>
+              </div>
+
+              <div>
+                <strong>{{ option.name }}</strong>
+                <small>
+                  {{ option.company || option.email || 'Client' }}
+                </small>
               </div>
             </div>
-            <div v-else class="read-info-empty">No one has seen this order yet.</div>
+          </template>
+
+          <template #tag="{ option, remove }">
+            <span class="member-selected-tag">
+              {{ option.name }}
+
+              <button
+                type="button"
+                @click.stop="remove(option)"
+              >
+                ×
+              </button>
+            </span>
+          </template>
+        </Multiselect>
+
+        <div class="member-selected-preview">
+          <div
+            v-for="client in bulkSelectedClients"
+            :key="client.id"
+            class="member-preview-chip"
+          >
+            <span class="client-preview-icon">
+              <i class="fa-solid fa-user-tie"></i>
+            </span>
+
+            <strong>{{ client.name }}</strong>
           </div>
+        </div>
+
+        <div class="member-select-footer">
+          <button
+            type="button"
+            class="member-cancel-button"
+            @click="closeBulkClientsModal"
+          >
+            Cancel
+          </button>
+
+          <button
+            type="button"
+            class="member-save-button"
+            :disabled="bulkClientSaving"
+            @click="bulkUpdateClients"
+          >
+            <i
+              :class="
+                bulkClientSaving
+                  ? 'fa-solid fa-spinner fa-spin'
+                  : 'fa-solid fa-check'
+              "
+            ></i>
+
+            {{
+              bulkClientSaving
+                ? 'Saving...'
+                : 'Apply Clients'
+            }}
+          </button>
         </div>
       </div>
     </div>
 
-    <!-- IMAGE / FILE PREVIEW MODAL -->
-    <div v-if="previewFile" class="image-preview-overlay" @click.self="previewFile = null">
-      <div class="image-preview-modal">
-        <button class="image-preview-close" @click="previewFile = null"><i class="fa-solid fa-xmark"></i></button>
-        <img v-if="previewFile.isImage" :src="previewFile.url" class="image-preview-full" :alt="previewFile.name" />
-       <div v-else class="file-preview-doc">
-  <i :class="getFileIcon(previewFile.name)"></i>
-  <strong>{{ previewFile.name }}</strong>
-  <a :href="previewFile.url" target="_blank" class="download-all-btn mt-3">
-    <i class="fa-solid fa-arrow-up-right-from-square me-1"></i>Open File
-  </a>
-  <a :href="previewFile.url" :download="previewFile.name" class="download-all-btn mt-3" style="background:#374151">
-    <i class="fa-solid fa-download me-1"></i>Download
-  </a>
-</div>
+    <!-- VIEWED BY MODAL -->
+    <div
+      v-if="orderInfoModal"
+      class="viewed-modal-overlay"
+      @click.self="closeOrderInfo"
+    >
+      <div class="viewed-modal">
+        <div class="viewed-modal-header">
+          <div>
+            <h3>Order View History</h3>
+            <p>{{ infoOrder?.name || 'Order' }}</p>
+          </div>
+
+          <button
+            type="button"
+            @click="closeOrderInfo"
+          >
+            <i class="fa-solid fa-xmark"></i>
+          </button>
+        </div>
+
+        <div
+          v-if="orderReadInfo.length === 0"
+          class="viewed-empty"
+        >
+          No member has opened this order yet.
+        </div>
+
+        <div
+          v-for="read in orderReadInfo"
+          :key="read.id || read.user_id"
+          class="viewed-person-row"
+        >
+          <div class="viewed-avatar">
+            <img
+              v-if="read.user?.profile_photo_url || read.profile_photo_url"
+              :src="read.user?.profile_photo_url || read.profile_photo_url"
+              alt=""
+            />
+
+            <span v-else>
+              {{ initial(read.user?.name || read.name || 'U') }}
+            </span>
+          </div>
+          <div class="viewed-person-info">
+            <strong>
+              {{ read.user?.name || read.name || 'Member' }}
+            </strong>
+
+            <small>
+              Opened: {{
+                formatReadDate(
+                  read.last_viewed_at ||
+                  read.read_at ||
+                  read.created_at
+                )
+              }}
+            </small>
+
+            <small v-if="read.views_count">
+              Views: {{ read.views_count }}
+            </small>
+          </div>
+
+          <span
+            v-if="
+              infoOrder &&
+              workingDesigner(infoOrder) &&
+              Number(
+                workingDesigner(infoOrder)?.id
+              ) === Number(
+                read.user_id ||
+                read.user?.id
+              )
+            "
+            class="currently-working-badge"
+          >
+            Working now
+          </span>
+        </div>
       </div>
     </div>
-
   </div>
+  </AppLayout>
 </template>
 
 <script>
@@ -829,14 +2079,67 @@ import axios from 'axios'
 import JSZip from 'jszip'
 import Multiselect from 'vue-multiselect'
 import OrderChatPanel from './OrderChatPanel.vue'
+import AppLayout from '../layouts/AppLayout.vue'
+import PageHeader from '../layouts/PageHeader.vue'
 import 'vue-multiselect/dist/vue-multiselect.min.css'
 
 export default {
   name: 'AllOrdersView',
-  components: { Multiselect, OrderChatPanel },
+  components: { Multiselect, OrderChatPanel, AppLayout, PageHeader },
   data() {
       return {
       showShippingAddressMenu: false,
+      dragActiveCardType: null,
+      dragCounter: 0,
+      detailOpen: false,
+      inlineAddOpen: false,
+      inlineOrderName: '',
+      inlineOrderSaving: false,
+      inlineEditingCell: null,
+      inlineEditValue: '',
+      packingEditOrderId: null,
+      packingEditValue: '',
+      packingSavingOrderId: null,
+      rowStatusMenuId: null,
+      rowStatusMenuOrder: null,
+      rowStatusMenuPosition: {
+        top: 0,
+        left: 0,
+        width: 190
+      },
+
+      columnWidths: {
+        check: 42,
+        name: 380,
+        status: 170,
+        owner: 120,
+        files: 190,
+        packing: 130,
+        chat: 85,
+        payment: 120,
+        address: 240,
+        track: 110,
+        info: 42
+      },
+      columnResizeState: null,
+
+      rowFileDragOrderId: null,
+      rowFileDragDepth: 0,
+      customBoardGroups: [],
+      defaultBoardGroupOverrides: {},
+      newlyCreatedOrderIds: JSON.parse(
+        localStorage.getItem('factory_pinned_new_order_ids') || '[]'
+      ).map(Number),
+      showChatNotificationMenu: false,
+      notificationTab: 'chats',
+      activeSectionCollapsed: false,
+      boardTheme: localStorage.getItem('artwork_board_theme') || 'light',
+      persistentSeenOrderIds: JSON.parse(
+        localStorage.getItem('artwork_seen_order_ids') || '[]'
+      ).map(Number),
+      bulkClientsModal: false,
+      bulkSelectedClients: [],
+      bulkClientSaving: false,
       shippingAddressEdit: '',
       sidebarLightMode: false,
       leftWidth: 370,
@@ -858,6 +2161,12 @@ export default {
       previewFile: null,
       customStatusLabel: '',
       customStatusColor: '#6161ff',
+
+      // Row status manager
+      rowStatusEditingLabel: null,
+      rowStatusEditName: '',
+      rowStatusEditColor: '#6161ff',
+
       orders: [],
       availableMembers: [],
       availableClients: [],
@@ -926,6 +2235,75 @@ activeTrackingIndex: 0,
   },
 
   computed: {
+    boardGroups() {
+      const statusColorByLabel = (label, fallback) => {
+        const found = this.statusOptions.find(
+          status =>
+            String(status.label || '').toLowerCase() ===
+            String(label).toLowerCase()
+        )
+
+        return found?.color || fallback
+      }
+
+      const baseDefaults = [
+        {
+          key: 'in_production',
+          label: 'IN PRODUCTION',
+          color: statusColorByLabel('In Production', '#6161ff'),
+          icon: 'fa-solid fa-house'
+        },
+        {
+          key: 'completed',
+          label: 'COMPLETED',
+          color: statusColorByLabel('Completed', '#00c875'),
+          icon: 'fa-solid fa-house'
+        },
+        {
+          key: 'shipped',
+          label: 'SHIPPED',
+          color: statusColorByLabel('Shipped', '#fdab3d'),
+          icon: 'fa-solid fa-house'
+        },
+        {
+          key: 'delivered',
+          label: 'DELIVERED',
+          color: statusColorByLabel('Delivered', '#00c875'),
+          icon: 'fa-solid fa-house'
+        }
+      ]
+
+      const defaults = baseDefaults
+        .map(group => {
+          const override =
+            this.defaultBoardGroupOverrides?.[group.key] || {}
+
+          return {
+            ...group,
+            ...override,
+            key: group.key,
+            custom: false
+          }
+        })
+        .filter(group => !group.hidden)
+
+      return [...defaults, ...this.customBoardGroups]
+    },
+
+    activeBoardGroup() {
+      if (this.activeGroup === 'all') {
+        return {
+          key: 'all',
+          label: 'ALL ORDERS',
+          color: '#4a90e2'
+        }
+      }
+
+      return this.boardGroups.find(
+        group => group.key === this.activeGroup
+      ) || this.boardGroups[0]
+    },
+
     trackingList() {
   return this.parseTrackingList(this.selectedOrder?.trk)
 },
@@ -937,29 +2315,33 @@ activeTracking() {
   return this.currentUser?.role === 'client'
 },
  canEditNotes() {
-  if (!this.selectedOrder || !this.currentUser) return false
+  if (!this.selectedOrder || !this.currentUser) {
+    return false
+  }
 
-  if (this.currentUser.role === 'super_admin') return true
-
-  return this.currentUser.can_create_orders === true
+  return this.hasFullOrderAccess
+    || this.currentUser?.can_create_orders === true
 },
 canUploadFiles() {
-  return this.currentUser?.role === 'super_admin'
+  return this.hasFullOrderAccess
     || this.currentUser?.can_create_orders === true
-    || this.isClient
 },
-    currentUser() {
-      try { return JSON.parse(localStorage.getItem('user')) || null } catch { return null }
-    },
-    isSuperAdmin() { return this.currentUser?.role === 'super_admin' },
-   canCreateOrder() {
+canEditWorkflowFields() {
   const role = this.currentUser?.role
 
   return role === 'super_admin'
     || role === 'admin'
     || role === 'member'
+},
+    currentUser() {
+      try { return JSON.parse(localStorage.getItem('user')) || null } catch { return null }
+    },
+    isSuperAdmin() { return this.currentUser?.role === 'super_admin' },
+    isAdmin() { return this.currentUser?.role === 'admin' },
+    hasFullOrderAccess() { return this.isSuperAdmin || this.isAdmin },
+   canCreateOrder() {
+  return this.hasFullOrderAccess
     || this.currentUser?.can_create_orders === true
-    || this.isClient
 },
 
     userInitial() {
@@ -971,13 +2353,31 @@ canUploadFiles() {
 filteredOrders() {
   return this.orders
     .filter(o => {
-      const groupMatch = o.group === this.activeGroup
+      const groupMatch =
+        this.activeGroup === 'all' ||
+        o.group === this.activeGroup ||
+        (
+          this.activeGroup === 'delivered' &&
+          String(o.status || '').toLowerCase() === 'delivered'
+        )
 
-      const searchText = String(this.searchOrder || '').trim().toLowerCase()
-      const orderName = String(o.name || '').toLowerCase()
+      const searchText = String(this.searchOrder || '')
+        .trim()
+        .toLowerCase()
+
+      const searchable = [
+        o.name,
+        o.po,
+        o.status,
+        o.shippingAddress,
+        o.trk
+      ]
+        .filter(Boolean)
+        .join(' ')
+        .toLowerCase()
 
       const searchMatch =
-        !searchText || orderName.includes(searchText)
+        !searchText || searchable.includes(searchText)
 
       const clientMatch =
         !this.selectedClient ||
@@ -988,15 +2388,18 @@ filteredOrders() {
       return groupMatch && searchMatch && clientMatch
     })
     .sort((a, b) => {
+      /*
+       * 1)Jis order mein unread chat aaye woh sab se upar.
+       *   Chat view hote hi unread count 0 ho jata hai aur row apni normal
+       *   pinned/A-Z position par wapas chali jati hai.
+       */
       const aUnread = Number(a.unread_chat_count || 0) > 0
       const bUnread = Number(b.unread_chat_count || 0) > 0
 
-      // 1) Unread chat wala order hamesha top par rahega
       if (aUnread !== bUnread) {
         return aUnread ? -1 : 1
       }
 
-      // 2) Agar dono unread hain to latest chat pehle show hogi
       if (aUnread && bUnread) {
         const aTime = new Date(a.last_message_at || 0).getTime()
         const bTime = new Date(b.last_message_at || 0).getTime()
@@ -1005,8 +2408,27 @@ filteredOrders() {
           return bTime - aTime
         }
       }
+      /*
+       * 2) Is browser se newly-created orders refresh ke baad bhi top par.
+       *    IDs localStorage mein persist hoti hain.
+       */
+      const aNewIndex = this.newlyCreatedOrderIds.indexOf(Number(a.id))
+      const bNewIndex = this.newlyCreatedOrderIds.indexOf(Number(b.id))
+      const aIsNew = aNewIndex !== -1
+      const bIsNew = bNewIndex !== -1
 
-      // 3) Read chat aur normal tamam orders A-Z mein show honge
+      if (aIsNew !== bIsNew) {
+        return aIsNew ? -1 : 1
+      }
+
+      if (aIsNew && bIsNew && aNewIndex !== bNewIndex) {
+        return aNewIndex - bNewIndex
+      }
+
+      /*
+       * 3) Baqi orders A-Z.
+       */
+
       return String(a.name || '').localeCompare(
         String(b.name || ''),
         'en',
@@ -1018,7 +2440,106 @@ filteredOrders() {
       )
     })
 },
+    unreadChatOrders() {
+      return this.orders
+        .filter(order => Number(order.unread_chat_count || 0) > 0)
+        .sort((a, b) => {
+          const aTime = new Date(a.last_message_at || 0).getTime()
+          const bTime = new Date(b.last_message_at || 0).getTime()
+          return bTime - aTime
+        })
+    },
+
+    totalUnreadChatCount() {
+      return this.unreadChatOrders.reduce(
+        (total, order) => total + Number(order.unread_chat_count || 0),
+        0
+      )
+    },
+
+    unreadOrderNotifications() {
+      return this.orders
+        .filter(order => !order.user_has_seen)
+        .sort((a, b) => {
+          const aTime = new Date(a.created_at || 0).getTime()
+          const bTime = new Date(b.created_at || 0).getTime()
+          return bTime - aTime
+        })
+    },
+
+    unreadOrderNotificationCount() {
+      return this.unreadOrderNotifications.length
+    },
+
+    totalBellNotificationCount() {
+      return this.totalUnreadChatCount + this.unreadOrderNotificationCount
+    },
+
     unreadOrdersCount() { return this.orders.filter(o => !o.user_has_seen).length },
+
+    rowStatusOrder() {
+      if (!this.rowStatusMenuId) return null
+
+      return this.orders.find(
+        order => Number(order.id) === Number(this.rowStatusMenuId)
+      ) || null
+    },
+
+    rowStatusMenuStyle() {
+      const pos = this.rowStatusMenuPosition || {}
+
+      return {
+        position: 'fixed',
+        top: `${Number(pos.top || 0)}px`,
+        left: `${Number(pos.left || 0)}px`,
+        width: `${Number(pos.width || 320)}px`,
+        zIndex: 2147483647
+      }
+    },
+
+    boardGridStyle() {
+      const w = this.columnWidths
+
+      const keys = [
+        'check',
+        'name',
+        'status',
+        'owner',
+        'files',
+        'packing',
+        'chat',
+        'payment',
+        'address',
+        'track',
+        'info'
+      ]
+
+      const total = keys.reduce(
+        (sum, key) => sum + Number(w[key] || 0),
+        0
+      ) || 1
+
+      /*
+       * Percent-based grid:
+       * table always remains exactly 100% wide.
+       * Divider move = one column grows, next one shrinks.
+       * No blank area, no horizontal layout break.
+       */
+
+      const columns = keys
+        .map(key => {
+          const percent =
+            (Number(w[key] || 0) / total) * 100
+
+          return `${percent.toFixed(5)}%`
+        })
+        .join(' ')
+
+      return {
+        '--board-grid-columns': columns,
+        gridTemplateColumns: columns
+      }
+    },
     desktopLeftStyle() {
        // Only apply dynamic width on desktop (>= 768px)
       if (typeof window !== 'undefined' && window.innerWidth >= 768) {
@@ -1028,20 +2549,54 @@ filteredOrders() {
     }
   },
 
+
+watch: {
+  detailOpen(value) {
+    document.body.style.overflow = value
+      ? 'hidden'
+      : ''
+  },
+
+  orderInfoModal(value) {
+    if (value) {
+      document.body.style.overflow = 'hidden'
+    } else if (!this.detailOpen && !this.bulkMembersModal && !this.bulkClientsModal) {
+      document.body.style.overflow = ''
+    }
+  },
+
+  bulkMembersModal(value) {
+    if (value) {
+      document.body.style.overflow = 'hidden'
+    } else if (!this.detailOpen && !this.orderInfoModal && !this.bulkClientsModal) {
+      document.body.style.overflow = ''
+    }
+  },
+
+  bulkClientsModal(value) {
+    if (value) {
+      document.body.style.overflow = 'hidden'
+    } else if (!this.detailOpen && !this.orderInfoModal && !this.bulkMembersModal) {
+      document.body.style.overflow = ''
+    }
+  }
+},
+
 async mounted() {
   this.loadCustomStatuses()
-  await this.fetchOrders()
-  await this.fetchMembers()
-await this.fetchClients()
+  this.loadBoardGroups()
+  this.loadDefaultBoardGroupOverrides()
+  await Promise.all([
+    this.fetchOrders(),
+    this.fetchMembers(),
+    this.fetchClients()
+  ])
   if ('Notification' in window) {
     Notification.requestPermission()
   }
 
   await this.fetchNotifications(false)
 
-  this.notificationTimer = setInterval(() => {
-    this.fetchNotifications(true)
-  }, 5000)
 
   const orderId = this.$route.query.order_id
   const openChat = this.$route.query.open_chat
@@ -1059,14 +2614,15 @@ await this.fetchClients()
     }
   }
 } else if (this.filteredOrders.length) {
-  await this.selectOrder(this.filteredOrders[0])
+  this.selectedOrder = this.filteredOrders[0]
 }
-    this.unreadTimer = setInterval(() => { this.fetchUnreadCount() }, 5000)
   },
 
 beforeUnmount()  {
   document.removeEventListener('mousemove', this.resizeSidebar)
   document.removeEventListener('mouseup', this.stopResize)
+  document.removeEventListener('mousemove', this.resizeBoardColumn)
+  document.removeEventListener('mouseup', this.stopColumnResize)
 
   if (this.unreadTimer) {
     clearInterval(this.unreadTimer)
@@ -1077,7 +2633,3871 @@ beforeUnmount()  {
   }
 },
 
+
+
+
+
+
+
+
+  beforeUnmount() {
+    document.body.style.overflow = ''
+  },
+
+
+
  methods: {
+    normalizeOwnerRole(role) {
+      return String(role || 'member')
+        .trim()
+        .toLowerCase()
+        .replace(/\s+/g, '_')
+    },
+
+    formatOwnerRole(role) {
+      const normalized = this.normalizeOwnerRole(role)
+
+      if (normalized === 'super_admin') {
+        return 'Super Admin'
+      }
+
+      if (normalized === 'admin') {
+        return 'Admin'
+      }
+
+      return 'Member'
+    },
+
+    allAvailableMembersAssigned(order) {
+      const assignedIds = new Set(
+        (order?.owners || []).map(
+          owner => Number(owner.id)
+        )
+      )
+
+      const availableIds = (
+        this.availableMembers || []
+      )
+        .map(member => Number(member.id))
+        .filter(Boolean)
+
+      return (
+        availableIds.length > 0 &&
+        availableIds.every(id => assignedIds.has(id))
+      )
+    },
+
+    loggedInOrderOwner(order) {
+      const owners = Array.isArray(order?.owners)
+        ? order.owners
+        : []
+
+      const currentId = Number(this.currentUser?.id)
+
+      const assignedCurrentUser = owners.find(
+        owner => Number(owner.id) === currentId
+      )
+
+      if (assignedCurrentUser) {
+        return assignedCurrentUser
+      }
+
+      if (this.currentUser?.id) {
+        return {
+          id: this.currentUser.id,
+          name: this.currentUser.name || 'User',
+          role: this.currentUser.role,
+          profile_photo_url:
+            this.currentUser.profile_photo_url || null
+        }
+      }
+
+      return null
+    },
+
+    otherOrderOwners(order) {
+      const owners = Array.isArray(order?.owners)
+        ? order.owners
+        : []
+
+      const currentId = Number(this.currentUser?.id)
+
+      return owners.filter(
+        owner => Number(owner.id) !== currentId
+      )
+    },
+
+    otherOrderOwnersCount(order) {
+      return this.otherOrderOwners(order).length
+    },
+
+    otherOrderOwnersNames(order) {
+      return this.otherOrderOwners(order)
+        .map(owner => owner.name)
+        .filter(Boolean)
+        .join(', ')
+    },
+
+    visibleOrderOwners(order) {
+      const owners = [...(order?.owners || [])]
+
+      /*
+       * Jab tamam available members order mein assigned hon:
+       * 1 Super Admin, 1 Admin aur alphabetically pehle
+       * 2 normal Members show honge.
+       */
+      if (this.allAvailableMembersAssigned(order)) {
+        const byName = (first, second) =>
+          String(first.name || '').localeCompare(
+            String(second.name || ''),
+            'en',
+            {
+              sensitivity: 'base',
+              numeric: true
+            }
+          )
+
+        const superAdmin = owners
+          .filter(
+            owner =>
+              this.normalizeOwnerRole(owner.role) ===
+              'super_admin'
+          )
+          .sort(byName)
+          .slice(0, 1)
+
+        const admin = owners
+          .filter(
+            owner =>
+              this.normalizeOwnerRole(owner.role) ===
+              'admin'
+          )
+          .sort(byName)
+          .slice(0, 1)
+
+        const members = owners
+          .filter(owner => {
+            const role =
+              this.normalizeOwnerRole(owner.role)
+
+            return (
+              role !== 'super_admin' &&
+              role !== 'admin'
+            )
+          })
+          .sort(byName)
+          .slice(0, 2)
+
+        return [
+          ...superAdmin,
+          ...admin,
+          ...members
+        ]
+      }
+
+      /*
+       * Normal case:
+       * Sirf profile image wale assigned members show honge.
+       * Bina image wale members + count ke andar rahenge.
+       */
+      return owners
+        .filter(owner => Boolean(owner.profile_photo_url))
+        .sort((first, second) =>
+          String(first.name || '').localeCompare(
+            String(second.name || ''),
+            'en',
+            {
+              sensitivity: 'base',
+              numeric: true
+            }
+          )
+        )
+        .slice(0, 4)
+    },
+
+    hiddenOrderOwners(order) {
+      const visibleIds = new Set(
+        this.visibleOrderOwners(order).map(
+          owner => Number(owner.id)
+        )
+      )
+
+      return (order?.owners || []).filter(
+        owner => !visibleIds.has(Number(owner.id))
+      )
+    },
+
+    hiddenOrderOwnersCount(order) {
+      return this.hiddenOrderOwners(order).length
+    },
+
+    hiddenOrderOwnersNames(order) {
+      const hidden = this.hiddenOrderOwners(order)
+
+      if (!hidden.length) {
+        return ''
+      }
+
+      return hidden
+        .map(owner => owner.name)
+        .filter(Boolean)
+        .sort((first, second) =>
+          String(first).localeCompare(
+            String(second),
+            'en',
+            {
+              sensitivity: 'base',
+              numeric: true
+            }
+          )
+        )
+        .join(', ')
+    },
+
+    toggleBoardTheme() {
+      this.boardTheme =
+        this.boardTheme === 'light'
+          ? 'dark'
+          : 'light'
+
+      localStorage.setItem(
+        'artwork_board_theme',
+        this.boardTheme
+      )
+    },
+
+    softColor(color, alpha = 0.08) {
+      const value = String(color || '')
+        .replace('#', '')
+        .trim()
+
+      if (!/^[0-9a-f]{6}$/i.test(value)) {
+        return `rgba(100, 116, 139, ${alpha})`
+      }
+
+      const red = parseInt(value.slice(0, 2), 16)
+      const green = parseInt(value.slice(2, 4), 16)
+      const blue = parseInt(value.slice(4, 6), 16)
+
+      return `rgba(${red}, ${green}, ${blue}, ${alpha})`
+    },
+
+    readableTextColor(color) {
+      const value = String(color || '')
+        .replace('#', '')
+        .trim()
+
+      if (!/^[0-9a-f]{6}$/i.test(value)) {
+        return '#111827'
+      }
+
+      const red = parseInt(value.slice(0, 2), 16)
+      const green = parseInt(value.slice(2, 4), 16)
+      const blue = parseInt(value.slice(4, 6), 16)
+
+      const luminance =
+        (0.299 * red) +
+        (0.587 * green) +
+        (0.114 * blue)
+
+      return luminance > 150
+        ? '#111827'
+        : '#ffffff'
+    },
+
+    openBulkClientsModal() {
+      if (!this.selectedOrders.length) {
+        return
+      }
+
+      this.bulkSelectedClients = []
+      this.bulkClientsModal = true
+    },
+
+    closeBulkClientsModal() {
+      this.bulkClientsModal = false
+      this.bulkSelectedClients = []
+      this.bulkClientSaving = false
+    },
+
+    selectAllAvailableClients() {
+      if (
+        this.bulkSelectedClients.length ===
+          this.availableClients.length &&
+        this.availableClients.length
+      ) {
+        this.bulkSelectedClients = []
+        return
+      }
+
+      this.bulkSelectedClients = [
+        ...this.availableClients
+      ]
+    },
+
+    async bulkUpdateClients() {
+      if (!this.selectedOrders.length) return
+
+      this.bulkClientSaving = true
+
+      try {
+        const clientIds =
+          this.bulkSelectedClients.map(
+            client => Number(client.id)
+          )
+
+        await Promise.all(
+          this.selectedOrders.map(orderId =>
+            axios.put(
+              `/api/orders/${orderId}`,
+              {
+                client_ids: clientIds
+              },
+              {
+                headers: this.headers()
+              }
+            )
+          )
+        )
+
+        await this.fetchOrders()
+        this.closeBulkClientsModal()
+      } catch (error) {
+        console.error(
+          'Bulk clients update error:',
+          error
+        )
+
+        alert(
+          error.response?.data?.message ||
+          'Clients could not be added.'
+        )
+      } finally {
+        this.bulkClientSaving = false
+      }
+    },
+
+    async startWorking(order) {
+      if (!order?.id) return
+
+      try {
+        const response = await axios.post(
+          `/api/orders/${order.id}/claim`,
+          {},
+          {
+            headers: this.headers()
+          }
+        )
+
+        order.working_by =
+          response.data?.working_by ||
+          response.data?.user ||
+          this.currentUser
+
+        await this.fetchOrders()
+      } catch (error) {
+        console.error('Start working error:', error)
+
+        alert(
+          error.response?.data?.message ||
+          'Working status could not be started.'
+        )
+      }
+    },
+
+    async stopWorking(order) {
+      if (!order?.id) return
+
+      try {
+        await axios.post(
+          `/api/orders/${order.id}/release`,
+          {},
+          {
+            headers: this.headers()
+          }
+        )
+
+        order.working_by = null
+        await this.fetchOrders()
+      } catch (error) {
+        console.error('Stop working error:', error)
+
+        alert(
+          error.response?.data?.message ||
+          'Working status could not be stopped.'
+        )
+      }
+    },
+
+    workingDesigner(order) {
+      return order?.working_by || null
+    },
+
+    async claimOrder(order) {
+      if (!order?.id || !this.currentUser) return
+
+      try {
+        const response = await axios.post(
+          `/api/orders/${order.id}/claim`,
+          {},
+          {
+            headers: this.headers()
+          }
+        )
+
+        order.working_by =
+          response.data?.working_by ||
+          response.data?.user ||
+          this.currentUser
+      } catch (error) {
+        console.error('Claim order error:', error)
+
+        alert(
+          error.response?.data?.message ||
+          'Working status could not be started.'
+        )
+      }
+    },
+
+    async releaseOrder(order) {
+      if (!order?.id) return
+
+      try {
+        await axios.post(
+          `/api/orders/${order.id}/release`,
+          {},
+          {
+            headers: this.headers()
+          }
+        )
+
+        order.working_by = null
+      } catch (error) {
+        console.error('Release order error:', error)
+
+        alert(
+          error.response?.data?.message ||
+          'Working status could not be stopped.'
+        )
+      }
+    },
+
+    onRowFileDragEnter(order) {
+      if (!this.canUploadFiles) return
+
+      this.rowFileDragDepth += 1
+      this.rowFileDragOrderId = Number(order.id)
+    },
+
+    onRowFileDragOver(event, order) {
+      if (!this.canUploadFiles) return
+
+      if (event?.dataTransfer) {
+        event.dataTransfer.dropEffect = 'copy'
+      }
+
+      this.rowFileDragOrderId = Number(order.id)
+    },
+
+    onRowFileDragLeave(event, order) {
+      if (!this.canUploadFiles) return
+
+      const current = event?.currentTarget
+      const related = event?.relatedTarget
+
+      if (
+        current &&
+        related &&
+        current.contains(related)
+      ) {
+        return
+      }
+
+      this.rowFileDragDepth = Math.max(
+        0,
+        this.rowFileDragDepth - 1
+      )
+
+      if (this.rowFileDragDepth === 0) {
+        this.rowFileDragOrderId = null
+      }
+    },
+
+    async onRowFileDrop(event, order) {
+      this.rowFileDragDepth = 0
+      this.rowFileDragOrderId = null
+
+      if (!this.canUploadFiles) return
+
+      const files = Array.from(
+        event?.dataTransfer?.files || []
+      )
+
+      if (!files.length) return
+
+      await this.uploadRowFiles(order, files)
+    },
+
+    async uploadRowFiles(order, files) {
+      try {
+        await this.selectOrder(order)
+
+        const targetCard =
+          this.selectedOrder?.cards?.find(
+            card => card.type === 'files'
+          ) ||
+          this.selectedOrder?.cards?.find(
+            card => card.type !== 'notes'
+          )
+
+        if (!targetCard) {
+          alert('No file section found in this order.')
+          return
+        }
+
+        await this.uploadFilesToOrder(
+          files,
+          targetCard.type
+        )
+
+        await this.fetchOrderFiles()
+
+        const listOrder = this.orders.find(
+          item =>
+            Number(item.id) === Number(order.id)
+        )
+
+        if (listOrder && this.selectedOrder) {
+          listOrder.cards =
+            this.selectedOrder.cards
+        }
+      } catch (error) {
+        console.error(
+          'Row drag-drop upload error:',
+          error
+        )
+
+        alert(
+          error.response?.data?.message ||
+          'Files could not be uploaded.'
+        )
+      }
+    },
+
+    async moveSelectedOrderToPipeline(group) {
+      if (
+        !this.selectedOrder ||
+        !this.canCreateOrder
+      ) {
+        return
+      }
+
+      const status =
+        this.statusOptions.find(
+          item => item.group === group.key
+        ) || {
+          label: group.label,
+          color: group.color
+        }
+
+      await this.inlineChangeStatus(
+        this.selectedOrder,
+        status.label
+      )
+    },
+
+    persistWorkflowGroups() {
+      localStorage.setItem(
+        'custom_factory_order_groups',
+        JSON.stringify(this.customBoardGroups)
+      )
+    },
+
+    loadDefaultBoardGroupOverrides() {
+      try {
+        const saved = JSON.parse(
+          localStorage.getItem(
+            'default_factory_order_group_overrides'
+          ) || '{}'
+        )
+
+        this.defaultBoardGroupOverrides =
+          saved && typeof saved === 'object'
+            ? saved
+            : {}
+      } catch (error) {
+        console.error(
+          'Default board group overrides load error:',
+          error
+        )
+        this.defaultBoardGroupOverrides = {}
+      }
+    },
+
+    persistDefaultBoardGroupOverrides() {
+      localStorage.setItem(
+        'default_factory_order_group_overrides',
+        JSON.stringify(this.defaultBoardGroupOverrides)
+      )
+    },
+
+    defaultStatusLabelForGroup(groupKey) {
+      const map = {
+        in_production: 'In Production',
+        completed: 'Completed',
+        shipped: 'Shipped',
+        delivered: 'Delivered'
+      }
+
+      return map[groupKey] || null
+    },
+
+    changeWorkflowGroupColor(group, color) {
+      if (!group?.key || !color) return
+
+      if (group.custom) {
+        const target = this.customBoardGroups.find(
+          item => item.key === group.key
+        )
+
+        if (!target) return
+
+        target.color = color
+        this.persistWorkflowGroups()
+
+        const relatedStatuses = this.statusOptions.filter(
+          status => status.group === group.key
+        )
+
+        relatedStatuses.forEach(status => {
+          status.color = color
+        })
+
+        localStorage.setItem(
+          'custom_order_statuses',
+          JSON.stringify(
+            this.statusOptions.filter(status => status.custom)
+          )
+        )
+
+        return
+      }
+
+      /*
+       * Default sections:
+       * color override save hota hai, aur usi named main status
+       * ka color bhi update hota hai. Is se SHIPPED bar/status
+       * mismatch nahi hota.
+       */
+      this.defaultBoardGroupOverrides = {
+        ...this.defaultBoardGroupOverrides,
+        [group.key]: {
+          ...(this.defaultBoardGroupOverrides?.[group.key] || {}),
+          color
+        }
+      }
+
+      this.persistDefaultBoardGroupOverrides()
+
+      const statusLabel =
+        this.defaultStatusLabelForGroup(group.key)
+
+      if (statusLabel) {
+        const status = this.statusOptions.find(
+          item =>
+            String(item.label || '').toLowerCase() ===
+            String(statusLabel).toLowerCase()
+        )
+
+        if (status) {
+          status.color = color
+        }
+      }
+    },
+
+    editWorkflowGroup(group) {
+      const entered = window.prompt(
+        'Edit section name',
+        group.label
+      )
+
+      if (!entered || !entered.trim()) {
+        return
+      }
+
+      const newLabel = entered.trim().toUpperCase()
+
+      if (!group.custom) {
+        /*
+         * Default section ka display name change hoga.
+         * Internal key/status relation same rahegi, is liye orders
+         * aur pipeline break nahi hongi.
+         */
+        this.defaultBoardGroupOverrides = {
+          ...this.defaultBoardGroupOverrides,
+          [group.key]: {
+            ...(this.defaultBoardGroupOverrides?.[group.key] || {}),
+            label: newLabel
+          }
+        }
+
+        this.persistDefaultBoardGroupOverrides()
+        return
+      }
+
+      const target = this.customBoardGroups.find(
+        item => item.key === group.key
+      )
+
+      if (!target) return
+
+      const oldLabel = target.label
+      target.label = newLabel
+      this.persistWorkflowGroups()
+
+      this.statusOptions
+        .filter(status => status.group === group.key)
+        .forEach(status => {
+          status.groupLabel = newLabel
+
+          if (status.label === oldLabel) {
+            status.label = newLabel
+          }
+        })
+
+      localStorage.setItem(
+        'custom_order_statuses',
+        JSON.stringify(
+          this.statusOptions.filter(status => status.custom)
+        )
+      )
+    },
+
+    deleteWorkflowGroup(group) {
+      const count = this.countForGroup(group.key)
+
+      if (count > 0) {
+        alert(
+          `This section has ${count} order(s). Move those orders to another section before deleting it.`
+        )
+        return
+      }
+
+      const confirmed = window.confirm(
+        `Delete "${group.label}" section?`
+      )
+
+      if (!confirmed) return
+
+      if (!group.custom) {
+        this.defaultBoardGroupOverrides = {
+          ...this.defaultBoardGroupOverrides,
+          [group.key]: {
+            ...(this.defaultBoardGroupOverrides?.[group.key] || {}),
+            hidden: true
+          }
+        }
+
+        this.persistDefaultBoardGroupOverrides()
+
+        if (this.activeGroup === group.key) {
+          this.activeGroup = this.boardGroups[0]?.key || 'all'
+        }
+
+        return
+      }
+
+      this.customBoardGroups =
+        this.customBoardGroups.filter(
+          item => item.key !== group.key
+        )
+
+      this.statusOptions =
+        this.statusOptions.filter(
+          status => status.group !== group.key
+        )
+
+      this.persistWorkflowGroups()
+
+      localStorage.setItem(
+        'custom_order_statuses',
+        JSON.stringify(
+          this.statusOptions.filter(status => status.custom)
+        )
+      )
+
+      if (this.activeGroup === group.key) {
+        this.activeGroup = this.boardGroups[0]?.key || 'all'
+      }
+    },
+
+    rowFiles(order) {
+      return (order.cards || [])
+        .filter(card => card.type !== 'notes')
+        .flatMap(card =>
+          (card.files || []).map(file => ({
+            ...file,
+            sourceCardType: card.type,
+            sourceCardTitle: card.title
+          }))
+        )
+    },
+
+    async openRowFile(order, file) {
+      await this.selectOrder(order)
+
+      const normalized = {
+        ...file,
+        isImage:
+          file.isImage ??
+          /\.(jpg|jpeg|png|gif|webp|svg)$/i.test(
+            file.name || ''
+          )
+      }
+
+      this.openPreviewFile(normalized)
+    },
+
+    async openRowViewAll(order) {
+      await this.selectOrder(order)
+      this.viewAllCard = {
+        title: `${order.name || 'Order'} - All Files`,
+        type: 'all_order_files',
+        files: this.rowFiles(this.selectedOrder || order)
+      }
+    },
+
+    async removeRowFile(order, file) {
+      if (!this.canDeleteFile(file) || !file?.id) return
+      if (!confirm(`Delete ${file.name || 'this file'}?`)) return
+
+      try {
+        await axios.delete(`/api/order-files/${file.id}`, { headers: this.headers() })
+
+        ;(order.cards || []).forEach(card => {
+          card.files = (card.files || []).filter(item => Number(item.id) !== Number(file.id))
+        })
+
+        if (this.selectedOrder && Number(this.selectedOrder.id) === Number(order.id)) {
+          ;(this.selectedOrder.cards || []).forEach(card => {
+            card.files = (card.files || []).filter(item => Number(item.id) !== Number(file.id))
+          })
+        }
+      } catch (e) {
+        console.error('removeRowFile error:', e)
+        alert(e.response?.data?.message || 'File delete nahi hui')
+      }
+    },
+
+    triggerRowFileUpload(order) {
+      if (!this.canUploadFiles) return
+
+      const input = document.createElement('input')
+      input.type = 'file'
+      input.multiple = true
+      input.accept = '*/*'
+
+      input.addEventListener(
+        'change',
+        async event => {
+          const files = Array.from(
+            event.target.files || []
+          )
+
+          if (!files.length) return
+
+          await this.uploadRowFiles(
+            order,
+            files
+          )
+        },
+        { once: true }
+      )
+
+      input.click()
+    },
+
+    isEditingCell(orderId, field) {
+      return (
+        this.inlineEditingCell?.orderId === Number(orderId) &&
+        this.inlineEditingCell?.field === field
+      )
+    },
+
+    startInlineCell(order, field, value) {
+      if (!this.canCreateOrder) return
+
+      this.inlineEditingCell = {
+        orderId: Number(order.id),
+        field
+      }
+
+      this.inlineEditValue = String(value || '')
+
+      this.$nextTick(() => {
+        const active = document.activeElement
+        if (active?.select) active.select()
+      })
+    },
+
+    cancelInlineCell() {
+      this.inlineEditingCell = null
+      this.inlineEditValue = ''
+    },
+
+    async saveInlineCell(order, field) {
+      if (!this.isEditingCell(order.id, field)) return
+
+      const value = String(this.inlineEditValue || '').trim()
+
+      if (field === 'name' && !value) {
+        return
+      }
+
+      try {
+        await axios.put(
+          `/api/orders/${order.id}`,
+          {
+            [field]: value
+          },
+          {
+            headers: this.headers()
+          }
+        )
+
+        if (field === 'name') {
+          order.name = value.toUpperCase()
+        } else {
+          order[field] = value
+        }
+
+        this.cancelInlineCell()
+      } catch (error) {
+        console.error('Inline cell save error:', error)
+
+        alert(
+          error.response?.data?.message ||
+          'Value could not be saved.'
+        )
+      }
+    },
+
+    async savePackingInline(order, event, fromBlur = false) {
+      const input = event?.target
+      if (!input || !order?.id) return
+
+      const value = String(input.value || '').trim()
+      const oldValue = this.packingDetailText(order)
+
+      // Blur after Enter should not make a duplicate request.
+      if (fromBlur && value === oldValue) {
+        return
+      }
+
+      const saved = await this.saveDirectInlineField(
+        order,
+        'packing_detail',
+        value
+      )
+
+      if (!saved) {
+        input.value = oldValue
+        return
+      }
+
+      order.packing_detail = value
+      order.packingDetail = value
+      input.value = value
+
+      if (!fromBlur) {
+        input.blur()
+      }
+    },
+
+    async saveDirectInlineField(order, field, value) {
+      if (!this.canEditWorkflowFields) return false
+
+      try {
+        await axios.put(
+          `/api/orders/${order.id}`,
+          {
+            [field]: value
+          },
+          {
+            headers: this.headers()
+          }
+        )
+
+        if (field === 'shipping_address') {
+          order.shippingAddress = value
+        } else if (field === 'packing_detail') {
+          order.packingDetail = value
+          order.packing_detail = value
+        } else {
+          order[field] = value
+        }
+
+        if (
+          this.selectedOrder &&
+          Number(this.selectedOrder.id) === Number(order.id)
+        ) {
+          if (field === 'shipping_address') {
+            this.selectedOrder.shippingAddress = value
+          } else if (field === 'packing_detail') {
+            this.selectedOrder.packingDetail = value
+            this.selectedOrder.packing_detail = value
+          } else {
+            this.selectedOrder[field] = value
+          }
+        }
+
+        return true
+      } catch (error) {
+        console.error('Direct inline save error:', error)
+
+        alert(
+          error.response?.data?.message ||
+          'Value could not be saved.'
+        )
+
+        return false
+      }
+    },
+
+    async inlineChangeStatus(order, label) {
+      if (!this.canEditWorkflowFields) return
+
+      const status = this.statusOptions.find(
+        item => item.label === label
+      )
+
+      if (!status) return
+
+      try {
+        await axios.put(
+          `/api/orders/${order.id}`,
+          {
+            status: status.label,
+            status_color: status.color
+          },
+          {
+            headers: this.headers()
+          }
+        )
+
+        order.status = status.label
+        order.statusColor = status.color
+        order.group = this.statusToGroup(status.label)
+
+        if (
+          this.selectedOrder &&
+          Number(this.selectedOrder.id) === Number(order.id)
+        ) {
+          this.selectedOrder.status = status.label
+          this.selectedOrder.statusColor = status.color
+          this.selectedOrder.group = order.group
+        }
+      } catch (error) {
+        console.error('Inline status error:', error)
+
+        alert(
+          error.response?.data?.message ||
+          'Status could not be updated.'
+        )
+      }
+    },
+
+    openSingleOrderMembers(order) {
+      this.selectedOrders = [order.id]
+
+      const ownerIds = (order.owners || []).map(
+        owner => Number(owner.id)
+      )
+
+      this.bulkSelectedMembers =
+        this.availableMembers.filter(
+          member =>
+            ownerIds.includes(Number(member.id))
+        )
+
+      this.bulkMembersModal = true
+    },
+
+    openBulkClientsPrompt() {
+      if (!this.selectedOrders.length) return
+
+      const available = this.availableClients
+        .map(client => `${client.id}: ${client.name}`)
+        .join('\n')
+
+      const entered = window.prompt(
+        `Enter client ID.\n\nAvailable clients:\n${available}`
+      )
+
+      if (!entered) return
+
+      const clientId = Number(entered)
+
+      if (!clientId) {
+        alert('Invalid client ID.')
+        return
+      }
+
+      this.bulkAssignClient(clientId)
+    },
+
+    async bulkAssignClient(clientId) {
+      try {
+        const selectedClient = this.availableClients.find(
+          client => Number(client.id) === Number(clientId)
+        )
+
+        if (!selectedClient) {
+          alert('Client not found.')
+          return
+        }
+
+        await Promise.all(
+          this.selectedOrders.map(async orderId => {
+            const order = this.orders.find(
+              item => Number(item.id) === Number(orderId)
+            )
+
+            const currentClientIds = (order?.clients || []).map(
+              client => Number(client.id)
+            )
+
+            if (!currentClientIds.includes(Number(clientId))) {
+              currentClientIds.push(Number(clientId))
+            }
+
+            await axios.put(
+              `/api/orders/${orderId}`,
+              {
+                client_ids: currentClientIds
+              },
+              {
+                headers: this.headers()
+              }
+            )
+          })
+        )
+
+        await this.fetchOrders()
+      } catch (error) {
+        console.error('Bulk client assign error:', error)
+
+        alert(
+          error.response?.data?.message ||
+          'Client could not be assigned.'
+        )
+      }
+    },
+
+    printVisibleOrders() {
+      /*
+       * Checkbox selection ho to sirf selected orders.
+       * Selection na ho to current visible/filter orders.
+       */
+      if (this.selectedOrders.length > 0) {
+        this.printSelectedOrders()
+        return
+      }
+
+      this.printOrders(this.filteredOrders)
+    },
+
+    printSelectedOrders() {
+      const selectedIds = this.selectedOrders.map(Number)
+
+      const orders = this.orders.filter(
+        order => selectedIds.includes(Number(order.id))
+      )
+
+      this.printOrders(orders)
+    },
+
+    printOrderCreator(order) {
+      /*
+       * Preferred: actual order creator.
+       * Purane API response mein creator na ho to:
+       * created_by member ya pehla assigned owner fallback hoga.
+       */
+      const directCreator =
+        order?.creator ||
+        order?.created_by_user ||
+        order?.createdBy ||
+        null
+
+      if (directCreator) {
+        return {
+          id: directCreator.id || directCreator.user_id || null,
+          name:
+            directCreator.name ||
+            directCreator.full_name ||
+            'Order Creator',
+          profile_photo_url:
+            directCreator.profile_photo_url ||
+            directCreator.photo_url ||
+            directCreator.avatar ||
+            null
+        }
+      }
+
+      const members = order?.owners || order?.members || []
+
+      const creatorMember = members.find(member => {
+        return (
+          member?.pivot?.role === 'creator' ||
+          member?.role === 'creator' ||
+          Number(member?.id) === Number(order?.created_by)
+        )
+      })
+
+      const fallback = creatorMember || members[0] || null
+
+      return {
+        id: fallback?.id || null,
+        name: fallback?.name || 'Unassigned',
+        profile_photo_url:
+          fallback?.profile_photo_url ||
+          fallback?.photo_url ||
+          null
+      }
+    },
+
+    absolutePrintImageUrl(url) {
+      const value = String(url || '').trim()
+
+      if (!value) {
+        return ''
+      }
+
+      if (
+        value.startsWith('http://') ||
+        value.startsWith('https://') ||
+        value.startsWith('data:')
+      ) {
+        return value
+      }
+
+      if (value.startsWith('/')) {
+        return `${window.location.origin}${value}`
+      }
+
+      return `${window.location.origin}/${value}`
+    },
+
+    splitPrintOrders(orders, pageSize = 30) {
+      const pages = []
+
+      for (let index = 0; index < orders.length; index += pageSize) {
+        pages.push(orders.slice(index, index + pageSize))
+      }
+
+      return pages
+    },
+
+    waitForPrintImages(printWindow, timeout = 2500) {
+      return new Promise(resolve => {
+        const images = Array.from(
+          printWindow.document.images || []
+        )
+
+        if (!images.length) {
+          resolve()
+          return
+        }
+
+        let finished = 0
+        let resolved = false
+
+        const done = () => {
+          finished += 1
+
+          if (!resolved && finished >= images.length) {
+            resolved = true
+            resolve()
+          }
+        }
+
+        images.forEach(image => {
+          if (image.complete) {
+            done()
+            return
+          }
+
+          image.addEventListener('load', done, { once: true })
+          image.addEventListener('error', done, { once: true })
+        })
+
+        setTimeout(() => {
+          if (!resolved) {
+            resolved = true
+            resolve()
+          }
+        }, timeout)
+      })
+    },
+
+    async printOrders(orders) {
+      if (!orders.length) {
+        alert('No orders available for print.')
+        return
+      }
+
+      /*
+       * Window foran open hoti hai taake browser popup block na kare.
+       * Heavy report/summary/images remove kiye gaye hain for fast load.
+       */
+      const printWindow = window.open(
+        '',
+        '_blank',
+        'width=1200,height=850'
+      )
+
+      if (!printWindow) {
+        alert('Please allow popups for printing.')
+        return
+      }
+
+      printWindow.document.write(`
+        <!DOCTYPE html>
+        <html>
+          <head>
+            <meta charset="UTF-8" />
+            <title>Preparing Prosix Orders...</title>
+            <style>
+              body {
+                margin: 0;
+                min-height: 100vh;
+                font-family: Arial, Helvetica, sans-serif;
+                display: grid;
+                place-items: center;
+                background: #ffffff;
+                color: #111827;
+              }
+
+              .loading-print {
+                text-align: center;
+              }
+
+              .loading-print strong,
+              .loading-print span {
+                display: block;
+              }
+
+              .loading-print span {
+                margin-top: 8px;
+                color: #6b7280;
+                font-size: 12px;
+              }
+
+
+/* ===========================
+   CHAT NOTIFICATION BELL
+   =========================== */
+.chat-notification-wrap {
+  position: relative;
+  flex: 0 0 auto;
+}
+
+.chat-notification-button {
+  position: relative;
+  width: 40px;
+  height: 36px;
+  padding: 0;
+  border: 1px solid #0f172a;
+  border-radius: 18px;
+  background: #ffffff;
+  color: #0f172a;
+  cursor: pointer;
+  display: grid;
+  place-items: center;
+  font-size: 14px;
+  transition: transform .15s ease, background .15s ease;
+}
+
+.chat-notification-button:hover {
+  transform: translateY(-1px);
+  background: #f8fafc;
+}
+
+.chat-notification-count {
+  position: absolute;
+  top: -7px;
+  right: -7px;
+  min-width: 19px;
+  height: 19px;
+  padding: 0 5px;
+  border: 2px solid #ffffff;
+  border-radius: 999px;
+  background: #ef4444;
+  color: #ffffff;
+  font-size: 9px;
+  font-weight: 900;
+  line-height: 15px;
+  text-align: center;
+}
+
+.chat-notification-dropdown {
+  position: absolute;
+  top: calc(100% + 9px);
+  right: 0;
+  z-index: 10000;
+  width: 340px;
+  max-height: 390px;
+  overflow-y: auto;
+  border: 1px solid #dbe2ea;
+  border-radius: 12px;
+  background: #ffffff;
+  box-shadow: 0 18px 45px rgba(15, 23, 42, .16);
+}
+
+.chat-notification-head {
+  position: sticky;
+  top: 0;
+  z-index: 2;
+  padding: 11px 13px;
+  border-bottom: 1px solid #e8edf3;
+  background: #ffffff;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.chat-notification-head strong {
+  color: #0f172a;
+  font-size: 12px;
+  font-weight: 900;
+}
+
+.chat-notification-head span {
+  color: #64748b;
+  font-size: 10px;
+  font-weight: 700;
+}
+
+.chat-notification-item {
+  width: 100%;
+  padding: 10px 12px;
+  border: 0;
+  border-bottom: 1px solid #eef2f7;
+  background: #ffffff;
+  color: #0f172a;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  text-align: left;
+}
+
+.chat-notification-item:hover {
+  background: #f8fafc;
+}
+
+.chat-notification-icon {
+  flex: 0 0 34px;
+  width: 34px;
+  height: 34px;
+  border-radius: 50%;
+  background: #0f172a;
+  color: #ffffff;
+  display: grid;
+  place-items: center;
+  font-size: 12px;
+}
+
+.chat-notification-content {
+  min-width: 0;
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.chat-notification-content strong {
+  overflow: hidden;
+  color: #0f172a;
+  font-size: 11px;
+  font-weight: 900;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.chat-notification-content small {
+  overflow: hidden;
+  color: #64748b;
+  font-size: 9px;
+  font-weight: 600;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.chat-notification-badge {
+  flex: 0 0 auto;
+  min-width: 23px;
+  height: 23px;
+  padding: 0 6px;
+  border-radius: 999px;
+  background: #ef4444;
+  color: #ffffff;
+  display: grid;
+  place-items: center;
+  font-size: 9px;
+  font-weight: 900;
+}
+
+.chat-notification-empty {
+  min-height: 90px;
+  padding: 18px;
+  color: #64748b;
+  display: grid;
+  place-items: center;
+  gap: 7px;
+  font-size: 11px;
+  font-weight: 700;
+}
+
+.workflow-total-box {
+  font-size: 12px;
+  font-weight: 900;
+}
+
+/* Section bar must use the same color as its selected status */
+.collapsed-status-bar {
+  background: var(--group-color) !important;
+  color: #111827;
+}
+
+/* Dark mode notification support */
+.theme-dark .chat-notification-button,
+.theme-dark .chat-notification-dropdown,
+.theme-dark .chat-notification-head,
+.theme-dark .chat-notification-item {
+  background: #111827;
+  color: #f8fafc;
+  border-color: #334155;
+}
+
+.theme-dark .chat-notification-item:hover {
+  background: #1e293b;
+}
+
+.theme-dark .chat-notification-head strong,
+.theme-dark .chat-notification-content strong {
+  color: #f8fafc;
+}
+
+.theme-dark .chat-notification-head span,
+.theme-dark .chat-notification-content small,
+.theme-dark .chat-notification-empty {
+  color: #cbd5e1;
+}
+
+@media (max-width: 767px) {
+  .chat-notification-dropdown {
+    position: fixed;
+    top: 58px;
+    right: 10px;
+    left: 10px;
+    width: auto;
+  }
+}
+
+
+
+/* =========================================================
+   FINAL PIPELINE UI FIXES
+   ========================================================= */
+
+/* Toolbar right side must have enough room for Bell + Theme + Search */
+.board-toolbar {
+  grid-template-columns: 122px minmax(0, 1fr) auto !important;
+}
+
+/* Active/open section must use the exact pipeline/status color */
+.collapsible-active-heading {
+  margin-bottom: 0;
+  padding-left: 14px;
+  padding-right: 14px;
+  border-top: 0 !important;
+  border-radius: 3px 3px 0 0;
+  transition: background .15s ease, color .15s ease;
+}
+
+.collapsible-active-heading h1,
+.collapsible-active-heading span,
+.collapsible-active-heading .section-collapse-icon {
+  color: inherit !important;
+}
+
+.collapsible-active-heading .board-top-add-button {
+  border: 1px solid currentColor;
+}
+
+/* Hover tools for every pipeline section */
+.workflow-tab-wrap .workflow-custom-actions {
+  min-width: max-content;
+}
+
+/* Keep the tab's own status color visible */
+.workflow-total-box {
+  background: var(--group-color);
+  font-size: 12px;
+  font-weight: 900;
+}
+
+/* Better active indication without replacing the section color */
+.workflow-tab.active {
+  box-shadow:
+    0 0 0 3px color-mix(
+      in srgb,
+      var(--group-color),
+      transparent 68%
+    ) !important;
+}
+
+/* Bell sits cleanly with search controls */
+.chat-notification-wrap {
+  z-index: 500;
+}
+
+.chat-notification-button {
+  flex: 0 0 38px;
+  width: 38px;
+  height: 36px;
+}
+
+.chat-notification-dropdown {
+  z-index: 999999 !important;
+}
+
+/* Dropdown order name / last chat line */
+.chat-notification-content strong,
+.chat-notification-content small {
+  max-width: 220px;
+}
+
+/* The colored collapsed bars always use their group color */
+.collapsed-status-bar {
+  background: var(--group-color) !important;
+}
+
+/* Bell count remains visible even with many notifications */
+.chat-notification-count {
+  min-width: 20px;
+  max-width: 34px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+@media (max-width: 1150px) {
+  .board-toolbar {
+    grid-template-columns: 122px minmax(0, 1fr) !important;
+  }
+
+  .board-toolbar-actions {
+    grid-column: 1 / -1;
+    justify-content: flex-end;
+  }
+}
+
+
+
+/* =========================================================
+   PACKING DETAIL INLINE / HOVER EDITOR
+   ========================================================= */
+.packing-detail-cell {
+  overflow: visible !important;
+  position: relative;
+  z-index: 8;
+}
+
+.packing-detail-wrap {
+  position: relative;
+  width: 100%;
+  display: flex;
+  justify-content: center;
+}
+
+.packing-detail-preview {
+  max-width: 112px;
+  min-width: 72px;
+  height: 28px;
+  padding: 0 8px;
+  border: 1px solid transparent;
+  border-radius: 6px;
+  background: transparent;
+  color: #334155;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
+  font-size: 9px;
+  font-weight: 700;
+  white-space: nowrap;
+  transition: .15s ease;
+}
+
+.packing-detail-preview:hover {
+  border-color: #d7dee8;
+  background: #ffffff;
+  box-shadow: 0 4px 12px rgba(15, 23, 42, .08);
+}
+
+.packing-detail-preview i {
+  opacity: 0;
+  font-size: 8px;
+  transition: .15s ease;
+}
+
+.packing-detail-preview:hover i {
+  opacity: 1;
+}
+
+.packing-empty-text {
+  color: #94a3b8;
+  font-weight: 600;
+}
+
+.packing-detail-tooltip {
+  position: absolute;
+  left: 50%;
+  bottom: calc(100% + 8px);
+  transform: translateX(-50%);
+  z-index: 10050;
+  width: max-content;
+  max-width: 300px;
+  padding: 8px 10px;
+  border-radius: 7px;
+  background: #111827;
+  color: #ffffff;
+  box-shadow: 0 10px 28px rgba(15, 23, 42, .2);
+  font-size: 10px;
+  font-weight: 600;
+  line-height: 1.45;
+  white-space: normal;
+  word-break: break-word;
+  opacity: 0;
+  visibility: hidden;
+  pointer-events: none;
+  transition: .12s ease;
+}
+
+.packing-detail-tooltip::after {
+  content: "";
+  position: absolute;
+  top: 100%;
+  left: 50%;
+  transform: translateX(-50%);
+  border: 5px solid transparent;
+  border-top-color: #111827;
+}
+
+.packing-detail-wrap:hover .packing-detail-tooltip {
+  opacity: 1;
+  visibility: visible;
+}
+
+.packing-detail-popover {
+  position: absolute;
+  top: calc(100% + 7px);
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 10060;
+  width: 290px;
+  padding: 10px;
+  border: 1px solid #dbe2ea;
+  border-radius: 10px;
+  background: #ffffff;
+  box-shadow: 0 18px 42px rgba(15, 23, 42, .18);
+}
+
+.packing-popover-head {
+  margin-bottom: 7px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.packing-popover-head strong {
+  color: #111827;
+  font-size: 11px;
+  font-weight: 900;
+}
+
+.packing-popover-close {
+  width: 23px;
+  height: 23px;
+  padding: 0;
+  border: 0;
+  border-radius: 5px;
+  background: #f1f5f9;
+  color: #475569;
+  cursor: pointer;
+  display: grid;
+  place-items: center;
+}
+
+.packing-detail-input {
+  width: 100%;
+  min-height: 78px;
+  padding: 8px 9px;
+  border: 1px solid #cbd5e1;
+  border-radius: 7px;
+  outline: none;
+  resize: vertical;
+  color: #111827;
+  background: #ffffff;
+  font-size: 11px;
+  line-height: 1.4;
+}
+
+.packing-detail-input:focus {
+  border-color: #64748b;
+  box-shadow: 0 0 0 3px rgba(100, 116, 139, .12);
+}
+
+.packing-popover-footer {
+  margin-top: 7px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.packing-popover-footer small {
+  color: #94a3b8;
+  font-size: 9px;
+  font-weight: 600;
+}
+
+.packing-save-btn {
+  height: 28px;
+  padding: 0 10px;
+  border: 0;
+  border-radius: 6px;
+  background: #111827;
+  color: #ffffff;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 9px;
+  font-weight: 800;
+}
+
+.packing-save-btn:disabled {
+  opacity: .6;
+  cursor: wait;
+}
+
+.theme-dark .packing-detail-preview {
+  color: #e5e7eb;
+}
+
+.theme-dark .packing-detail-preview:hover,
+.theme-dark .packing-detail-popover {
+  border-color: #334155;
+  background: #111827;
+}
+
+.theme-dark .packing-popover-head strong {
+  color: #f8fafc;
+}
+
+.theme-dark .packing-detail-input {
+  border-color: #475569;
+  background: #0f172a;
+  color: #f8fafc;
+}
+
+/* AppLayout sidebar ke andar board full available width use kare */
+.factory-board-page {
+  width: 100%;
+  min-width: 0;
+}
+
+
+
+/* =========================================================
+   ONLY REQUESTED CHANGE:
+   section color = TEXT color, not full bar background
+   ========================================================= */
+
+.workflow-tab {
+  background: #ffffff !important;
+  color: var(--group-color) !important;
+  border-color: #dfe3e8 !important;
+  border-left: 4px solid var(--group-color) !important;
+}
+
+.workflow-tab-label {
+  color: var(--group-color) !important;
+}
+
+.workflow-total-box {
+  background: transparent !important;
+  color: var(--group-color) !important;
+  border-left: 1px solid #e5e7eb !important;
+}
+
+.workflow-tab.active {
+  background: #ffffff !important;
+  color: var(--group-color) !important;
+  box-shadow: 0 0 0 2px rgba(17, 24, 39, .08) !important;
+}
+
+/* Current/open section */
+.collapsible-active-heading {
+  background: #ffffff !important;
+  color: var(--active-section-color) !important;
+  border-left: 5px solid var(--active-section-color) !important;
+}
+
+.collapsible-active-heading h1,
+.collapsible-active-heading .section-collapse-icon {
+  color: var(--active-section-color) !important;
+}
+
+/* Other section bars */
+.collapsed-status-bar {
+  background: #ffffff !important;
+  color: var(--group-color) !important;
+  border: 1px solid #e5e7eb !important;
+  border-left: 5px solid var(--group-color) !important;
+}
+
+.collapsed-status-bar:hover {
+  background: #f8f9fb !important;
+}
+
+.collapsed-status-bar strong {
+  color: var(--group-color) !important;
+}
+
+.collapsed-status-bar span {
+  color: var(--group-color) !important;
+}
+
+
+
+/* =========================================================
+   FINAL CLEAN PIPELINE SPACING / COLORS
+   ========================================================= */
+
+/* Top tabs keep their own colors, but only as a light tint */
+.workflow-tab {
+  background: color-mix(
+    in srgb,
+    var(--group-color) 12%,
+    #ffffff
+  ) !important;
+  color: var(--group-color) !important;
+  border: 1px solid color-mix(
+    in srgb,
+    var(--group-color) 28%,
+    #e5e7eb
+  ) !important;
+  border-left: 4px solid var(--group-color) !important;
+  border-radius: 6px !important;
+  box-shadow: none !important;
+}
+
+.workflow-tab:hover {
+  background: color-mix(
+    in srgb,
+    var(--group-color) 18%,
+    #ffffff
+  ) !important;
+}
+
+.workflow-total-box {
+  background: color-mix(
+    in srgb,
+    var(--group-color) 17%,
+    #ffffff
+  ) !important;
+  color: var(--group-color) !important;
+  border-left: 1px solid color-mix(
+    in srgb,
+    var(--group-color) 24%,
+    #e5e7eb
+  ) !important;
+}
+
+.workflow-tab.active {
+  background: color-mix(
+    in srgb,
+    var(--group-color) 16%,
+    #ffffff
+  ) !important;
+  box-shadow: 0 0 0 2px color-mix(
+    in srgb,
+    var(--group-color) 22%,
+    transparent
+  ) !important;
+}
+
+/* Current open category */
+.collapsible-active-heading {
+  background: #ffffff !important;
+  color: var(--active-section-color) !important;
+  border-left: 4px solid var(--active-section-color) !important;
+}
+
+.collapsible-active-heading .section-collapse-icon {
+  color: var(--active-section-color) !important;
+  margin-right: 10px !important;
+}
+
+/* Other categories: clean text rows with icon, no right total */
+.collapsed-status-bars {
+  display: flex !important;
+  flex-direction: column !important;
+  gap: 50px !important;
+  padding-top: 22px !important;
+  border-top: 1px dashed #e3e7ec !important;
+}
+
+.collapsed-status-bar {
+  min-height: 24px !important;
+  padding: 0 0 0 10px !important;
+  border: 0 !important;
+  border-left: 0 !important;
+  border-radius: 0 !important;
+  background: transparent !important;
+  color: var(--group-color) !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: flex-start !important;
+  box-shadow: none !important;
+}
+
+.collapsed-status-bar:hover {
+  background: transparent !important;
+}
+
+.collapsed-status-left {
+  display: inline-flex !important;
+  align-items: center !important;
+  gap: 10px !important;
+}
+
+.collapsed-status-icon {
+  width: 12px;
+  color: var(--group-color) !important;
+  font-size: 11px !important;
+  transition: transform .15s ease;
+}
+
+.collapsed-status-bar:hover .collapsed-status-icon {
+  transform: translateX(2px);
+}
+
+.collapsed-status-bar strong {
+  color: var(--group-color) !important;
+  font-size: 16px !important;
+  font-weight: 800 !important;
+  font-style: italic !important;
+}
+
+/* Any old right-side total span is hidden defensively */
+.collapsed-status-bar > span:not(.collapsed-status-left) {
+  display: none !important;
+}
+
+
+
+/* =========================================================
+   SPACING + CHEVRON ALIGNMENT ONLY
+   ========================================================= */
+
+/* More space between each category/section */
+.collapsed-status-bars {
+  gap: 65px !important;
+  padding-top: 30px !important;
+}
+
+/* Keep every collapsed category on exactly the same left line */
+.collapsed-status-bar {
+  padding-left: 27px !important;
+  margin: 0 !important;
+}
+
+.collapsed-status-left {
+  display: grid !important;
+  grid-template-columns: 18px auto !important;
+  align-items: center !important;
+  column-gap: 10px !important;
+}
+
+.collapsed-status-icon {
+  width: 18px !important;
+  min-width: 18px !important;
+  margin: 0 !important;
+  padding: 0 !important;
+  text-align: center !important;
+}
+
+.collapsed-status-bar strong {
+  margin: 0 !important;
+}
+
+/* Active/open heading icon uses the exact same icon column */
+.collapsible-active-heading {
+  padding-left: 27px !important;
+}
+
+.collapsible-active-heading > div:first-child {
+  display: grid !important;
+  grid-template-columns: 18px auto auto !important;
+  align-items: center !important;
+  column-gap: 10px !important;
+}
+
+.collapsible-active-heading .section-collapse-icon {
+  width: 18px !important;
+  min-width: 18px !important;
+  margin: 0 !important;
+  padding: 0 !important;
+  text-align: center !important;
+}
+
+/* 20px vertical space between individual order rows */
+.board-table-body {
+  background: #ffffff !important;
+}
+
+.board-table-row {
+  margin-bottom: 20px !important;
+  border-bottom: 0 !important;
+  box-shadow: 0 1px 0 #e5e7eb !important;
+}
+
+.board-table-row:last-child {
+  margin-bottom: 0 !important;
+}
+
+
+
+/* =========================================================
+   EXCEL-LIKE RESIZABLE BOARD COLUMNS
+   ========================================================= */
+
+/* white background + black grid lines */
+.board-table-shell {
+  background: #ffffff !important;
+  border: 1px solid ##aeb0b3 !important;
+  overflow-x: auto !important;
+  overflow-y: visible !important;
+}
+
+.board-table-head {
+  background: #ffffff !important;
+  color: #111827 !important;
+  border-bottom: 1px solid #111827 !important;
+}
+
+.board-table-row,
+.board-inline-add-row {
+  background: #ffffff !important;
+}
+
+/* Dynamic widths come from :style="boardGridStyle" */
+.board-table-head,
+.board-table-row,
+.board-inline-add-row {
+  min-width: max-content !important;
+  width: max-content !important;
+  grid-template-columns: unset;
+}
+
+/* Full vertical pipelines on every column boundary */
+.board-table-head .board-col,
+.board-table-row .board-col,
+.board-inline-add-row .board-col {
+  position: relative !important;
+  min-width: 0 !important;
+  border-right: 1px solid #111827 !important;
+  background: #ffffff !important;
+}
+
+.board-table-head .board-col:last-child,
+.board-table-row .board-col:last-child,
+.board-inline-add-row .board-col:last-child {
+  border-right: 0 !important;
+}
+
+/* Remove old short gray separator pseudo-lines */
+.board-table-row .board-col::after,
+.board-table-head .board-col::after,
+.board-inline-add-row .board-col::after,
+.board-table-row .board-col::before,
+.board-table-head .board-col::before,
+.board-inline-add-row .board-col::before {
+  display: none !important;
+  content: none !important;
+}
+
+/* Header resize handle */
+.resizable-head-cell {
+  position: relative !important;
+  overflow: visible !important;
+}
+
+.column-resizer {
+  position: absolute;
+  top: 0;
+  right: -4px;
+  z-index: 120;
+  width: 8px;
+  height: 100%;
+  cursor: col-resize;
+  touch-action: none;
+}
+
+.column-resizer::before {
+  content: "";
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 3px;
+  width: 1px;
+  background: #111827;
+}
+
+.column-resizer:hover::before,
+body.board-column-resizing .column-resizer::before {
+  width: 2px;
+  left: 2px;
+  background: #111827;
+}
+
+/* While dragging: Excel-like horizontal resize cursor */
+body.board-column-resizing,
+body.board-column-resizing * {
+  cursor: col-resize !important;
+  user-select: none !important;
+}
+
+/* Keep header labels centered / name left aligned */
+.board-table-head .board-col {
+  justify-content: center !important;
+  font-weight: 700 !important;
+}
+
+.board-table-head .board-col-name {
+  justify-content: flex-start !important;
+}
+
+/* Keep cells clean while width changes */
+.board-col {
+  overflow: hidden;
+}
+
+.board-col-name,
+.board-col-address,
+.board-col-track,
+.board-col-packing {
+  min-width: 0 !important;
+}
+
+.board-col-address input,
+.board-col-track input,
+.board-col-packing .packing-detail-wrap,
+.board-col-payment input {
+  max-width: 100% !important;
+}
+
+/* Keep row spacing requested earlier */
+.board-table-row {
+  margin-bottom: 20px !important;
+  border-bottom: 1px solid #d1d5db !important;
+}
+
+.board-table-row:last-child {
+  margin-bottom: 0 !important;
+}
+
+
+
+/* =========================================================
+   CHEVRON ALIGNMENT FIX ONLY
+   Open + collapsed section icons use same fixed column
+   ========================================================= */
+
+/* Collapsed rows start from exactly the same left position */
+.collapsed-status-bar {
+  padding-left: 27px !important;
+}
+
+/* Fixed icon column + fixed gap before title */
+.collapsed-status-left {
+  display: grid !important;
+  grid-template-columns: 18px auto !important;
+  align-items: center !important;
+  column-gap: 14px !important;
+  width: max-content !important;
+}
+
+.collapsed-status-icon {
+  display: block !important;
+  width: 18px !important;
+  min-width: 18px !important;
+  margin: 0 !important;
+  padding: 0 !important;
+  text-align: center !important;
+  justify-self: center !important;
+  color: #64748b !important;
+}
+
+/* Prevent > icon from touching category text */
+.collapsed-status-bar strong {
+  display: block !important;
+  margin: 0 !important;
+  padding: 0 !important;
+}
+
+/* Open section uses exactly the same 18px icon column + 14px gap */
+.collapsible-active-heading {
+  padding-left: 27px !important;
+}
+
+.collapsible-active-heading > div:first-child {
+  display: grid !important;
+  grid-template-columns: 18px auto auto !important;
+  align-items: center !important;
+  column-gap: 14px !important;
+}
+
+.collapsible-active-heading .section-collapse-icon {
+  display: block !important;
+  width: 18px !important;
+  min-width: 18px !important;
+  margin: 0 !important;
+  padding: 0 !important;
+  text-align: center !important;
+  justify-self: center !important;
+  color: #64748b !important;
+}
+
+
+
+/* =========================================================
+   FINAL FIX — VERTICAL PIPELINES + SECTION TARTEEB
+   ========================================================= */
+
+/* ---------- SECTION CHEVRONS: ONE EXACT VERTICAL LINE ---------- */
+.collapsible-active-heading {
+  padding-left: 28px !important;
+}
+
+.collapsible-active-heading > div:first-child {
+  display: flex !important;
+  align-items: center !important;
+  gap: 0 !important;
+}
+
+.section-chevron-slot {
+  flex: 0 0 28px !important;
+  width: 28px !important;
+  min-width: 28px !important;
+  height: 24px !important;
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  margin: 0 12px 0 0 !important;
+  padding: 0 !important;
+}
+
+.section-chevron-slot i {
+  width: 12px !important;
+  min-width: 12px !important;
+  margin: 0 !important;
+  padding: 0 !important;
+  text-align: center !important;
+  line-height: 1 !important;
+}
+
+/* Open heading title starts at same X as every closed title */
+.collapsible-active-heading h1 {
+  margin: 0 !important;
+  padding: 0 !important;
+}
+
+.collapsed-status-bars {
+  padding-left: 28px !important;
+}
+
+.collapsed-status-bar {
+  padding: 0 !important;
+  margin: 0 !important;
+}
+
+.collapsed-status-left {
+  display: flex !important;
+  align-items: center !important;
+  gap: 0 !important;
+  width: max-content !important;
+}
+
+.collapsed-status-left .section-chevron-slot {
+  flex: 0 0 28px !important;
+  width: 28px !important;
+  min-width: 28px !important;
+  margin-right: 12px !important;
+}
+
+.collapsed-status-bar strong {
+  margin: 0 !important;
+  padding: 0 !important;
+}
+
+/* ---------- REAL PIPELINES: HEADER + EVERY ORDER ROW ---------- */
+
+/* Outer table frame */
+.board-table-shell {
+  position: relative !important;
+  background: #ffffff !important;
+  border: 1px solid #111827 !important;
+  border-radius: 0 !important;
+  overflow-x: auto !important;
+  overflow-y: visible !important;
+}
+
+/* Header and rows share EXACT same dynamic CSS grid */
+.board-table-head,
+.board-table-row,
+.board-inline-add-row {
+  display: grid !important;
+  width: max-content !important;
+  min-width: 100% !important;
+  align-items: stretch !important;
+  column-gap: 0 !important;
+}
+
+/* White header like requested */
+.board-table-head {
+  background: #ffffff !important;
+  color: #111827 !important;
+  border-bottom: 1px solid #111827 !important;
+}
+
+/* White rows */
+.board-table-row,
+.board-inline-add-row {
+  background: #ffffff !important;
+}
+
+/* IMPORTANT:
+   Every cell itself owns the vertical pipeline.
+   This makes line continue for the full cell height. */
+.board-table-head > .board-col,
+.board-table-row > .board-col,
+.board-inline-add-row > .board-col {
+  position: relative !important;
+  height: 100% !important;
+  min-height: 100% !important;
+  border-right: 1px solid #111827 !important;
+  box-sizing: border-box !important;
+}
+
+/* Last info column does not need a right line because outer frame exists */
+.board-table-head > .board-col:last-child,
+.board-table-row > .board-col:last-child,
+.board-inline-add-row > .board-col:last-child {
+  border-right: 0 !important;
+}
+
+/* Kill any old pseudo separators so there is only ONE clean pipeline */
+.board-table-head > .board-col::before,
+.board-table-head > .board-col::after,
+.board-table-row > .board-col::before,
+.board-table-row > .board-col::after,
+.board-inline-add-row > .board-col::before,
+.board-inline-add-row > .board-col::after {
+  content: none !important;
+  display: none !important;
+}
+
+/* Horizontal row separation */
+.board-table-row {
+  border-bottom: 1px solid #d7dce2 !important;
+}
+
+/* Keep requested order spacing without breaking vertical column geometry */
+.board-table-row + .board-table-row {
+  margin-top: 20px !important;
+}
+
+/* Resize grab area sits ON TOP of the black pipeline */
+.resizable-head-cell {
+  overflow: visible !important;
+}
+
+.column-resizer {
+  position: absolute !important;
+  top: 0 !important;
+  right: -5px !important;
+  z-index: 999 !important;
+  width: 10px !important;
+  height: 100% !important;
+  cursor: col-resize !important;
+  background: transparent !important;
+}
+
+.column-resizer::before {
+  content: "" !important;
+  display: block !important;
+  position: absolute !important;
+  top: 0 !important;
+  bottom: 0 !important;
+  left: 4px !important;
+  width: 1px !important;
+  background: #111827 !important;
+}
+
+.column-resizer:hover::before,
+body.board-column-resizing .column-resizer::before {
+  width: 3px !important;
+  left: 3px !important;
+  background: #111827 !important;
+}
+
+/* Make sure fields do not paint over the pipeline */
+.board-col-status,
+.board-col-owner,
+.board-col-files,
+.board-col-packing,
+.board-col-chat,
+.board-col-payment,
+.board-col-address,
+.board-col-track {
+  overflow: visible !important;
+}
+
+.board-col-name {
+  overflow: hidden !important;
+}
+
+/* Keep input controls inside their own columns */
+.board-col input,
+.board-col select,
+.board-col textarea,
+.board-col button {
+  max-width: 100%;
+  box-sizing: border-box;
+}
+
+
+
+/* =========================================================
+   FINAL OWNER COLUMN
+   Logged-in user only + remaining count + add button
+========================================================= */
+
+.factory-board-page .board-col-owner {
+  min-width: 0 !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: flex-start !important;
+  padding: 0 8px !important;
+  overflow: hidden !important;
+}
+
+.factory-board-page .owner-compact-stack {
+  width: 100% !important;
+  min-width: 0 !important;
+  height: 100% !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: flex-start !important;
+  gap: 0 !important;
+  padding: 0 !important;
+  margin: 0 !important;
+  overflow: visible !important;
+}
+
+.factory-board-page .owner-compact-stack .owner-current-avatar {
+  position: relative !important;
+  z-index: 3 !important;
+  width: 30px !important;
+  height: 30px !important;
+  min-width: 30px !important;
+  max-width: 30px !important;
+  padding: 0 !important;
+  margin: 0 !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  border: 2px solid #ffffff !important;
+  border-radius: 50% !important;
+  background: #ffffff !important;
+  overflow: hidden !important;
+  cursor: pointer !important;
+}
+
+.factory-board-page .owner-compact-stack .owner-current-avatar img {
+  width: 100% !important;
+  height: 100% !important;
+  display: block !important;
+  object-fit: cover !important;
+  border-radius: 50% !important;
+}
+
+.factory-board-page .owner-compact-stack .owner-current-avatar > span {
+  width: 100% !important;
+  height: 100% !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  background: #0f172a !important;
+  color: #ffffff !important;
+  font-size: 10px !important;
+  font-weight: 800 !important;
+}
+
+.factory-board-page .owner-compact-stack .board-avatar-more {
+  position: relative !important;
+  z-index: 4 !important;
+  width: 24px !important;
+  height: 24px !important;
+  min-width: 24px !important;
+  max-width: 24px !important;
+  margin-left: -7px !important;
+  padding: 0 !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  border: 2px solid #ffffff !important;
+  border-radius: 50% !important;
+  background: #273142 !important;
+  color: #ffffff !important;
+  font-size: 8px !important;
+  font-weight: 800 !important;
+  line-height: 1 !important;
+  cursor: pointer !important;
+}
+
+.factory-board-page .owner-compact-stack .board-avatar-add {
+  width: 30px !important;
+  height: 30px !important;
+  min-width: 30px !important;
+  max-width: 30px !important;
+  margin-left: 7px !important;
+  padding: 0 !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  border: 1px dashed #94a3b8 !important;
+  border-radius: 50% !important;
+  background: transparent !important;
+  color: #64748b !important;
+  font-size: 10px !important;
+  cursor: pointer !important;
+}
+
+.factory-board-page .owner-compact-stack .board-avatar-add:hover {
+  background: #f8fafc !important;
+  border-color: #64748b !important;
+  color: #111827 !important;
+}
+
+.factory-board-page.theme-dark .owner-compact-stack .owner-current-avatar {
+  border-color: #111827 !important;
+}
+
+.factory-board-page.theme-dark .owner-compact-stack .board-avatar-more {
+  border-color: #111827 !important;
+}
+
+.factory-board-page.theme-dark .owner-compact-stack .board-avatar-add:hover {
+  background: #1f2937 !important;
+  color: #ffffff !important;
+}
+
+</style>
+          </head>
+          <body>
+            <div class="loading-print">
+              <strong>Preparing order sheet...</strong>
+              <span>Please wait</span>
+            </div>
+          </body>
+        </html>
+      `)
+
+      printWindow.document.close()
+
+      const generatedAt = new Date().toLocaleString()
+      const pages = this.splitPrintOrders(orders, 30)
+
+      const pageMarkup = pages
+        .map((pageOrders, pageIndex) => {
+          const leftOrders = pageOrders.slice(0, 15)
+          const rightOrders = pageOrders.slice(15, 30)
+
+          const makeColumn = (columnOrders, startIndex) => {
+            const orderRows = columnOrders
+              .map((order, localIndex) => {
+                const creator = this.printOrderCreator(order)
+                const photoUrl = this.absolutePrintImageUrl(
+                  creator.profile_photo_url
+                )
+
+                const creatorPhoto = photoUrl
+                  ? `
+                      <img
+                        src="${this.escapePrint(photoUrl)}"
+                        alt=""
+                        loading="eager"
+                        decoding="sync"
+                        onerror="
+                          this.style.display='none';
+                          this.nextElementSibling.style.display='grid';
+                        "
+                      />
+                      <span
+                        class="creator-fallback"
+                        style="display:none"
+                      >
+                        ${this.escapePrint(
+                          this.initial(creator.name || 'U')
+                        )}
+                      </span>
+                    `
+                  : `
+                      <span class="creator-fallback">
+                        ${this.escapePrint(
+                          this.initial(creator.name || 'U')
+                        )}
+                      </span>
+                    `
+
+                return `
+                  <article class="print-order-card">
+                    <span class="order-number">
+                      ${startIndex + localIndex + 1}
+                    </span>
+
+                    <div class="order-main">
+                      <strong class="order-name">
+                        ${this.escapePrint(order.name || 'Unnamed Order')}
+                      </strong>
+
+                      <span
+                        class="order-status"
+                        style="
+                          --status-color:${this.escapePrint(
+                            order.statusColor || '#e5e7eb'
+                          )};
+                          --status-text:${this.escapePrint(
+                            this.readableTextColor(
+                              order.statusColor || '#e5e7eb'
+                            )
+                          )};
+                        "
+                      >
+                        ${this.escapePrint(order.status || 'Pending')}
+                      </span>
+                    </div>
+
+                    <div class="creator">
+                      <span class="creator-photo">
+                        ${creatorPhoto}
+                      </span>
+
+                      <span class="creator-name">
+                        <small>Created By</small>
+                        <strong>
+                          ${this.escapePrint(creator.name || 'Unassigned')}
+                        </strong>
+                      </span>
+                    </div>
+                  </article>
+                `
+              })
+              .join('')
+
+            const emptyRows = Math.max(0, 15 - columnOrders.length)
+
+            const placeholders = Array.from(
+              { length: emptyRows },
+              () => '<div class="empty-print-row"></div>'
+            ).join('')
+
+            return `
+              <div class="print-column">
+                ${orderRows}
+                ${placeholders}
+              </div>
+            `
+          }
+
+          return `
+            <section class="print-page">
+              <header class="print-header">
+                <div class="print-brand">
+                  <strong>PROSIX SPORTS</strong>
+                  <span>Factory Order Production Sheet</span>
+                </div>
+
+                <div class="print-meta">
+                  <strong>
+                    ${this.escapePrint(this.activeBoardGroup.label)}
+                  </strong>
+                  <span>
+                    Page ${pageIndex + 1} of ${pages.length}
+                  </span>
+                  <span>
+                    Generated: ${this.escapePrint(generatedAt)}
+                  </span>
+                </div>
+              </header>
+
+              <div class="print-columns">
+                ${makeColumn(
+                  leftOrders,
+                  pageIndex * 30
+                )}
+
+                ${makeColumn(
+                  rightOrders,
+                  pageIndex * 30 + 15
+                )}
+              </div>
+
+              <footer class="print-footer">
+                <span>Prosix Sports — Internal Use</span>
+                <strong>
+                  ${pageOrders.length} orders on this page
+                </strong>
+              </footer>
+            </section>
+          `
+        })
+        .join('')
+
+      printWindow.document.open()
+      printWindow.document.write(`
+        <!DOCTYPE html>
+        <html>
+          <head>
+            <meta charset="UTF-8" />
+
+            <title>Prosix Factory Orders</title>
+
+            <style>
+              @page {
+                size: A4 landscape;
+                margin: 6mm;
+              }
+
+              * {
+                box-sizing: border-box;
+              }
+
+              html,
+              body {
+                margin: 0;
+                padding: 0;
+                background: #ffffff;
+                color: #111827;
+                font-family: Arial, Helvetica, sans-serif;
+                -webkit-print-color-adjust: exact;
+                print-color-adjust: exact;
+              }
+
+              .print-page {
+                width: 100%;
+                min-height: 190mm;
+                padding: 0;
+                display: flex;
+                flex-direction: column;
+                page-break-after: always;
+                break-after: page;
+              }
+
+              .print-page:last-child {
+                page-break-after: auto;
+                break-after: auto;
+              }
+
+              .print-header {
+                height: 14mm;
+                padding: 0 1mm 2mm;
+                border-bottom: 1.5px solid #111827;
+                display: flex;
+                align-items: center;
+                justify-content: space-between;
+                gap: 10px;
+              }
+
+              .print-brand strong,
+              .print-brand span,
+              .print-meta strong,
+              .print-meta span {
+                display: block;
+              }
+
+              .print-brand strong {
+                font-size: 15px;
+                letter-spacing: .06em;
+              }
+
+              .print-brand span {
+                margin-top: 2px;
+                color: #6b7280;
+                font-size: 7px;
+              }
+
+              .print-meta {
+                text-align: right;
+              }
+
+              .print-meta strong {
+                font-size: 8px;
+                text-transform: uppercase;
+              }
+
+              .print-meta span {
+                margin-top: 1px;
+                color: #6b7280;
+                font-size: 6px;
+              }
+
+              .print-columns {
+                flex: 1;
+                padding-top: 3mm;
+                display: grid;
+                grid-template-columns: repeat(2, minmax(0, 1fr));
+                gap: 4mm;
+              }
+
+              .print-column {
+                min-width: 0;
+                display: grid;
+                grid-template-rows: repeat(15, minmax(0, 1fr));
+                gap: 1.1mm;
+              }
+
+              .print-order-card,
+              .empty-print-row {
+                min-height: 9.2mm;
+                border: 1px solid #d4d8df;
+                border-radius: 2mm;
+              }
+
+              .print-order-card {
+                padding: 1.2mm 1.8mm;
+                background: #ffffff;
+                display: grid;
+                grid-template-columns: 6mm minmax(0, 1fr) 39mm;
+                align-items: center;
+                gap: 2mm;
+                break-inside: avoid;
+                page-break-inside: avoid;
+              }
+
+              .empty-print-row {
+                border-color: transparent;
+              }
+
+              .order-number {
+                width: 5mm;
+                height: 5mm;
+                border-radius: 50%;
+                background: #111827;
+                color: #ffffff;
+                font-size: 6px;
+                font-weight: 800;
+                display: grid;
+                place-items: center;
+              }
+
+              .order-main {
+                min-width: 0;
+                display: flex;
+                align-items: center;
+                gap: 2mm;
+              }
+
+              .order-name {
+                min-width: 0;
+                flex: 1;
+                overflow: hidden;
+                font-size: 7.4px;
+                line-height: 1.1;
+                text-overflow: ellipsis;
+                white-space: nowrap;
+              }
+
+              .order-status {
+                flex-shrink: 0;
+                max-width: 25mm;
+                padding: 1.2mm 2mm;
+                border-radius: 999px;
+                background: var(--status-color);
+                color: var(--status-text);
+                overflow: hidden;
+                font-size: 5.8px;
+                font-weight: 900;
+                line-height: 1;
+                text-overflow: ellipsis;
+                white-space: nowrap;
+              }
+
+              .creator {
+                min-width: 0;
+                padding-left: 2mm;
+                border-left: 1px solid #e5e7eb;
+                display: flex;
+                align-items: center;
+                gap: 1.5mm;
+              }
+
+              .creator-photo,
+              .creator-photo img,
+              .creator-fallback {
+                width: 6.5mm;
+                height: 6.5mm;
+                flex-shrink: 0;
+                border-radius: 50%;
+              }
+
+              .creator-photo {
+                overflow: hidden;
+                background: #eef0f3;
+              }
+
+              .creator-photo img {
+                display: block;
+                object-fit: cover;
+              }
+
+              .creator-fallback {
+                background: #111827;
+                color: #ffffff;
+                font-size: 6px;
+                font-weight: 900;
+                place-items: center;
+              }
+
+              .creator-name {
+                min-width: 0;
+              }
+
+              .creator-name small,
+              .creator-name strong {
+                display: block;
+                overflow: hidden;
+                text-overflow: ellipsis;
+                white-space: nowrap;
+              }
+
+              .creator-name small {
+                color: #9ca3af;
+                font-size: 4.8px;
+                font-weight: 800;
+                text-transform: uppercase;
+              }
+
+              .creator-name strong {
+                margin-top: .7mm;
+                font-size: 6.3px;
+              }
+
+              .print-footer {
+                height: 8mm;
+                padding: 2mm 1mm 0;
+                border-top: 1px solid #d4d8df;
+                color: #6b7280;
+                font-size: 6px;
+                display: flex;
+                align-items: flex-start;
+                justify-content: space-between;
+              }
+
+              .print-footer strong {
+                color: #111827;
+              }
+
+              @media screen {
+                body {
+                  padding: 12px;
+                  background: #e5e7eb;
+                }
+
+                .print-page {
+                  max-width: 297mm;
+                  min-height: 210mm;
+                  margin: 0 auto 14px;
+                  padding: 6mm;
+                  background: #ffffff;
+                  box-shadow: 0 8px 25px rgba(0, 0, 0, .12);
+                }
+              }
+
+              @media print {
+                body {
+                  background: #ffffff;
+                }
+
+                .print-page {
+                  height: 198mm;
+                  min-height: 198mm;
+                  overflow: hidden;
+                }
+              }
+            </style>
+          </head>
+
+          <body>
+            ${pageMarkup}
+          </body>
+        </html>
+      `)
+
+      printWindow.document.close()
+
+      /*
+       * Browser ko document render aur creator photos load karne do.
+       * Hard delay ki jagah actual image load events ka wait hota hai.
+       */
+      await this.waitForPrintImages(printWindow, 2500)
+
+      printWindow.focus()
+
+      requestAnimationFrame(() => {
+        setTimeout(() => {
+          printWindow.print()
+        }, 120)
+      })
+    },
+
+    escapePrint(value) {
+      return String(value || '')
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#039;')
+    },
+
+    countForGroup(groupKey) {
+      if (groupKey === 'all') {
+        return this.orders.length
+      }
+
+      if (groupKey === 'delivered') {
+        return this.orders.filter(
+          order =>
+            String(order.status || '').toLowerCase() ===
+            'delivered'
+        ).length
+      }
+
+      return this.orders.filter(
+        order => order.group === groupKey
+      ).length
+    },
+
+    loadBoardGroups() {
+      try {
+        const saved = JSON.parse(
+          localStorage.getItem(
+            'custom_factory_order_groups'
+          ) || '[]'
+        )
+
+        this.customBoardGroups = Array.isArray(saved)
+          ? saved.map(group => ({
+              ...group,
+              custom: true
+            }))
+          : []
+      } catch (error) {
+        console.error('Board groups load error:', error)
+        this.customBoardGroups = []
+      }
+    },
+
+    addWorkflowGroup() {
+      const label = window.prompt(
+        'New order section name'
+      )
+
+      if (!label || !label.trim()) {
+        return
+      }
+
+      const cleanLabel = label.trim().toUpperCase()
+
+      const key = cleanLabel
+        .toLowerCase()
+        .replace(/[^a-z0-9]+/g, '_')
+        .replace(/^_|_$/g, '')
+
+      if (
+        this.boardGroups.some(
+          group => group.key === key
+        )
+      ) {
+        alert('This section already exists.')
+        return
+      }
+
+      const palette = [
+        '#8b5cf6',
+        '#ec4899',
+        '#06b6d4',
+        '#14b8a6',
+        '#f97316'
+      ]
+
+      const group = {
+        key,
+        label: cleanLabel,
+        color:
+          palette[
+            this.customBoardGroups.length %
+            palette.length
+          ],
+        icon: 'fa-solid fa-house',
+        custom: true
+      }
+
+      this.customBoardGroups.push(group)
+
+      localStorage.setItem(
+        'custom_factory_order_groups',
+        JSON.stringify(this.customBoardGroups)
+      )
+
+      const statusOption = {
+        label: cleanLabel,
+        color: group.color,
+        group: key,
+        groupLabel: cleanLabel,
+        custom: true
+      }
+
+      this.statusOptions.push(statusOption)
+      this.saveCustomStatusOption(statusOption)
+
+      this.activeGroup = key
+    },
+
+    toggleNotificationMenu() {
+      this.showChatNotificationMenu = !this.showChatNotificationMenu
+
+      if (!this.showChatNotificationMenu) return
+
+      if (
+        this.totalUnreadChatCount === 0 &&
+        this.unreadOrderNotificationCount > 0
+      ) {
+        this.notificationTab = 'orders'
+      } else if (
+        this.unreadOrderNotificationCount === 0 &&
+        this.totalUnreadChatCount > 0
+      ) {
+        this.notificationTab = 'chats'
+      }
+    },
+
+    async openBoardOrder(order) {
+      await this.selectOrder(order)
+      this.detailOpen = true
+    },
+
+    async openOrderFromNotification(order) {
+      this.showChatNotificationMenu = false
+      this.activeGroup = order.group || this.activeGroup
+      this.activeSectionCollapsed = false
+
+      await this.openBoardOrder(order)
+    },
+
+    notificationTime(value) {
+      if (!value) return ''
+
+      const date = new Date(value)
+      if (Number.isNaN(date.getTime())) return ''
+
+      const diff = Date.now() - date.getTime()
+      const minute = 60 * 1000
+      const hour = 60 * minute
+      const day = 24 * hour
+
+      if (diff < minute) return 'Just now'
+      if (diff < hour) return `${Math.floor(diff / minute)}m ago`
+      if (diff < day) return `${Math.floor(diff / hour)}h ago`
+      if (diff < 7 * day) return `${Math.floor(diff / day)}d ago`
+
+      return date.toLocaleDateString('en-US', {
+        month: 'short',
+        day: 'numeric'
+      })
+    },
+
+    closeBoardDetail() {
+      this.detailOpen = false
+      this.showChat = false
+      this.closeAllMenus()
+    },
+
+    async openBoardChat(order) {
+      await this.selectOrder(order)
+      this.detailOpen = true
+      this.showChat = true
+
+      if (this.markChatRead) {
+        await this.markChatRead()
+      }
+    },
+
+    async openChatFromNotification(order) {
+      this.showChatNotificationMenu = false
+      this.activeGroup = order.group || this.activeGroup
+      this.activeSectionCollapsed = false
+
+      await this.openBoardChat(order)
+
+      /*
+       * Read hone ke baad bell dropdown aur board row dono
+       * foran refresh ho jayein.
+       */
+      await this.fetchOrders()
+    },
+
+    async openOrderCard(order, card) {
+      await this.selectOrder(order)
+      this.detailOpen = true
+
+      const selectedCard =
+        this.selectedOrder?.cards?.find(
+          item => item.type === card.type
+        )
+
+      if (selectedCard) {
+        this.openViewAll(selectedCard)
+      }
+    },
+
+    toggleRowStatusMenu(order, event) {
+      if (!order?.id) return
+
+      const id = Number(order.id)
+
+      if (this.rowStatusMenuId === id) {
+        this.rowStatusMenuId = null
+        this.rowStatusMenuOrder = null
+        return
+      }
+
+      const button = event?.currentTarget
+      const rect = button?.getBoundingClientRect?.()
+
+      if (!rect) return
+
+      const width = 320
+      const gap = 8
+      const padding = 12
+
+      let left = rect.left
+      let top = rect.bottom + gap
+
+      const estimatedHeight = 470
+
+      if (left + width > window.innerWidth - padding) {
+        left = window.innerWidth - width - padding
+      }
+
+      if (left < padding) {
+        left = padding
+      }
+
+      if (top + estimatedHeight > window.innerHeight - padding) {
+        top = Math.max(
+          padding,
+          rect.top - estimatedHeight - gap
+        )
+      }
+
+      this.rowStatusMenuPosition = {
+        top,
+        left,
+        width
+      }
+
+      this.rowStatusMenuOrder = order
+      this.rowStatusMenuId = id
+    },
+
+    async selectRowStatus(order, status) {
+      if (!order || !status?.label) return
+
+      this.rowStatusMenuId = null
+      this.rowStatusMenuOrder = null
+
+      await this.inlineChangeStatus(
+        order,
+        status.label
+      )
+    },
+
+    startRowStatusEdit(status) {
+      if (!status?.custom) return
+
+      this.rowStatusEditingLabel = status.label
+      this.rowStatusEditName = status.label
+      this.rowStatusEditColor = status.color || '#6161ff'
+    },
+
+    cancelRowStatusEdit() {
+      this.rowStatusEditingLabel = null
+      this.rowStatusEditName = ''
+      this.rowStatusEditColor = '#6161ff'
+    },
+
+    async saveRowStatusEdit(status) {
+      if (!status?.custom) return
+
+      const oldLabel = String(status.label || '').trim()
+      const newLabel = String(this.rowStatusEditName || '').trim()
+      const newColor = this.rowStatusEditColor || status.color || '#6161ff'
+
+      if (!oldLabel || !newLabel) return
+
+      const duplicate = this.statusOptions.some(
+        item =>
+          item !== status &&
+          String(item.label || '').trim().toLowerCase() ===
+          newLabel.toLowerCase()
+      )
+
+      if (duplicate) {
+        alert('A status with this name already exists.')
+        return
+      }
+
+      const affectedOrders = this.orders.filter(
+        order =>
+          String(order.status || '').trim().toLowerCase() ===
+          oldLabel.toLowerCase()
+      )
+
+      status.label = newLabel
+      status.color = newColor
+      status.custom = true
+
+      const customOnly = this.statusOptions
+        .filter(item => item.custom)
+        .map(item => ({
+          label: item.label,
+          color: item.color,
+          group: item.group || 'in_production',
+          groupLabel: item.groupLabel || 'In Production',
+          custom: true
+        }))
+
+      localStorage.setItem(
+        'custom_order_statuses',
+        JSON.stringify(customOnly)
+      )
+
+      // Keep already-loaded orders in sync and persist them.
+      affectedOrders.forEach(order => {
+        order.status = newLabel
+        order.statusColor = newColor
+      })
+
+      await Promise.allSettled(
+        affectedOrders.map(order =>
+          axios.put(
+            `/api/orders/${order.id}`,
+            {
+              status: newLabel,
+              status_color: newColor
+            },
+            { headers: this.headers() }
+          )
+        )
+      )
+
+      if (
+        this.rowStatusMenuOrder &&
+        String(this.rowStatusMenuOrder.status || '').trim().toLowerCase() ===
+          oldLabel.toLowerCase()
+      ) {
+        this.rowStatusMenuOrder.status = newLabel
+        this.rowStatusMenuOrder.statusColor = newColor
+      }
+
+      if (
+        this.selectedOrder &&
+        String(this.selectedOrder.status || '').trim().toLowerCase() ===
+          oldLabel.toLowerCase()
+      ) {
+        this.selectedOrder.status = newLabel
+        this.selectedOrder.statusColor = newColor
+      }
+
+      this.cancelRowStatusEdit()
+    },
+
+    async deleteRowCustomStatus(status) {
+      if (!status?.custom) return
+
+      const label = String(status.label || '').trim()
+
+      if (
+        !confirm(
+          `Delete "${label}" status?\n\nOrders already using it will keep their current status until you change them.`
+        )
+      ) {
+        return
+      }
+
+      this.statusOptions = this.statusOptions.filter(
+        item => item !== status
+      )
+
+      const customOnly = this.statusOptions
+        .filter(item => item.custom)
+        .map(item => ({
+          label: item.label,
+          color: item.color,
+          group: item.group || 'in_production',
+          groupLabel: item.groupLabel || 'In Production',
+          custom: true
+        }))
+
+      localStorage.setItem(
+        'custom_order_statuses',
+        JSON.stringify(customOnly)
+      )
+
+      if (this.rowStatusEditingLabel === label) {
+        this.cancelRowStatusEdit()
+      }
+    },
+
+    async addCustomRowStatus(order) {
+      if (!order) return
+
+      const label = String(this.customStatusLabel || '').trim()
+      if (!label) return
+
+      const existing = this.statusOptions.find(
+        item =>
+          String(item.label || '').toLowerCase() ===
+          label.toLowerCase()
+      )
+
+      const status = existing || {
+        label,
+        color: this.customStatusColor || '#6161ff',
+        group: order.group || this.activeGroup || 'in_production',
+        groupLabel:
+          this.boardGroups.find(
+            group =>
+              group.key ===
+              (order.group || this.activeGroup)
+          )?.label || 'In Production',
+        custom: true
+      }
+
+      if (!existing) {
+        this.saveCustomStatusOption(status)
+      }
+
+      this.customStatusLabel = ''
+      this.customStatusColor = '#6161ff'
+
+      await this.inlineChangeStatus(order, status.label)
+
+      this.rowStatusMenuId = null
+      this.rowStatusMenuOrder = null
+    },
+
+    async changeRowCustomStatusColor(status, color) {
+      if (!status || !color) return
+
+      status.color = color
+      status.custom = true
+      this.saveCustomStatusOption(status)
+
+      const affectedOrders = this.orders.filter(
+        order =>
+          String(order.status || '').toLowerCase() ===
+          String(status.label || '').toLowerCase()
+      )
+
+      for (const order of affectedOrders) {
+        order.statusColor = color
+      }
+
+      if (
+        this.rowStatusMenuOrder &&
+        String(this.rowStatusMenuOrder.status || '').toLowerCase() ===
+        String(status.label || '').toLowerCase()
+      ) {
+        try {
+          await axios.put(
+            `/api/orders/${this.rowStatusMenuOrder.id}`,
+            {
+              status: status.label,
+              status_color: color
+            },
+            { headers: this.headers() }
+          )
+
+          this.rowStatusMenuOrder.statusColor = color
+        } catch (error) {
+          console.error('changeRowCustomStatusColor error:', error)
+        }
+      }
+    },
+
+    async openStatusForRow(order) {
+      await this.selectOrder(order)
+      this.detailOpen = true
+      this.showStatusMenu = true
+    },
+
+    packingDetailText(order) {
+      return String(
+        order?.packing_detail ??
+        order?.packingDetail ??
+        ''
+      ).trim()
+    },
+
+    shortPackingDetail(value) {
+      const words = String(value || '')
+        .trim()
+        .split(/\s+/)
+        .filter(Boolean)
+
+      if (!words.length) return '—'
+
+      if (words.length <= 2) {
+        return words.join(' ')
+      }
+
+      return words.slice(0, 2).join(' ') + '...'
+    },
+
+    openPackingEditor(order) {
+      this.packingEditOrderId = Number(order.id)
+      this.packingEditValue = this.packingDetailText(order)
+
+      this.$nextTick(() => {
+        const textarea = document.querySelector(
+          '.packing-detail-popover .packing-detail-input'
+        )
+
+        if (textarea) {
+          textarea.focus()
+          textarea.setSelectionRange(
+            textarea.value.length,
+            textarea.value.length
+          )
+        }
+      })
+    },
+
+    closePackingEditor() {
+      this.packingEditOrderId = null
+      this.packingEditValue = ''
+      this.packingSavingOrderId = null
+    },
+
+    async savePackingDetail(order) {
+      if (!order?.id) return
+
+      this.packingSavingOrderId = Number(order.id)
+
+      const value = String(this.packingEditValue || '').trim()
+
+      try {
+        await axios.put(
+          `/api/orders/${order.id}`,
+          { notes: value },
+          { headers: this.headers() }
+        )
+
+        const noteCard = order.cards?.find(
+          card => card.type === 'notes'
+        )
+
+        if (noteCard) {
+          noteCard.noteText = value
+          noteCard.saved = true
+
+          setTimeout(() => {
+            noteCard.saved = false
+          }, 1400)
+        }
+
+        /*
+         * Detail panel mein same order open ho to uska notes card bhi
+         * instantly sync rahe.
+         */
+        if (
+          this.selectedOrder &&
+          Number(this.selectedOrder.id) === Number(order.id)
+        ) {
+          const selectedNoteCard =
+            this.selectedOrder.cards?.find(
+              card => card.type === 'notes'
+            )
+
+          if (selectedNoteCard) {
+            selectedNoteCard.noteText = value
+          }
+        }
+
+        this.closePackingEditor()
+      } catch (error) {
+        console.error('Packing detail save error:', error)
+
+        alert(
+          error.response?.data?.message ||
+          'Packing detail save nahi hua.'
+        )
+      } finally {
+        this.packingSavingOrderId = null
+      }
+    },
+
+    trackingSummary(value) {
+      const list = this.parseTrackingList(value)
+      const item = list?.[0]
+
+      return item?.number || 'N/A'
+    },
+
+    startInlineOrder() {
+      this.inlineAddOpen = true
+      this.inlineOrderName = ''
+
+      this.$nextTick(() => {
+        const input = this.$refs.inlineOrderInput
+
+        if (input) {
+          input.scrollIntoView({
+            behavior: 'smooth',
+            block: 'center'
+          })
+
+          input.focus()
+        }
+      })
+    },
+
+    cancelInlineOrder() {
+      this.inlineAddOpen = false
+      this.inlineOrderName = ''
+      this.inlineOrderSaving = false
+    },
+
+    async createInlineOrder() {
+      const name = this.inlineOrderName
+        .trim()
+        .toUpperCase()
+
+      if (
+        !name ||
+        this.inlineOrderSaving ||
+        !this.canCreateOrder
+      ) {
+        return
+      }
+
+      this.inlineOrderSaving = true
+
+      const activeStatus =
+        this.statusOptions.find(
+          item => item.group === this.activeGroup
+        ) ||
+        this.statusOptions.find(
+          item => item.label === 'Pending'
+        )
+
+      try {
+        const response = await axios.post(
+          '/api/orders',
+          {
+            name,
+            po: this.generatePoNumber(),
+            ship_date: null,
+            status:
+              activeStatus?.label || 'Pending',
+            status_color:
+              activeStatus?.color || '#fdab3d',
+            payment: '0 % Paid',
+            trk: 'N/A',
+            notes: '',
+            shipping_address: '',
+            member_ids: [],
+            client_ids: []
+          },
+          {
+            headers: this.headers()
+          }
+        )
+
+        const createdId =
+          response.data?.order?.id ||
+          response.data?.id
+
+        if (
+          createdId &&
+          !this.newlyCreatedOrderIds.includes(
+            Number(createdId)
+          )
+        ) {
+          this.newlyCreatedOrderIds.unshift(
+            Number(createdId)
+          )
+
+          localStorage.setItem(
+            'factory_pinned_new_order_ids',
+            JSON.stringify(this.newlyCreatedOrderIds)
+          )
+        }
+
+        this.cancelInlineOrder()
+        await this.fetchOrders()
+
+        /*
+         * Order create hone ke baad row list mein hi rahegi.
+         * Detail panel automatically open nahi hoga.
+         */
+        this.selectedOrder = null
+        this.detailOpen = false
+      } catch (error) {
+        console.error(
+          'Inline order create error:',
+          error
+        )
+
+        alert(
+          error.response?.data?.message ||
+          'Order could not be created.'
+        )
+      } finally {
+        this.inlineOrderSaving = false
+      }
+    },
+
 shortLastMessage(text) {
   if (!text) return ''
   return text.length > 28 ? text.substring(0, 28) + '...' : text
@@ -1156,7 +6576,7 @@ deleteCustomStatus(status) {
   // Client sirf view/download karega
   if (this.isClient) return false;
 
-  return this.isSuperAdmin || Number(file?.senderId) === Number(this.currentUser?.id);
+  return this.hasFullOrderAccess || Number(file?.senderId) === Number(this.currentUser?.id);
 },
   toggleSelectAll() {
   this.selectedOrders = this.selectAll
@@ -1167,6 +6587,21 @@ deleteCustomStatus(status) {
 clearBulkSelection() {
   this.selectedOrders = []
   this.selectAll = false
+},
+
+selectAllAvailableMembers() {
+  if (
+    this.bulkSelectedMembers.length ===
+      this.availableMembers.length &&
+    this.availableMembers.length
+  ) {
+    this.bulkSelectedMembers = []
+    return
+  }
+
+  this.bulkSelectedMembers = [
+    ...this.availableMembers
+  ]
 },
 
 openBulkMembersModal() {
@@ -1268,7 +6703,7 @@ alert(e.response?.data?.message || 'Orders were not deleted')
 
     // Mobile: select order and close left panel
     selectOrderAndClose(order) {
-      this.selectOrder(order)
+      this.openBoardOrder(order)
       this.mobileLeftOpen = false
     },
 
@@ -1303,14 +6738,14 @@ alert(e.response?.data?.message || 'Orders were not deleted')
     clearSelectedMembers() { this.newOrder.selectedMembers = [] },
 
     triggerInvoiceUpload() {
-      if (!this.isSuperAdmin || !this.selectedOrder) return
+      if (!this.hasFullOrderAccess || !this.selectedOrder) return
       this.$refs.invoiceInput?.click()
     },
 
     async onInvoiceFileChange(event) {
       const files = Array.from(event.target.files || [])
       event.target.value = ''
-      if (!files.length || !this.isSuperAdmin || !this.selectedOrder) return
+      if (!files.length || !this.hasFullOrderAccess || !this.selectedOrder) return
       const formData = new FormData()
       formData.append('card_type', 'invoice_files')
       files.forEach(file => formData.append('files[]', file))
@@ -1453,28 +6888,92 @@ async saveTracking() {
 
 openPreviewFile(file) {
   if (!file?.url) return
-  const ext = (file.name || '').split('.').pop().toLowerCase()
-  const officeExts = ['doc', 'docx', 'xls', 'xlsx', 'ppt', 'pptx']
-  const browserExts = ['pdf', 'csv', 'txt']
 
-  if (officeExts.includes(ext)) {
-    // Google Docs Viewer se open karo — download nahi hoga
-    const fullUrl = file.url.startsWith('http')
-      ? file.url
-      : window.location.origin + file.url
-    const viewerUrl = `https://docs.google.com/viewer?url=${encodeURIComponent(fullUrl)}&embedded=false`
-    window.open(viewerUrl, '_blank')
-    return
+  this.previewFile = {
+    ...file,
+    isImage:
+      file.isImage ??
+      /\.(jpg|jpeg|png|gif|webp|svg)$/i.test(file.name || '')
   }
-
-  if (browserExts.includes(ext)) {
-    window.open(file.url, '_blank')
-    return
-  }
-
-  this.previewFile = file
 },
-    safeFileName(name) { return String(name || 'file').replace(/[^a-z0-9_.-]/gi, '_') },
+
+    fileExtension(file) {
+      return String(file?.name || '')
+        .split('.')
+        .pop()
+        .toLowerCase()
+    },
+
+    absoluteFileUrl(file) {
+      if (!file?.url) return ''
+      return file.url.startsWith('http')
+        ? file.url
+        : window.location.origin + file.url
+    },
+
+    canEmbedPreview(file) {
+      const ext = this.fileExtension(file)
+      return [
+        'pdf', 'txt', 'csv',
+        'doc', 'docx', 'xls', 'xlsx', 'ppt', 'pptx'
+      ].includes(ext)
+    },
+
+    previewEmbedUrl(file) {
+      const ext = this.fileExtension(file)
+      const fullUrl = this.absoluteFileUrl(file)
+
+      if (['doc', 'docx', 'xls', 'xlsx', 'ppt', 'pptx'].includes(ext)) {
+        return `https://docs.google.com/viewer?url=${encodeURIComponent(fullUrl)}&embedded=true`
+      }
+
+      return file?.url || ''
+    },
+
+    openFileNewTab(file) {
+      if (!file?.url) return
+      window.open(this.absoluteFileUrl(file), '_blank', 'noopener,noreferrer')
+    },
+
+    async downloadSingleFile(file) {
+      if (!file?.url) return
+
+      try {
+        const response = await fetch(file.url)
+        if (!response.ok) throw new Error('Download request failed')
+
+        const blob = await response.blob()
+        const blobUrl = URL.createObjectURL(blob)
+        const a = document.createElement('a')
+        a.href = blobUrl
+        a.download = this.safeFileName(file.name || 'file')
+        document.body.appendChild(a)
+        a.click()
+        a.remove()
+        URL.revokeObjectURL(blobUrl)
+      } catch (e) {
+        console.error('downloadSingleFile error:', e)
+
+        const a = document.createElement('a')
+        a.href = file.url
+        a.download = this.safeFileName(file.name || 'file')
+        a.target = '_blank'
+        a.rel = 'noopener'
+        document.body.appendChild(a)
+        a.click()
+        a.remove()
+      }
+    },
+
+    formatFileSize(bytes) {
+      const size = Number(bytes || 0)
+      if (!size) return ''
+      if (size < 1024) return `${size} B`
+      if (size < 1024 * 1024) return `${(size / 1024).toFixed(1)} KB`
+      return `${(size / (1024 * 1024)).toFixed(1)} MB`
+    },
+
+        safeFileName(name) { return String(name || 'file').replace(/[^a-z0-9_.-]/gi, '_') },
     zipBaseName() {
       const d = new Date()
       const month = d.toLocaleString('en-US', { month: 'long' }).toLowerCase()
@@ -1540,7 +7039,14 @@ openPreviewFile(file) {
       try {
         const res = await axios.post('/api/me/profile', form, { headers: { ...this.headers(), 'Content-Type': 'multipart/form-data' } })
         const user = res.data?.user
-        if (user) localStorage.setItem('user', JSON.stringify(user))
+
+        if (user) {
+          localStorage.setItem(
+            'user',
+            JSON.stringify(user)
+          )
+        }
+
         this.closeProfile()
         await this.fetchMembers()
         await this.fetchOrders()
@@ -1605,11 +7111,60 @@ openPreviewFile(file) {
         const res = await axios.get('/api/orders', { headers: this.headers() })
         const list = Array.isArray(res.data) ? res.data : (res.data?.data || [])
         this.orders = list.map(order => this.formatOrder(order))
+
+        // Load file thumbnails for every board row as well.
+        // This keeps the 3 thumbnail previews visible after a full page refresh.
+        await this.loadBoardOrderFiles()
+
         if (this.selectedOrder) {
           const fresh = this.orders.find(o => Number(o.id) === Number(this.selectedOrder.id))
           if (fresh) this.selectedOrder = fresh
         }
       } catch (e) { console.error('fetchOrders error:', e) } finally { this.loadingOrders = false }
+    },
+
+    async loadBoardOrderFiles() {
+      if (!Array.isArray(this.orders) || !this.orders.length) return
+
+      await Promise.all(
+        this.orders.map(async order => {
+          try {
+            const res = await axios.get(`/api/orders/${order.id}/files`, {
+              headers: this.headers()
+            })
+
+            const files = Array.isArray(res.data)
+              ? res.data
+              : (res.data?.data || [])
+
+            const normalizedFiles = files.map(file => ({
+              ...this.normalizeOrderFile(file),
+              cardType: file.card_type
+            }))
+
+            order.invoiceFiles = normalizedFiles.filter(
+              file => file.cardType === 'invoice_files'
+            )
+
+            ;(order.cards || []).forEach(card => {
+              if (card.type === 'notes') return
+
+              if (card.type === 'order_files') {
+                card.files = normalizedFiles.filter(file =>
+                  file.cardType === 'order_files' ||
+                  file.cardType === 'chat_files'
+                )
+              } else {
+                card.files = normalizedFiles.filter(
+                  file => file.cardType === card.type
+                )
+              }
+            })
+          } catch (error) {
+            console.error(`Board files load error for order ${order.id}:`, error)
+          }
+        })
+      )
     },
 
     async fetchMembers() {
@@ -1639,7 +7194,10 @@ async fetchClients() {
       const status = order.status || 'Pending'
       return {
         id: order.id,
-        user_has_seen: Boolean(order.user_has_seen),
+        created_at: order.created_at || null,
+        user_has_seen:
+          Boolean(order.user_has_seen) ||
+          this.persistentSeenOrderIds.includes(Number(order.id)),
         read_at: order.read_at || null,
         read_info: order.read_info || [],
         group: this.statusToGroup(status),
@@ -1657,11 +7215,29 @@ async fetchClients() {
         members,
         clients: order.clients || [],
         shippingAddress: order.shipping_address || '',
+        packing_detail: order.packing_detail || '',
+        packingDetail: order.packing_detail || '',
         unread_chat_count: Number(order.unread_chat_count || 0),
         last_message_at: order.last_message_at || null,
         last_message_text: order.last_message_text || '',
         last_message_sender: order.last_message_sender || '',
         last_message_time: order.last_message_time || '',
+
+        /*
+         * Current working designer backend ki
+         * order_work_sessions table se aata hai.
+         */
+        working_by: order.working_by || null,
+
+        /*
+         * Order creator backend se creator relation ke naam se aaye.
+         * Alternate field names bhi support kiye gaye hain.
+         */
+        creator:
+          order.creator ||
+          order.created_by_user ||
+          order.createdBy ||
+          null,
 
         invoiceFiles: [],
         owners: members.map(m => ({
@@ -1682,8 +7258,18 @@ async fetchClients() {
     },
 
     statusToGroup(status) {
+      const found = this.statusOptions.find(
+        item => item.label === status
+      )
+
+      if (found?.group) {
+        return found.group
+      }
+
       if (status === 'Completed') return 'completed'
-      if (status === 'Shipped' || status === 'Delivered') return 'shipped'
+      if (status === 'Shipped') return 'shipped'
+      if (status === 'Delivered') return 'delivered'
+
       return 'in_production'
     },
 
@@ -1736,6 +7322,22 @@ this.activeTrackingIndex = 0
         const res = await axios.post(`/api/orders/${order.id}/mark-read`, {}, { headers: this.headers() })
         order.user_has_seen = true
         order.read_at = res.data?.read_at || new Date().toISOString()
+
+        if (
+          !this.persistentSeenOrderIds.includes(
+            Number(order.id)
+          )
+        ) {
+          this.persistentSeenOrderIds.push(
+            Number(order.id)
+          )
+
+          localStorage.setItem(
+            'artwork_seen_order_ids',
+            JSON.stringify(this.persistentSeenOrderIds)
+          )
+        }
+
         const idx = this.orders.findIndex(o => Number(o.id) === Number(order.id))
         if (idx !== -1) { this.orders[idx].user_has_seen = true; this.orders[idx].read_at = order.read_at }
       } catch (e) { console.error('markOrderRead error:', e) }
@@ -1862,7 +7464,7 @@ shippingAddress: order.shippingAddress || '',
     getOrderNote(order) { return order.cards?.find(c => c.title === 'Notes')?.noteText || '' },
 
     async duplicateOrder(order) {
-if (!this.isSuperAdmin && this.currentUser?.can_create_orders !== true) return
+if (!this.hasFullOrderAccess && this.currentUser?.can_create_orders !== true) return
       const status = this.statusOptions.find(s => s.label === order.status)
       try {
         const res = await axios.post('/api/orders', {
@@ -1881,7 +7483,7 @@ if (!this.isSuperAdmin && this.currentUser?.can_create_orders !== true) return
     },
 
     async deleteOrder(order) {
-if (!this.isSuperAdmin && this.currentUser?.can_create_orders !== true) return
+if (!this.hasFullOrderAccess && this.currentUser?.can_create_orders !== true) return
       if (!confirm('Delete this order?')) return
       try {
         await axios.delete(`/api/orders/${order.id}`, { headers:  this.headers() })
@@ -2104,11 +7706,90 @@ async onFileChange(event, card) {
       catch (e) { console.error('onFileChange error:', e); alert(e.response?.data?.message || 'File upload nahi hui') }
     },
 
+    onDragEnter(card) {
+      if (!this.canUploadFiles || !card || card.type === 'notes') return
+
+      this.dragCounter += 1
+      this.dragActiveCardType = card.type
+    },
+
+    onDragOver(event, card) {
+      if (!this.canUploadFiles || !card || card.type === 'notes') return
+
+      if (event?.dataTransfer) {
+        event.dataTransfer.dropEffect = 'copy'
+      }
+
+      this.dragActiveCardType = card.type
+    },
+
+    onDragLeave(event, card) {
+      if (!card) return
+
+      this.dragCounter = Math.max(0, this.dragCounter - 1)
+
+      const currentTarget = event?.currentTarget
+      const relatedTarget = event?.relatedTarget
+
+      /*
+       * Child element ke andar move karne par overlay hide nahi hoga.
+       */
+      if (
+        currentTarget &&
+        relatedTarget &&
+        currentTarget.contains(relatedTarget)
+      ) {
+        return
+      }
+
+      if (this.dragCounter === 0) {
+        this.dragActiveCardType = null
+      }
+    },
+
     async onDrop(event, card) {
-      const files = Array.from(event.dataTransfer.files || [])
-if (!files.length || !this.canUploadFiles || !card || card.type === 'notes') return
-      try { await this.uploadFilesToOrder(files, card.type) }
-      catch (e) { console.error('onDrop error:', e); alert(e.response?.data?.message || 'File upload nahi hui') }
+      this.dragCounter = 0
+      this.dragActiveCardType = null
+
+      if (!this.canUploadFiles || !card || card.type === 'notes') {
+        return
+      }
+
+      const droppedItems = Array.from(
+        event?.dataTransfer?.items || []
+      )
+
+      /*
+       * Browser folder ko direct upload nahi kar sakta.
+       * Folder ke andar files select/drag karni hongi.
+       */
+      const containsFolder = droppedItems.some(item => {
+        const entry = item.webkitGetAsEntry?.()
+        return entry?.isDirectory === true
+      })
+
+      if (containsFolder) {
+        alert('Please folder ke andar ki files drag karein. Complete folder upload supported nahi hai.')
+        return
+      }
+
+      const files = Array.from(
+        event?.dataTransfer?.files || []
+      ).filter(file => file && file.size >= 0)
+
+      if (!files.length) {
+        return
+      }
+
+      try {
+        await this.uploadFilesToOrder(files, card.type)
+      } catch (e) {
+        console.error('onDrop error:', e)
+        alert(
+          e.response?.data?.message ||
+          'File upload nahi hui'
+        )
+      }
     },
 
   async removeFile(card, index) {
@@ -2132,7 +7813,7 @@ if (!files.length || !this.canUploadFiles || !card || card.type === 'notes') ret
     openViewAll(card) { this.viewAllCard = card },
 
     openInvoiceFiles() {
-      if (!this.isSuperAdmin || !this.selectedOrder?.invoiceFiles?.length) return
+      if (!this.hasFullOrderAccess || !this.selectedOrder?.invoiceFiles?.length) return
       this.viewAllCard = { title: 'Invoices', type: 'invoice_files', files: this.selectedOrder.invoiceFiles }
     },
 
@@ -2161,11 +7842,125 @@ if (!files.length || !this.canUploadFiles || !card || card.type === 'notes') ret
       return 'fa-solid fa-file'
     },
 
+    minimumColumnWidth(key) {
+      const minimums = {
+        check: 36,
+        name: 180,
+        status: 95,
+        owner: 85,
+        files: 90,
+        packing: 105,
+        chat: 65,
+        payment: 90,
+        address: 130,
+        track: 85,
+        info: 36
+      }
+
+      return minimums[key] || 70
+    },
+
+    nextColumnKey(key) {
+      const order = [
+        'check',
+        'name',
+        'status',
+        'owner',
+        'files',
+        'packing',
+        'chat',
+        'payment',
+        'address',
+        'track',
+        'info'
+      ]
+
+      const index = order.indexOf(key)
+
+      if (index === -1 || index >= order.length - 1) {
+        return null
+      }
+
+      return order[index + 1]
+    },
+
+    startColumnResize(key, event) {
+      if (!key || !event) return
+
+      const nextKey = this.nextColumnKey(key)
+
+      if (!nextKey) return
+
+      this.columnResizeState = {
+        key,
+        nextKey,
+        startX: event.clientX,
+        startWidth: Number(this.columnWidths[key] || 100),
+        nextStartWidth: Number(this.columnWidths[nextKey] || 100)
+      }
+
+      document.body.classList.add('board-column-resizing')
+      document.addEventListener('mousemove', this.resizeBoardColumn)
+      document.addEventListener('mouseup', this.stopColumnResize)
+    },
+
+    resizeBoardColumn(event) {
+      if (!this.columnResizeState) return
+
+      const {
+        key,
+        nextKey,
+        startX,
+        startWidth,
+        nextStartWidth
+      } = this.columnResizeState
+
+      const requestedDelta = event.clientX - startX
+
+      const currentMin = this.minimumColumnWidth(key)
+      const nextMin = this.minimumColumnWidth(nextKey)
+
+      /*
+       * Divider move karne par:
+       * left/current column barhta hai to right/next column utna hi chhota hota hai.
+       * Is liye total table width SAME rehti hai aur blank space nahi banti.
+       */
+      const maxPositiveDelta = nextStartWidth - nextMin
+      const maxNegativeDelta = -(startWidth - currentMin)
+
+      const delta = Math.max(
+        maxNegativeDelta,
+        Math.min(requestedDelta, maxPositiveDelta)
+      )
+
+      this.columnWidths[key] = Math.round(startWidth + delta)
+      this.columnWidths[nextKey] = Math.round(nextStartWidth - delta)
+    },
+
+    stopColumnResize() {
+      if (!this.columnResizeState) return
+
+      /*
+       * Width intentionally save nahi hoti.
+       * Page refresh ke baad default column widths wapas aayengi.
+       */
+      this.columnResizeState = null
+
+      document.body.classList.remove('board-column-resizing')
+      document.removeEventListener('mousemove', this.resizeBoardColumn)
+      document.removeEventListener('mouseup', this.stopColumnResize)
+    },
+
     closeAllMenus() {
+      this.rowStatusMenuId = null
+      this.rowStatusMenuOrder = null
       this.showStatusMenu = false
       this.showPaymentMenu = false
       this.showTrackingMenu = false
       this.showDatePicker = false
+      this.showChatNotificationMenu = false
+      this.packingEditOrderId = null
+      this.packingEditValue = ''
       this.openOrderMenuId = null
     },
 
@@ -2255,6 +8050,7 @@ showDesktopNotification(notification) {
 
 }
 </script>
+
 
 <style scoped>
 
@@ -4108,4 +9904,8297 @@ grid-template-columns: 32px 1fr 118px 38px;
 }
 
 .me-1 { margin-right: 4px; }
+
+/* ================= DRAG AND DROP FILE UPLOAD ================= */
+
+.card-preview-area,
+.view-all-body {
+  position: relative;
+}
+
+.card-preview-area.drag-drop-active,
+.view-all-body.drag-drop-active {
+  outline: 2px dashed #111827;
+  outline-offset: -6px;
+  background: rgba(17, 24, 39, 0.06);
+}
+
+.drag-drop-overlay {
+  position: absolute;
+  inset: 6px;
+  z-index: 30;
+  border: 2px dashed #111827;
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.94);
+  color: #111827;
+  pointer-events: none;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  text-align: center;
+  backdrop-filter: blur(3px);
+}
+
+.drag-drop-overlay i {
+  font-size: 28px;
+}
+
+.drag-drop-overlay strong {
+  font-size: 14px;
+  font-weight: 800;
+}
+
+.drag-drop-overlay span {
+  max-width: 90%;
+  overflow: hidden;
+  color: #6b7280;
+  font-size: 12px;
+  font-weight: 700;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.drag-drop-overlay-modal {
+  inset: 12px;
+  min-height: 180px;
+}
+
+
+
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+.factory-board-page {
+  min-height: 100vh;
+  background: #ffffff;
+  color: #141821;
+  font-family: Arial, Helvetica, sans-serif;
+}
+
+/* HEADER */
+.board-brand-header {
+  min-height: 180px;
+  padding: 25px 42px 18px;
+  display: grid;
+  grid-template-columns: 180px 1fr 180px;
+  align-items: center;
+  gap: 20px;
+  background: #f4f5f8;
+}
+
+.board-brand-mark {
+  position: relative;
+  width: 145px;
+  height: 120px;
+  display: flex;
+  align-items: center;
+}
+
+.board-brand-mark img {
+  max-width: 145px;
+  max-height: 120px;
+  object-fit: contain;
+}
+
+.fallback-p {
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  font-size: 94px;
+  font-weight: 1000;
+  font-style: italic;
+  line-height: 1;
+}
+
+.board-header-center {
+  color: #a4a7ad;
+  font-size: 12px;
+  font-weight: 800;
+  letter-spacing: .18em;
+  text-align: center;
+}
+
+.board-profile-button {
+  justify-self: end;
+  position: relative;
+  width: 62px;
+  height: 62px;
+  border: 0;
+  border-radius: 50%;
+  background: #0f131c;
+  color: #ffffff;
+  cursor: pointer;
+  display: grid;
+  place-items: center;
+  font-size: 20px;
+  font-weight: 900;
+}
+
+.board-profile-photo {
+  width: 100%;
+  height: 100%;
+  border-radius: 50%;
+  object-fit: cover;
+}
+
+.board-profile-button > i {
+  position: absolute;
+  left: -5px;
+  bottom: -3px;
+  width: 25px;
+  height: 25px;
+  border: 3px solid #ffffff;
+  border-radius: 50%;
+  background: #0f131c;
+  color: #ffffff;
+  display: grid;
+  place-items: center;
+  font-size: 10px;
+}
+
+/* TOOLBAR */
+.board-toolbar {
+  padding: 0 42px 22px;
+  display: grid;
+  grid-template-columns: 122px minmax(0, 1fr) 235px;
+  align-items: center;
+  gap: 10px;
+}
+
+.summary-home-card,
+.workflow-tab {
+  border: 0;
+  cursor: pointer;
+}
+
+.summary-home-card {
+  height: 40px;
+  padding: 0 8px;
+  border-radius: 3px;
+  background: #494d54;
+  color: #ffffff;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.summary-home-card.active {
+  box-shadow: 0 0 0 3px rgba(74, 144, 226, .2);
+}
+
+.summary-home-icon {
+  width: 32px;
+  height: 32px;
+  border-radius: 2px;
+  background: #4a90e2;
+  display: grid;
+  place-items: center;
+}
+
+.summary-home-card small,
+.summary-home-card strong {
+  display: block;
+}
+
+.summary-home-card small {
+  font-size: 8px;
+  text-transform: uppercase;
+}
+
+.summary-home-card strong {
+  font-size: 14px;
+}
+
+.workflow-tabs {
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  overflow-x: auto;
+  padding: 3px;
+}
+
+.workflow-tab {
+  position: relative;
+  flex: 0 0 122px;
+  height: 40px;
+  padding: 0 42px 0 12px;
+  border-radius: 3px;
+  background: #4b4f56;
+  color: #ffffff;
+  text-align: left;
+  overflow: hidden;
+}
+
+.workflow-tab.active {
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--group-color), transparent 70%);
+}
+
+.workflow-tab-label {
+  display: block;
+  overflow: hidden;
+  font-size: 8px;
+  font-weight: 900;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.workflow-tab strong {
+  font-size: 13px;
+}
+
+.workflow-total-box {
+  position: absolute;
+  top: 0;
+  right: 0;
+  width: 34px;
+  height: 40px;
+  background: var(--group-color);
+  display: grid;
+  place-items: center;
+}
+
+.workflow-add-button {
+  flex: 0 0 40px;
+  width: 40px;
+  height: 40px;
+  border: 1px dashed #a7abb2;
+  border-radius: 3px;
+  background: #ffffff;
+  color: #4b4f56;
+  cursor: pointer;
+}
+
+.board-search {
+  height: 36px;
+  padding: 0 13px;
+  border: 2px solid #111827;
+  border-radius: 999px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.board-search input {
+  width: 100%;
+  border: 0;
+  outline: 0;
+  background: transparent;
+  font-size: 12px;
+}
+
+/* BOARD */
+.factory-board {
+  padding: 0 42px 45px;
+}
+
+.board-section-heading {
+  min-height: 60px;
+  padding: 12px 8px 8px;
+  border-top: 2px dashed #e5e7eb;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.board-section-heading > div {
+  display: flex;
+  align-items: flex-end;
+  gap: 18px;
+}
+
+.board-section-heading h1 {
+  margin: 0;
+  font-size: 21px;
+  font-weight: 1000;
+  font-style: italic;
+  letter-spacing: .03em;
+}
+
+.board-section-heading span {
+  margin-bottom: 3px;
+  font-size: 9px;
+  font-weight: 900;
+}
+
+.board-print-button {
+  border: 0;
+  background: transparent;
+  color: #111827;
+  cursor: pointer;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+.board-print-button i {
+  font-size: 26px;
+}
+
+.board-print-button small {
+  font-size: 8px;
+  font-weight: 900;
+}
+
+.board-table-shell {
+  border: 1px solid #dfe3e8;
+  background: #ffffff;
+  overflow-x: auto;
+}
+
+.board-table-head,
+.board-table-row,
+.board-inline-add-row {
+  min-width: 1210px;
+  display: grid;
+  grid-template-columns:
+    45px
+    minmax(185px, 1.6fr)
+    135px
+    145px
+    150px
+    145px
+    90px
+    125px
+    minmax(150px, 1fr)
+    110px
+    42px;
+  align-items: center;
+}
+
+.board-table-head {
+  min-height: 42px;
+  background: #4a90e2;
+  color: #111827;
+  font-size: 11px;
+  letter-spacing: .03em;
+}
+
+.board-table-row {
+  position: relative;
+  min-height: 88px;
+  border-bottom: 1px solid #e6e8eb;
+  cursor: pointer;
+  transition: background .16s ease;
+}
+
+.board-table-row:hover {
+  background: #f7fbff;
+}
+
+.board-table-row.unread {
+  box-shadow: inset 4px 0 #4a90e2;
+}
+
+.board-table-row.selected {
+  background: #f0f7ff;
+}
+
+.board-col {
+  min-width: 0;
+  padding: 8px 10px;
+}
+
+.board-col-check {
+  display: grid;
+  place-items: center;
+}
+
+.board-col-check input {
+  width: 22px;
+  height: 22px;
+  accent-color: #4a90e2;
+}
+
+.board-col-name {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.board-col-name strong {
+  display: block;
+  overflow: hidden;
+  font-size: 13px;
+  font-weight: 700;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.board-col-name small {
+  display: block;
+  margin-top: 4px;
+  color: #9ca3af;
+  font-size: 9px;
+}
+
+.board-new-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: #4a90e2;
+  flex-shrink: 0;
+}
+
+.board-status-pill,
+.board-payment-pill {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 82px;
+  min-height: 24px;
+  padding: 4px 12px;
+  border: 1px solid rgba(0, 0, 0, .25);
+  border-radius: 5px;
+  color: #111827;
+  font-size: 10px;
+  font-weight: 800;
+}
+
+.board-status-pill {
+  cursor: pointer;
+}
+
+.board-payment-pill {
+  border-radius: 999px;
+  background: #ffeb58;
+}
+
+.board-avatar-stack {
+  display: flex;
+  align-items: center;
+}
+
+.board-avatar {
+  width: 29px;
+  height: 29px;
+  margin-left: -5px;
+  border: 2px solid #ffffff;
+  border-radius: 50%;
+  color: #ffffff;
+  cursor: pointer;
+  display: grid;
+  place-items: center;
+  overflow: hidden;
+  font-size: 10px;
+  font-weight: 900;
+}
+
+.board-avatar:first-child {
+  margin-left: 0;
+}
+
+.board-avatar img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.board-avatar-more {
+  background: #343844;
+  cursor: default;
+}
+
+.board-file-icons {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.board-file-icons button {
+  position: relative;
+  width: 25px;
+  height: 29px;
+  border: 0;
+  background: transparent;
+  color: #252a31;
+  cursor: pointer;
+  font-size: 17px;
+}
+
+.board-file-icons button span {
+  position: absolute;
+  top: -4px;
+  right: -4px;
+  min-width: 14px;
+  height: 14px;
+  padding: 0 3px;
+  border-radius: 999px;
+  background: #4a90e2;
+  color: #ffffff;
+  font-size: 8px;
+  display: grid;
+  place-items: center;
+}
+
+.board-packing-text {
+  color: #6b7280;
+  font-size: 10px;
+  font-weight: 700;
+}
+
+.board-chat-button,
+.board-col-info button {
+  border: 0;
+  background: transparent;
+  cursor: pointer;
+}
+
+.board-chat-button {
+  position: relative;
+  width: 34px;
+  height: 34px;
+  border-radius: 50%;
+  background: #111827;
+  color: #ffffff;
+}
+
+.board-chat-button span {
+  position: absolute;
+  top: -5px;
+  right: -7px;
+  min-width: 18px;
+  height: 18px;
+  padding: 0 4px;
+  border: 2px solid #ffffff;
+  border-radius: 999px;
+  background: #4a5568;
+  font-size: 8px;
+  display: grid;
+  place-items: center;
+}
+
+.board-col-address,
+.board-col-track {
+  overflow: hidden;
+  color: #4b5563;
+  font-size: 10px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.board-col-info button {
+  color: #5f6368;
+  font-size: 17px;
+}
+
+.board-empty-state {
+  min-width: 1210px;
+  min-height: 150px;
+  color: #9ca3af;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  font-size: 13px;
+}
+
+/* PROSIX ORDER LOADER */
+.prosix-loading-state {
+  flex-direction: column;
+  gap: 10px;
+}
+
+.prosix-loader-logo-wrap {
+  width: 28px;
+  height: 28px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  animation: prosixLoaderPulse 1.15s ease-in-out infinite;
+}
+
+.prosix-loader-logo {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  display: block;
+}
+
+.prosix-loading-state span {
+  color: #9ca3af;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+@keyframes prosixLoaderPulse {
+  0%, 100% { transform: scale(.86); opacity: .45; }
+  50% { transform: scale(1.08); opacity: 1; }
+}
+
+/* INLINE ADD */
+.board-inline-add-row {
+  min-height: 72px;
+}
+
+.board-inline-add-main {
+  grid-column: 2 / -1;
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.board-add-order-button {
+  border: 0;
+  background: transparent;
+  color: #c4c7cc;
+  cursor: pointer;
+  font-size: 14px;
+  font-weight: 500;
+}
+
+.board-inline-add-main input {
+  width: min(480px, 70vw);
+  height: 40px;
+  padding: 0 13px;
+  border: 1px solid #4a90e2;
+  border-radius: 3px;
+  outline: 0;
+  font-size: 12px;
+  font-weight: 800;
+}
+
+.inline-save-button,
+.inline-cancel-button {
+  width: 38px;
+  height: 38px;
+  border: 0;
+  border-radius: 4px;
+  cursor: pointer;
+}
+
+.inline-save-button {
+  background: #4a90e2;
+  color: #ffffff;
+}
+
+.inline-cancel-button {
+  background: #eef0f3;
+  color: #111827;
+}
+
+/* COLLAPSED STATUS BARS */
+.collapsed-status-bars {
+  padding-top: 14px;
+  border-top: 2px dashed #e5e7eb;
+  display: grid;
+  gap: 10px;
+}
+
+.collapsed-status-bar {
+  min-height: 38px;
+  padding: 0 30px;
+  border: 0;
+  background: var(--group-color);
+  color: #10131a;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.collapsed-status-bar strong,
+.collapsed-status-bar span {
+  font-weight: 1000;
+  font-style: italic;
+}
+
+.collapsed-status-bar strong {
+  font-size: 18px;
+}
+
+.collapsed-status-bar span {
+  font-size: 15px;
+}
+
+/* DETAIL OVERLAY */
+.board-detail-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 5000;
+  padding: 22px;
+  background: rgba(9, 12, 18, .72);
+  display: flex;
+  align-items: stretch;
+  justify-content: flex-end;
+}
+
+.board-detail-panel {
+  position: relative;
+  width: min(1380px, calc(100vw - 44px));
+  height: calc(100vh - 44px);
+  overflow: auto;
+  border-radius: 8px;
+  background: #f6f7fb;
+  box-shadow: 0 30px 90px rgba(0, 0, 0, .4);
+}
+
+.board-detail-close {
+  position: absolute;
+  top: 14px;
+  right: 14px;
+  z-index: 20;
+  width: 35px;
+  height: 35px;
+  border: 1px solid rgba(255, 255, 255, .35);
+  border-radius: 7px;
+  background: rgba(0, 0, 0, .35);
+  color: #ffffff;
+  cursor: pointer;
+}
+
+@media (max-width: 1000px) {
+  .board-brand-header {
+    min-height: 120px;
+    grid-template-columns: 120px 1fr 80px;
+    padding: 18px;
+  }
+
+  .board-brand-mark {
+    width: 100px;
+    height: 80px;
+  }
+
+  .board-brand-mark img {
+    max-width: 100px;
+    max-height: 80px;
+  }
+
+  .board-toolbar {
+    padding: 0 18px 18px;
+    grid-template-columns: 110px 1fr;
+  }
+
+  .board-search {
+    grid-column: 1 / -1;
+  }
+
+  .factory-board {
+    padding: 0 18px 30px;
+  }
+}
+
+@media (max-width: 700px) {
+  .board-brand-header {
+    grid-template-columns: 80px 1fr 55px;
+  }
+
+  .board-header-center {
+    font-size: 8px;
+  }
+
+  .board-profile-button {
+    width: 48px;
+    height: 48px;
+  }
+
+  .board-toolbar {
+    display: block;
+  }
+
+  .summary-home-card {
+    width: 100%;
+    margin-bottom: 8px;
+  }
+
+  .workflow-tabs {
+    margin-bottom: 10px;
+  }
+
+  .factory-board {
+    padding-inline: 10px;
+  }
+
+  .board-section-heading > div {
+    align-items: flex-start;
+    flex-direction: column;
+    gap: 2px;
+  }
+
+  .collapsed-status-bar {
+    padding: 0 14px;
+  }
+
+  .collapsed-status-bar strong {
+    font-size: 14px;
+  }
+
+  .collapsed-status-bar span {
+    font-size: 11px;
+  }
+
+  .board-detail-overlay {
+    padding: 0;
+  }
+
+  .board-detail-panel {
+    width: 100vw;
+    height: 100vh;
+    border-radius: 0;
+  }
+}
+
+
+
+/* BULK TOOLBAR */
+.board-bulk-toolbar {
+  position: sticky;
+  top: 8px;
+  z-index: 50;
+  min-height: 54px;
+  margin-bottom: 10px;
+  padding: 8px 12px;
+  border: 1px solid #d8dde5;
+  border-radius: 8px;
+  background: #111827;
+  color: #ffffff;
+  box-shadow: 0 10px 25px rgba(15, 23, 42, .18);
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  overflow-x: auto;
+}
+
+.bulk-selected-count {
+  min-width: 78px;
+  padding-right: 10px;
+  border-right: 1px solid rgba(255,255,255,.2);
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.bulk-selected-count strong {
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  background: #ffffff;
+  color: #111827;
+  display: grid;
+  place-items: center;
+}
+
+.bulk-selected-count span {
+  font-size: 11px;
+  font-weight: 800;
+}
+
+.board-bulk-toolbar > button {
+  min-height: 34px;
+  padding: 0 11px;
+  border: 1px solid rgba(255,255,255,.18);
+  border-radius: 6px;
+  background: rgba(255,255,255,.08);
+  color: #ffffff;
+  cursor: pointer;
+  font-size: 10px;
+  font-weight: 800;
+  white-space: nowrap;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.board-bulk-toolbar > button:hover {
+  background: #ffffff;
+  color: #111827;
+}
+
+.board-bulk-toolbar > button.danger {
+  background: #b91c1c;
+}
+
+.board-bulk-toolbar > button.clear {
+  margin-left: auto;
+}
+
+/* INLINE CELLS */
+.inline-cell-wrap {
+  min-width: 0;
+  width: 100%;
+}
+
+.inline-value-button {
+  width: 100%;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  text-align: left;
+  cursor: text;
+}
+
+.inline-value-button strong,
+.inline-value-button small {
+  pointer-events: none;
+}
+
+.board-inline-cell-input,
+.board-inline-select {
+  width: 100%;
+  min-width: 0;
+  height: 32px;
+  padding: 0 7px;
+  border: 1px solid transparent;
+  border-radius: 4px;
+  background: transparent;
+  color: #111827;
+  outline: none;
+  font-family: inherit;
+  font-size: 10px;
+  font-weight: 700;
+}
+
+.board-inline-cell-input:hover,
+.board-inline-cell-input:focus,
+.board-inline-select:hover,
+.board-inline-select:focus {
+  border-color: #4a90e2;
+  background: #ffffff;
+  box-shadow: 0 0 0 3px rgba(74, 144, 226, .1);
+}
+
+.board-inline-select.board-status-pill {
+  min-width: 100px;
+  cursor: pointer;
+  appearance: auto;
+}
+
+.payment-input-inline {
+  min-width: 90px;
+  border-radius: 999px;
+  background: #ffeb58;
+  text-align: center;
+}
+
+.board-avatar-add {
+  border: 1px dashed #aab0ba;
+  background: #ffffff !important;
+  color: #111827;
+}
+
+
+/* CUSTOM WORKFLOW CONTROLS */
+.workflow-tab-wrap {
+  position: relative;
+  flex: 0 0 122px;
+}
+
+.workflow-tab-wrap .workflow-tab {
+  width: 100%;
+}
+
+.workflow-custom-actions {
+  position: absolute;
+  top: -29px;
+  left: 0;
+  z-index: 40;
+  padding: 3px;
+  border: 1px solid #d8dde5;
+  border-radius: 6px;
+  background: #ffffff;
+  box-shadow: 0 7px 18px rgba(15, 23, 42, .14);
+  opacity: 0;
+  visibility: hidden;
+  display: flex;
+  align-items: center;
+  gap: 3px;
+  transition: .15s ease;
+}
+
+.workflow-tab-wrap:hover .workflow-custom-actions {
+  opacity: 1;
+  visibility: visible;
+}
+
+.workflow-custom-actions button,
+.workflow-color-action {
+  position: relative;
+  width: 25px;
+  height: 25px;
+  padding: 0;
+  border: 0;
+  border-radius: 4px;
+  background: #eef1f5;
+  color: #111827;
+  cursor: pointer;
+  display: grid;
+  place-items: center;
+  font-size: 10px;
+}
+
+.workflow-custom-actions button:hover,
+.workflow-color-action:hover {
+  background: #111827;
+  color: #ffffff;
+}
+
+.workflow-custom-actions button.danger:hover {
+  background: #b91c1c;
+}
+
+.workflow-color-action input {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  opacity: 0;
+  cursor: pointer;
+}
+
+/* ROW FILE THUMBNAILS */
+.board-row-files {
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: 5px;
+}
+
+.board-row-file-thumb,
+.board-row-file-add {
+  position: relative;
+  flex: 0 0 31px;
+  width: 31px;
+  height: 31px;
+  padding: 0;
+  border: 1px solid #d9dee6;
+  border-radius: 5px;
+  background: #ffffff;
+  color: #111827;
+  cursor: pointer;
+  overflow: hidden;
+  display: grid;
+  place-items: center;
+}
+
+.board-row-file-thumb:hover,
+.board-row-file-add:hover {
+  border-color: #4a90e2;
+  box-shadow: 0 0 0 3px rgba(74, 144, 226, .12);
+}
+
+.board-row-file-thumb img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.board-row-file-thumb i {
+  font-size: 15px;
+}
+
+.board-file-count-overlay {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(15, 23, 42, .72);
+  color: #fff;
+  font-size: 10px;
+  font-weight: 900;
+  line-height: 1;
+  pointer-events: none;
+}
+
+.board-row-file-add {
+  border-style: dashed;
+}
+
+.board-more-files {
+  min-width: 25px;
+  height: 25px;
+  padding: 0 5px;
+  border-radius: 999px;
+  background: #111827;
+  color: #ffffff;
+  font-size: 8px;
+  font-weight: 900;
+  display: grid;
+  place-items: center;
+}
+
+/* DETAIL PANEL: VIEW ONLY, CHAT STILL WORKS */
+.view-only-detail .date-clickable,
+.view-only-detail .status-badge,
+.view-only-detail .payment-summary-badge,
+.view-only-detail .trk-clickable,
+.view-only-detail .info-value .fa-pen {
+  pointer-events: none;
+}
+
+.view-only-detail .invoice-info-item,
+.view-only-detail .notes-save-btn,
+.view-only-detail .card-add-btn,
+.view-only-detail .upload-small-btn,
+.view-only-detail .upload-btn-big,
+.view-only-detail .file-remove-btn,
+.view-only-detail .remove-btn {
+  display: none !important;
+}
+
+.view-only-detail .notes-textarea {
+  pointer-events: none;
+  background: #ffffff;
+}
+
+.view-only-detail .detail-header {
+  border-radius: 8px 8px 0 0;
+}
+
+.view-only-detail .cards-grid {
+  gap: 14px;
+}
+
+.view-only-detail .order-card {
+  border: 1px solid #e4e7ec;
+  box-shadow: 0 6px 18px rgba(15, 23, 42, .05);
+}
+
+
+/* COMPACT BOARD COLUMNS */
+.board-table-head,
+.board-table-row,
+.board-inline-add-row {
+  grid-template-columns:
+    42px
+    minmax(230px, 1.8fr)
+    118px
+    120px
+    190px
+    112px
+    78px
+    112px
+    minmax(150px, 1fr)
+    105px
+    38px;
+}
+
+.board-col {
+  padding-inline: 7px;
+}
+
+.board-col-name {
+  overflow: hidden;
+}
+
+.board-inline-cell-input {
+  text-overflow: ellipsis;
+}
+
+/* ROW FILE DRAG DROP */
+.board-files-drop-zone {
+  position: relative;
+  min-height: 62px;
+  display: flex;
+  align-items: center;
+}
+
+.board-files-drop-zone.row-file-drag-active {
+  outline: 2px dashed #4a90e2;
+  outline-offset: -4px;
+  background: #eff6ff;
+}
+
+.row-file-drop-label {
+  position: absolute;
+  inset: 3px;
+  z-index: 20;
+  border: 1px dashed #4a90e2;
+  border-radius: 5px;
+  background: rgba(239, 246, 255, .94);
+  color: #1d4ed8;
+  pointer-events: none;
+  font-size: 10px;
+  font-weight: 900;
+  display: grid;
+  place-items: center;
+}
+
+/* WORKING DESIGNER */
+.working-designer-pill {
+  width: max-content;
+  max-width: 170px;
+  margin-top: 6px;
+  padding: 3px 7px 3px 4px;
+  border: 1px solid #bbf7d0;
+  border-radius: 999px;
+  background: #f0fdf4;
+  color: #166534;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.working-designer-pill img {
+  width: 17px;
+  height: 17px;
+  border-radius: 50%;
+  object-fit: cover;
+}
+
+.working-designer-pill strong {
+  overflow: hidden;
+  max-width: 85px;
+  font-size: 8px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.working-designer-pill small {
+  margin: 0;
+  color: #16a34a;
+  font-size: 7px;
+}
+
+.working-live-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: #22c55e;
+  box-shadow: 0 0 0 3px rgba(34, 197, 94, .15);
+}
+
+/* DETAIL BACK BUTTON */
+.board-detail-back {
+  position: absolute;
+  top: 14px;
+  left: 14px;
+  z-index: 25;
+  min-height: 35px;
+  padding: 0 12px;
+  border: 1px solid rgba(255,255,255,.3);
+  border-radius: 7px;
+  background: rgba(0,0,0,.35);
+  color: #ffffff;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  font-size: 10px;
+  font-weight: 800;
+}
+
+/* DETAIL PIPELINE */
+.detail-pipeline-strip {
+  width: 100%;
+  padding: 8px 15px;
+  border-top: 1px solid rgba(255,255,255,.16);
+  background: rgba(0,0,0,.12);
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  overflow-x: auto;
+}
+
+.detail-pipeline-label {
+  color: #d1d5db;
+  font-size: 9px;
+  font-weight: 900;
+  text-transform: uppercase;
+}
+
+.detail-pipeline-step {
+  flex: 0 0 auto;
+  min-height: 27px;
+  padding: 0 9px;
+  border: 1px solid rgba(255,255,255,.2);
+  border-radius: 999px;
+  background: rgba(255,255,255,.08);
+  color: #ffffff;
+  cursor: pointer;
+  font-size: 8px;
+  font-weight: 800;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+}
+
+.detail-pipeline-step > span {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--pipeline-color);
+}
+
+.detail-pipeline-step.active {
+  background: var(--pipeline-color);
+  color: #111827;
+}
+
+
+/* TOP ACTIONS */
+.board-heading-actions {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.board-top-add-button {
+  min-height: 38px;
+  padding: 0 16px;
+  border: 0;
+  border-radius: 6px;
+  background: #111827;
+  color: #ffffff;
+  cursor: pointer;
+  font-size: 11px;
+  font-weight: 900;
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+}
+
+/* CLEAR COLUMN BOXES */
+.board-table-head .board-col,
+.board-table-row .board-col {
+  min-height: 100%;
+  border-right: 1px solid #d9dee7;
+  display: flex;
+  align-items: center;
+}
+
+.board-table-head .board-col:last-child,
+.board-table-row .board-col:last-child {
+  border-right: 0;
+}
+
+.board-col-status,
+.board-col-owner,
+.board-col-files,
+.board-col-packing,
+.board-col-chat,
+.board-col-payment,
+.board-col-address,
+.board-col-track,
+.board-col-info {
+  justify-content: center;
+}
+
+.board-col-name {
+  align-items: flex-start !important;
+}
+
+/* WORKING ACTIONS */
+.order-working-actions {
+  margin-top: 7px;
+}
+
+.start-working-btn,
+.stop-working-btn {
+  min-height: 25px;
+  padding: 0 8px;
+  border: 0;
+  border-radius: 999px;
+  cursor: pointer;
+  font-size: 8px;
+  font-weight: 900;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+}
+
+.start-working-btn {
+  background: #dcfce7;
+  color: #166534;
+}
+
+.stop-working-btn {
+  background: #fee2e2;
+  color: #991b1b;
+}
+
+.busy-working-label {
+  min-height: 25px;
+  padding: 0 8px;
+  border-radius: 999px;
+  background: #fff7ed;
+  color: #9a3412;
+  font-size: 8px;
+  font-weight: 900;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+}
+
+/* VIEW HISTORY MODAL */
+.viewed-modal-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 99999;
+  padding: 20px;
+  background: rgba(15, 23, 42, .68);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.viewed-modal {
+  width: min(520px, 100%);
+  max-height: 80vh;
+  overflow-y: auto;
+  border-radius: 14px;
+  background: #ffffff;
+  box-shadow: 0 30px 80px rgba(0,0,0,.3);
+}
+
+.viewed-modal-header {
+  position: sticky;
+  top: 0;
+  z-index: 3;
+  padding: 18px;
+  border-bottom: 1px solid #e5e7eb;
+  background: #ffffff;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.viewed-modal-header h3 {
+  margin: 0;
+  font-size: 18px;
+}
+
+.viewed-modal-header p {
+  margin: 4px 0 0;
+  color: #6b7280;
+  font-size: 11px;
+}
+
+.viewed-modal-header button {
+  width: 34px;
+  height: 34px;
+  border: 0;
+  border-radius: 8px;
+  background: #f3f4f6;
+  cursor: pointer;
+}
+
+.viewed-person-row {
+  padding: 13px 18px;
+  border-bottom: 1px solid #eef0f3;
+  display: flex;
+  align-items: center;
+  gap: 11px;
+}
+
+.viewed-avatar {
+  flex: 0 0 38px;
+  width: 38px;
+  height: 38px;
+  border-radius: 50%;
+  background: #111827;
+  color: #ffffff;
+  overflow: hidden;
+  display: grid;
+  place-items: center;
+  font-size: 12px;
+  font-weight: 900;
+}
+
+.viewed-avatar img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.viewed-person-info {
+  flex: 1;
+}
+
+.viewed-person-info strong,
+.viewed-person-info small {
+  display: block;
+}
+
+.viewed-person-info strong {
+  font-size: 12px;
+}
+
+.viewed-person-info small {
+  margin-top: 3px;
+  color: #6b7280;
+  font-size: 9px;
+}
+
+.currently-working-badge {
+  padding: 5px 8px;
+  border-radius: 999px;
+  background: #dcfce7;
+  color: #166534;
+  font-size: 8px;
+  font-weight: 900;
+}
+
+.viewed-empty {
+  padding: 40px 20px;
+  color: #6b7280;
+  text-align: center;
+  font-size: 12px;
+}
+
+/* CLEAN DETAIL HEADER */
+.board-detail-back {
+  top: 10px;
+  left: 10px;
+}
+
+.board-detail-close {
+  top: 10px;
+  right: 10px;
+}
+
+.detail-header {
+  padding-top: 48px;
+}
+
+.detail-pipeline-strip {
+  margin-top: 8px;
+}
+
+
+/* TOP INLINE ADD ROW */
+.board-inline-add-top {
+  min-height: 64px;
+  border-bottom: 1px solid #e5e7eb;
+  background: #f8fbff;
+}
+
+.board-inline-add-top .board-inline-add-main {
+  padding-left: 10px;
+}
+
+.board-inline-add-top input {
+  width: min(520px, 72vw);
+  height: 40px;
+  background: #ffffff;
+}
+
+/* SHORT GRAY PIPELINE SEPARATORS */
+.board-table-row .board-col {
+  position: relative;
+  border-right: 0 !important;
+}
+
+.board-table-row .board-col:not(:last-child)::after {
+  content: "";
+  position: absolute;
+  top: 50%;
+  right: 0;
+  width: 1px;
+  height: 42px;
+  background: #c9ced6;
+  transform: translateY(-50%);
+}
+
+.board-table-head .board-col {
+  border-right: 0 !important;
+}
+
+.board-table-row .board-col::before,
+.board-table-head .board-col::before {
+  display: none !important;
+  content: none !important;
+}
+
+.board-table-row .board-col-status::after,
+.board-table-row .board-col-owner::after,
+.board-table-row .board-col-files::after,
+.board-table-row .board-col-packing::after,
+.board-table-row .board-col-chat::after,
+.board-table-row .board-col-payment::after,
+.board-table-row .board-col-address::after,
+.board-table-row .board-col-track::after {
+  background: #bfc5ce;
+}
+
+/* MEMBER SELECT MODAL */
+.member-select-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 100000;
+  padding: 20px;
+  background: rgba(15, 23, 42, .7);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.member-select-modal {
+  width: min(620px, 100%);
+  max-height: 86vh;
+  overflow-y: auto;
+  border-radius: 16px;
+  background: #ffffff;
+  box-shadow: 0 30px 90px rgba(0, 0, 0, .35);
+}
+
+.member-select-header {
+  position: sticky;
+  top: 0;
+  z-index: 5;
+  padding: 18px 20px;
+  border-bottom: 1px solid #e5e7eb;
+  background: #ffffff;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.member-select-header h3 {
+  margin: 0;
+  color: #111827;
+  font-size: 19px;
+}
+
+.member-select-header p {
+  margin: 4px 0 0;
+  color: #6b7280;
+  font-size: 11px;
+}
+
+.member-select-header > button {
+  width: 35px;
+  height: 35px;
+  border: 0;
+  border-radius: 8px;
+  background: #f3f4f6;
+  cursor: pointer;
+}
+
+.member-select-toolbar {
+  padding: 14px 20px 10px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.member-select-toolbar button {
+  min-height: 34px;
+  padding: 0 12px;
+  border: 1px solid #d1d5db;
+  border-radius: 7px;
+  background: #ffffff;
+  color: #111827;
+  cursor: pointer;
+  font-size: 10px;
+  font-weight: 800;
+}
+
+.member-select-toolbar span {
+  color: #6b7280;
+  font-size: 10px;
+  font-weight: 800;
+}
+
+.member-multiselect {
+  margin: 0 20px;
+}
+
+.member-option-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.member-option-avatar,
+.member-preview-chip > img,
+.member-preview-chip > span {
+  width: 31px;
+  height: 31px;
+  border-radius: 50%;
+  background: #111827;
+  color: #ffffff;
+  object-fit: cover;
+  display: grid;
+  place-items: center;
+  font-size: 9px;
+  font-weight: 900;
+}
+
+.member-option-row strong,
+.member-option-row small {
+  display: block;
+}
+
+.member-option-row strong {
+  color: #111827;
+  font-size: 11px;
+}
+
+.member-option-row small {
+  margin-top: 2px;
+  color: #6b7280;
+  font-size: 9px;
+}
+
+.member-selected-tag {
+  margin: 2px;
+  padding: 4px 7px;
+  border-radius: 999px;
+  background: #111827;
+  color: #ffffff;
+  font-size: 9px;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+}
+
+.member-selected-tag button {
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: #ffffff;
+  cursor: pointer;
+}
+
+.member-selected-preview {
+  max-height: 190px;
+  margin: 14px 20px;
+  overflow-y: auto;
+  display: grid;
+  grid-template-columns: repeat(
+    auto-fill,
+    minmax(150px, 1fr)
+  );
+  gap: 8px;
+}
+
+.member-preview-chip {
+  min-width: 0;
+  padding: 7px;
+  border: 1px solid #e5e7eb;
+  border-radius: 9px;
+  display: flex;
+  align-items: center;
+  gap: 7px;
+}
+
+.member-preview-chip strong {
+  overflow: hidden;
+  color: #111827;
+  font-size: 9px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.member-select-footer {
+  position: sticky;
+  bottom: 0;
+  padding: 14px 20px;
+  border-top: 1px solid #e5e7eb;
+  background: #ffffff;
+  display: flex;
+  justify-content: flex-end;
+  gap: 9px;
+}
+
+.member-cancel-button,
+.member-save-button {
+  min-height: 38px;
+  padding: 0 15px;
+  border-radius: 7px;
+  cursor: pointer;
+  font-size: 10px;
+  font-weight: 900;
+}
+
+.member-cancel-button {
+  border: 1px solid #d1d5db;
+  background: #ffffff;
+  color: #111827;
+}
+
+.member-save-button {
+  border: 0;
+  background: #111827;
+  color: #ffffff;
+}
+
+
+/* PIPELINE HOVER CONTROLS FIX */
+.workflow-tabs {
+  overflow: visible !important;
+  padding-top: 34px !important;
+  margin-top: -34px;
+}
+
+.workflow-tab-wrap {
+  overflow: visible;
+}
+
+.workflow-custom-actions {
+  top: -32px !important;
+  left: 2px !important;
+  z-index: 200 !important;
+}
+
+.workflow-tab-wrap:hover {
+  z-index: 210;
+}
+
+/* CLIENT MODAL */
+.client-avatar,
+.client-preview-icon {
+  background: #eef2ff !important;
+  color: #3730a3 !important;
+}
+
+.client-preview-icon {
+  flex: 0 0 31px;
+  width: 31px;
+  height: 31px;
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+}
+
+/* CLEAN MODERN DETAIL VIEW */
+.board-detail-overlay {
+  padding: 18px !important;
+  background: rgba(15, 23, 42, .74) !important;
+  backdrop-filter: blur(6px);
+}
+
+.board-detail-panel {
+  width: min(1460px, calc(100vw - 36px)) !important;
+  height: calc(100vh - 36px) !important;
+  border: 1px solid rgba(255,255,255,.12);
+  border-radius: 18px !important;
+  background: #f5f7fb !important;
+  overflow: auto;
+}
+
+.view-only-detail .detail-header {
+  position: sticky;
+  top: 0;
+  z-index: 100;
+  min-height: 112px;
+  padding: 48px 20px 12px !important;
+  border-radius: 18px 18px 0 0 !important;
+  background:
+    linear-gradient(135deg, #191b34 0%, #302f5d 100%) !important;
+  box-shadow: 0 8px 28px rgba(20, 22, 45, .22);
+}
+
+.board-detail-back {
+  top: 12px !important;
+  left: 14px !important;
+  min-height: 34px;
+  background: rgba(255,255,255,.10) !important;
+  border-color: rgba(255,255,255,.22) !important;
+}
+
+.board-detail-close {
+  top: 12px !important;
+  right: 14px !important;
+}
+
+.current-order-title {
+  min-width: 0;
+  max-width: 360px;
+  height: 38px;
+  padding: 0 12px;
+  border: 1px solid rgba(255,255,255,.16);
+  border-radius: 9px;
+  background: rgba(255,255,255,.09);
+  display: inline-flex !important;
+  align-items: center;
+  gap: 8px;
+}
+
+.current-order-title span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.detail-pipeline-strip {
+  margin: 12px 0 0 !important;
+  padding: 9px 10px !important;
+  border: 1px solid rgba(255,255,255,.14) !important;
+  border-radius: 10px;
+  background: rgba(0,0,0,.16) !important;
+}
+
+.detail-pipeline-step {
+  min-height: 30px !important;
+  padding: 0 11px !important;
+  border-radius: 8px !important;
+}
+
+.detail-topbar-wrapper {
+  position: sticky;
+  top: 112px;
+  z-index: 80;
+  padding: 10px 14px 0;
+  background: #f5f7fb;
+}
+
+.detail-topbar {
+  border: 1px solid #e0e5ed !important;
+  border-radius: 11px;
+  background: #ffffff;
+  box-shadow: 0 5px 18px rgba(15, 23, 42, .05);
+}
+
+.detail-info-item {
+  min-height: 48px;
+  padding: 8px 12px !important;
+  border-right: 1px solid #e9edf2 !important;
+}
+
+.detail-body {
+  padding: 14px !important;
+  background: #f5f7fb;
+}
+
+.cards-grid {
+  grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+  gap: 14px !important;
+}
+
+.order-card {
+  overflow: hidden;
+  border: 1px solid #e2e7ee !important;
+  border-radius: 14px !important;
+  background: #ffffff !important;
+  box-shadow: 0 8px 24px rgba(15, 23, 42, .06) !important;
+}
+
+.card-preview-area {
+  min-height: 190px !important;
+  background:
+    linear-gradient(180deg, #fafbfc 0%, #f2f5f8 100%) !important;
+}
+
+.card-files-preview {
+  padding: 14px;
+  display: grid !important;
+  grid-template-columns: repeat(
+    auto-fill,
+    minmax(110px, 1fr)
+  );
+  gap: 10px;
+}
+
+.file-thumb {
+  min-height: 100px;
+  border: 1px solid #e2e7ee;
+  border-radius: 10px;
+  background: #ffffff;
+  overflow: hidden;
+}
+
+.file-img {
+  width: 100% !important;
+  height: 100px !important;
+  object-fit: cover !important;
+  cursor: zoom-in !important;
+}
+
+.card-footer-inner {
+  min-height: 48px;
+  padding: 8px 11px !important;
+  border-top: 1px solid #e7ebf0;
+  background: #ffffff;
+}
+
+.card-title {
+  font-size: 11px !important;
+  font-weight: 900 !important;
+}
+
+.card-view-btn {
+  min-height: 30px;
+  padding: 0 9px;
+  border: 1px solid #d8dee8 !important;
+  border-radius: 7px !important;
+  background: #ffffff !important;
+}
+
+.card-view-btn:hover {
+  border-color: #111827 !important;
+  background: #111827 !important;
+  color: #ffffff !important;
+}
+
+.card-notes-area {
+  min-height: 260px;
+  background: #ffffff;
+}
+
+.notes-header {
+  min-height: 44px;
+  padding: 0 13px !important;
+  background: #111827 !important;
+  color: #ffffff !important;
+}
+
+.notes-header .text-dark {
+  color: #ffffff !important;
+}
+
+.notes-textarea {
+  min-height: 165px !important;
+  padding: 14px !important;
+  border: 0 !important;
+  resize: vertical;
+}
+
+.notes-footer {
+  min-height: 46px;
+  padding: 8px 12px !important;
+  border-top: 1px solid #e7ebf0;
+  background: #f8fafc !important;
+}
+
+@media (max-width: 900px) {
+  .cards-grid {
+    grid-template-columns: 1fr !important;
+  }
+
+  .board-detail-overlay {
+    padding: 0 !important;
+  }
+
+  .board-detail-panel {
+    width: 100vw !important;
+    height: 100vh !important;
+    border-radius: 0 !important;
+  }
+}
+
+
+/* OPENED / UNOPENED ORDERS */
+.board-table-row.unread {
+  background: #fffdf5 !important;
+  box-shadow:
+    inset 5px 0 #f59e0b,
+    inset 0 0 0 1px rgba(245, 158, 11, .10);
+}
+
+.board-table-row.opened {
+  background: #f4fbf7 !important;
+  box-shadow:
+    inset 5px 0 #22c55e,
+    inset 0 0 0 1px rgba(34, 197, 94, .08);
+}
+
+.board-table-row.unread:hover {
+  background: #fff8e6 !important;
+}
+
+.board-table-row.opened:hover {
+  background: #eaf8ef !important;
+}
+
+.board-new-dot {
+  background: #f59e0b !important;
+}
+
+.board-table-row.opened .board-new-dot {
+  display: none;
+}
+
+/* CORRECT STATUS COLORS */
+.board-inline-select.board-status-pill {
+  border: 1px solid rgba(17, 24, 39, .18);
+  font-weight: 900;
+}
+
+.detail-pipeline-step.active {
+  border-color: var(--pipeline-color) !important;
+  background: var(--pipeline-color) !important;
+  color: #111827 !important;
+  box-shadow:
+    0 0 0 3px color-mix(
+      in srgb,
+      var(--pipeline-color),
+      transparent 72%
+    );
+}
+
+/* CLEAN DETAIL HEADER */
+.clean-detail-panel {
+  background: #f4f6fa !important;
+}
+
+.clean-detail-header {
+  position: sticky;
+  top: 0;
+  z-index: 110;
+  min-height: 118px;
+  padding: 16px 18px 14px 170px !important;
+  border-radius: 18px 18px 0 0 !important;
+  background:
+    linear-gradient(
+      135deg,
+      #171a31 0%,
+      #292852 100%
+    ) !important;
+  display: grid;
+  grid-template-columns:
+    minmax(220px, 1fr)
+    auto;
+  align-items: center;
+  gap: 12px;
+}
+
+.clean-detail-header .board-detail-back {
+  top: 17px !important;
+  left: 17px !important;
+}
+
+.clean-detail-order-name {
+  min-width: 0;
+  height: 48px;
+  padding: 0 14px;
+  border: 1px solid rgba(255,255,255,.16);
+  border-radius: 11px;
+  background: rgba(255,255,255,.08);
+  color: #ffffff;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.clean-detail-order-name > i {
+  font-size: 17px;
+}
+
+.clean-detail-order-name > div {
+  min-width: 0;
+}
+
+.clean-detail-order-name small,
+.clean-detail-order-name strong {
+  display: block;
+}
+
+.clean-detail-order-name small {
+  color: #b9bdd0;
+  font-size: 8px;
+  font-weight: 800;
+  text-transform: uppercase;
+}
+
+.clean-detail-order-name strong {
+  overflow: hidden;
+  margin-top: 2px;
+  font-size: 13px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.clean-detail-chat-button {
+  position: relative;
+  min-height: 42px;
+  padding: 0 14px;
+  border: 1px solid rgba(255,255,255,.18);
+  border-radius: 10px;
+  background: rgba(255,255,255,.09);
+  color: #ffffff;
+  cursor: pointer;
+  font-size: 10px;
+  font-weight: 900;
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+}
+
+.clean-detail-chat-button.active,
+.clean-detail-chat-button:hover {
+  background: #ffffff;
+  color: #171a31;
+}
+
+.clean-detail-chat-button strong {
+  min-width: 18px;
+  height: 18px;
+  padding: 0 4px;
+  border-radius: 999px;
+  background: #ef4444;
+  color: #ffffff;
+  font-size: 8px;
+  display: grid;
+  place-items: center;
+}
+
+.clean-detail-header .detail-pipeline-strip {
+  grid-column: 1 / -1;
+  margin: 0 !important;
+  padding: 8px !important;
+  border: 1px solid rgba(255,255,255,.13);
+  border-radius: 10px;
+  background: rgba(0,0,0,.14) !important;
+}
+
+/* REMOVE OLD DETAIL HEADER ELEMENTS */
+.clean-detail-panel .header-left-p,
+.clean-detail-panel .header-center-logo,
+.clean-detail-panel .header-right-icons,
+.clean-detail-panel .board-detail-close,
+.clean-detail-panel .user-avatar-top,
+.clean-detail-panel .current-order-title {
+  display: none !important;
+}
+
+/* NOTES / FILES PERMISSION LOOK */
+.clean-detail-panel .notes-textarea[readonly] {
+  background: #f8fafc !important;
+  color: #6b7280;
+  cursor: not-allowed;
+}
+
+.clean-detail-panel .card-add-btn {
+  display: inline-flex;
+}
+
+.clean-detail-panel .notes-save-btn {
+  display: inline-flex;
+}
+
+/* DETAIL BODY */
+.clean-detail-panel .detail-topbar-wrapper {
+  top: 118px !important;
+}
+
+.clean-detail-panel .detail-body {
+  padding: 16px !important;
+}
+
+.clean-detail-panel .order-card {
+  border-radius: 14px !important;
+  box-shadow:
+    0 8px 22px rgba(15, 23, 42, .06) !important;
+}
+
+/* SMALL PERMISSION NOTE */
+.permission-readonly-note {
+  color: #9ca3af;
+  font-size: 9px;
+}
+
+@media (max-width: 800px) {
+  .clean-detail-header {
+    padding: 58px 12px 12px !important;
+    grid-template-columns: 1fr auto;
+  }
+
+  .clean-detail-order-name {
+    min-width: 0;
+  }
+}
+
+
+/* FINAL OPENED / UNOPENED COLORS */
+.board-table-row.unread {
+  background: #f3f4f6 !important;
+  box-shadow: inset 4px 0 #9ca3af !important;
+}
+
+.board-table-row.unread:hover {
+  background: #e9edf2 !important;
+}
+
+.board-table-row.opened {
+  background: #ffffff !important;
+  box-shadow: inset 4px 0 #22c55e !important;
+}
+
+.board-table-row.opened:hover {
+  background: #f8fafc !important;
+}
+
+.board-table-row.unread .board-new-dot {
+  background: #9ca3af !important;
+}
+
+.board-table-row.opened .board-new-dot {
+  display: none !important;
+}
+
+/* DETAIL SCROLL: ONLY PANEL MOVES, PAGE BEHIND STAYS FIXED */
+.board-detail-overlay {
+  overflow: hidden !important;
+}
+
+.board-detail-panel {
+  overflow-y: auto !important;
+  overscroll-behavior: contain;
+}
+
+/* REMOVE DETAIL PIPELINE AREA */
+.clean-detail-header .detail-pipeline-strip,
+.detail-pipeline-strip {
+  display: none !important;
+}
+
+/* CLEAN HEADER AFTER PIPELINE REMOVAL */
+.clean-detail-header {
+  min-height: 78px !important;
+  grid-template-columns: minmax(220px, 1fr) auto !important;
+  padding-bottom: 14px !important;
+}
+
+.clean-detail-panel .detail-topbar-wrapper {
+  top: 78px !important;
+}
+
+/* NATIVE STATUS OPTIONS */
+.board-inline-select option {
+  font-weight: 800;
+  padding: 8px;
+}
+
+
+/* COLLAPSIBLE ACTIVE SECTION */
+.collapsible-active-heading {
+  min-height: 52px;
+  padding: 8px 10px;
+  cursor: pointer;
+  user-select: none;
+  transition: background .18s ease;
+}
+
+.collapsible-active-heading:hover {
+  background: #f8fafc;
+}
+
+.collapsible-active-heading > div:first-child {
+  align-items: center;
+}
+
+.section-collapse-icon {
+  width: 18px;
+  color: #64748b;
+  font-size: 12px;
+}
+
+.collapsible-active-heading.collapsed {
+  margin-bottom: 10px;
+  border: 1px solid #d9dee7;
+  border-radius: 7px;
+  background: #f8fafc;
+}
+
+.collapsible-active-heading.collapsed h1 {
+  font-size: 17px;
+}
+
+/* COMPACT TABLE TO REDUCE SCROLLING */
+.board-table-row {
+  min-height: 72px !important;
+}
+
+.board-table-head {
+  min-height: 38px !important;
+}
+
+.board-col {
+  padding-top: 5px !important;
+  padding-bottom: 5px !important;
+}
+
+.board-col-name strong {
+  font-size: 11px !important;
+}
+
+.board-col-name small {
+  margin-top: 2px !important;
+}
+
+.order-working-actions {
+  margin-top: 4px !important;
+}
+
+.start-working-btn,
+.stop-working-btn,
+.busy-working-label {
+  min-height: 21px !important;
+  font-size: 7px !important;
+}
+
+.collapsed-status-bars {
+  gap: 7px !important;
+}
+
+.collapsed-status-bar {
+  min-height: 34px !important;
+}
+
+/* ACTIVE SECTION STAYS VISIBLE */
+.board-section-heading {
+  position: sticky;
+  top: 0;
+  z-index: 90;
+  background: #ffffff;
+}
+
+
+/* EXTRA COMPACT DETAIL VIEW */
+.clean-detail-panel .detail-header,
+.clean-detail-header {
+  min-height: 66px !important;
+  padding-top: 10px !important;
+  padding-bottom: 10px !important;
+}
+
+.clean-detail-panel .detail-topbar-wrapper {
+  top: 66px !important;
+  padding-top: 7px !important;
+}
+
+.clean-detail-panel .detail-topbar {
+  min-height: 42px !important;
+}
+
+.clean-detail-panel .detail-info-item {
+  min-height: 42px !important;
+  padding: 6px 9px !important;
+}
+
+.clean-detail-panel .detail-body {
+  padding: 10px !important;
+}
+
+.clean-detail-panel .cards-grid {
+  gap: 9px !important;
+}
+
+.clean-detail-panel .order-card {
+  min-height: 0 !important;
+  border-radius: 10px !important;
+}
+
+.clean-detail-panel .card-preview-area {
+  min-height: 135px !important;
+  height: 135px !important;
+}
+
+.clean-detail-panel .card-footer-inner {
+  min-height: 38px !important;
+  padding: 5px 8px !important;
+}
+
+.clean-detail-panel .card-title {
+  font-size: 9px !important;
+}
+
+.clean-detail-panel .card-view-btn {
+  min-height: 25px !important;
+  padding: 0 7px !important;
+  font-size: 8px !important;
+}
+
+.clean-detail-panel .card-notes-area {
+  min-height: 180px !important;
+}
+
+.clean-detail-panel .notes-header {
+  min-height: 36px !important;
+  padding: 0 10px !important;
+}
+
+.clean-detail-panel .notes-textarea {
+  min-height: 108px !important;
+  padding: 10px !important;
+}
+
+.clean-detail-panel .notes-footer {
+  min-height: 36px !important;
+  padding: 5px 9px !important;
+}
+
+.clean-detail-panel .file-img {
+  height: 78px !important;
+}
+
+.clean-detail-panel .file-thumb {
+  min-height: 78px !important;
+}
+
+.clean-detail-panel .card-files-preview {
+  padding: 9px !important;
+  grid-template-columns:
+    repeat(auto-fill, minmax(85px, 1fr)) !important;
+  gap: 7px !important;
+}
+
+@media (min-width: 1100px) {
+  .clean-detail-panel .cards-grid {
+    grid-template-columns:
+      repeat(2, minmax(0, 1fr)) !important;
+  }
+}
+
+
+/* THEME TOOLBAR */
+.board-toolbar-actions {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 10px;
+}
+
+.theme-toggle-button {
+  height: 36px;
+  padding: 0 12px;
+  border: 1px solid #111827;
+  border-radius: 999px;
+  background: #ffffff;
+  color: #111827;
+  cursor: pointer;
+  font-size: 10px;
+  font-weight: 800;
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+}
+
+/* REMOVE LONG LEFT STATUS LINE */
+.board-table-row,
+.board-table-row.unread,
+.board-table-row.opened,
+.board-table-row.selected {
+  box-shadow: none !important;
+}
+
+.board-table-row::before,
+.board-table-row::after {
+  display: none !important;
+  content: none !important;
+}
+
+/* LIGHT THEME */
+.theme-light {
+  background: #ffffff;
+  color: #111827;
+}
+
+/* DARK THEME */
+.theme-dark {
+  background: #0f172a;
+  color: #f8fafc;
+}
+
+.theme-dark .board-brand-header,
+.theme-dark .board-toolbar,
+.theme-dark .factory-board,
+.theme-dark .board-section-heading,
+.theme-dark .board-table-shell,
+.theme-dark .board-inline-add-top {
+  background: #0f172a !important;
+  color: #f8fafc !important;
+}
+
+.theme-dark .board-section-heading:hover,
+.theme-dark .collapsible-active-heading.collapsed {
+  background: #111827 !important;
+}
+
+.theme-dark .board-table-head {
+  background: #1d4ed8 !important;
+  color: #ffffff !important;
+}
+
+.theme-dark .board-table-row,
+.theme-dark .board-table-row.opened,
+.theme-dark .board-table-row.unread {
+  background: #111827 !important;
+  color: #f8fafc !important;
+  border-bottom-color: #334155 !important;
+}
+
+.theme-dark .board-table-row:hover,
+.theme-dark .board-table-row.opened:hover,
+.theme-dark .board-table-row.unread:hover {
+  background: #1e293b !important;
+}
+
+.theme-dark .board-inline-cell-input,
+.theme-dark .board-inline-select,
+.theme-dark .board-search input {
+  color: #f8fafc !important;
+}
+
+.theme-dark .board-inline-cell-input:hover,
+.theme-dark .board-inline-cell-input:focus,
+.theme-dark .board-inline-select:hover,
+.theme-dark .board-inline-select:focus {
+  background: #1e293b !important;
+  border-color: #60a5fa !important;
+}
+
+.theme-dark .board-search {
+  border-color: #e2e8f0;
+  color: #f8fafc;
+}
+
+.theme-dark .theme-toggle-button {
+  border-color: #e2e8f0;
+  background: #111827;
+  color: #f8fafc;
+}
+
+.theme-dark .collapsed-status-bars {
+  border-top-color: #334155 !important;
+}
+
+.theme-dark .board-col-address,
+.theme-dark .board-col-track,
+.theme-dark .design-meta,
+.theme-dark .board-col-name small,
+.theme-dark .subtitle {
+  color: #cbd5e1 !important;
+}
+
+.theme-dark .board-row-file-thumb,
+.theme-dark .board-row-file-add,
+.theme-dark .board-avatar-add {
+  border-color: #475569;
+  background: #1e293b !important;
+  color: #f8fafc;
+}
+
+.theme-dark .board-table-row .board-col:not(:last-child)::after {
+  background: #475569 !important;
+}
+
+
+/* DARK MODE HEADER FIXES */
+.theme-dark .board-brand-mark img {
+  filter: brightness(0) invert(1);
+}
+
+.theme-dark .board-print-button {
+  color: #ffffff !important;
+}
+
+.theme-dark .board-print-button i,
+.theme-dark .board-print-button small {
+  color: #ffffff !important;
+}
+
+.theme-dark .board-top-add-button {
+  border: 1px solid #ffffff !important;
+  background: transparent !important;
+  color: #ffffff !important;
+}
+
+.theme-dark .board-top-add-button:hover {
+  background: #ffffff !important;
+  color: #111827 !important;
+}
+
+/* PROFILE BUTTON: TRUE FIXED CIRCLE */
+.board-profile-button {
+  overflow: visible !important;
+}
+
+.board-profile-button > img.board-profile-photo {
+  position: absolute;
+  inset: 0;
+  width: 100% !important;
+  height: 100% !important;
+  border-radius: 50% !important;
+  object-fit: cover !important;
+  object-position: center !important;
+  display: block;
+}
+
+.board-profile-button > span:not(.board-profile-photo) {
+  width: 100%;
+  height: 100%;
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+}
+
+.board-profile-button > i {
+  z-index: 4;
+}
+
+/* PROFILE SETTINGS */
+.profile-settings-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 120000;
+  padding: 20px;
+  background: rgba(15, 23, 42, .72);
+  backdrop-filter: blur(5px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.profile-settings-modal {
+  position: relative;
+  width: min(430px, 100%);
+  padding: 24px;
+  border-radius: 18px;
+  background: #ffffff;
+  color: #111827;
+  box-shadow: 0 35px 100px rgba(0, 0, 0, .35);
+}
+
+.profile-settings-close {
+  position: absolute;
+  top: 14px;
+  right: 14px;
+  width: 34px;
+  height: 34px;
+  border: 0;
+  border-radius: 9px;
+  background: #f3f4f6;
+  color: #111827;
+  cursor: pointer;
+}
+
+.profile-settings-heading h3 {
+  margin: 0;
+  font-size: 20px;
+}
+
+.profile-settings-heading p {
+  margin: 5px 0 0;
+  color: #6b7280;
+  font-size: 11px;
+}
+
+.profile-settings-photo-section {
+  margin: 22px 0;
+  text-align: center;
+}
+
+.profile-photo-circle {
+  position: relative;
+  width: 116px;
+  height: 116px;
+  margin: 0 auto;
+  border: 4px solid #ffffff;
+  border-radius: 50%;
+  background: #111827;
+  box-shadow:
+    0 0 0 2px #d1d5db,
+    0 12px 30px rgba(15, 23, 42, .18);
+  overflow: hidden;
+  cursor: pointer;
+  display: grid;
+  place-items: center;
+}
+
+.profile-photo-circle img {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  border-radius: 50%;
+  object-fit: cover;
+  object-position: center;
+}
+
+.profile-photo-circle > span {
+  color: #ffffff;
+  font-size: 32px;
+  font-weight: 900;
+}
+
+.profile-photo-circle input {
+  position: absolute;
+  inset: 0;
+  opacity: 0;
+  cursor: pointer;
+  z-index: 3;
+}
+
+.profile-photo-circle > i {
+  position: absolute;
+  right: 5px;
+  bottom: 5px;
+  z-index: 4;
+  width: 30px;
+  height: 30px;
+  border: 3px solid #ffffff;
+  border-radius: 50%;
+  background: #111827;
+  color: #ffffff;
+  display: grid;
+  place-items: center;
+  font-size: 11px;
+  pointer-events: none;
+}
+
+.profile-settings-photo-section small {
+  display: block;
+  margin-top: 10px;
+  color: #6b7280;
+  font-size: 10px;
+}
+
+.profile-settings-field {
+  margin-top: 14px;
+}
+
+.profile-settings-field label {
+  display: block;
+  margin-bottom: 6px;
+  color: #374151;
+  font-size: 11px;
+  font-weight: 800;
+}
+
+.profile-settings-field input,
+.profile-settings-field textarea {
+  width: 100%;
+  padding: 10px 12px;
+  border: 1px solid #d1d5db;
+  border-radius: 9px;
+  background: #ffffff;
+  color: #111827;
+  outline: 0;
+  font-family: inherit;
+  font-size: 12px;
+}
+
+.profile-settings-field input:focus,
+.profile-settings-field textarea:focus {
+  border-color: #2563eb;
+  box-shadow: 0 0 0 3px rgba(37, 99, 235, .12);
+}
+
+.profile-settings-field input[readonly],
+.profile-settings-field textarea[readonly] {
+  background: #f8fafc;
+  color: #64748b;
+}
+
+.profile-settings-actions {
+  margin-top: 20px;
+  display: flex;
+  justify-content: flex-end;
+  gap: 9px;
+}
+
+.profile-settings-cancel,
+.profile-settings-save {
+  min-height: 39px;
+  padding: 0 15px;
+  border-radius: 8px;
+  cursor: pointer;
+  font-size: 10px;
+  font-weight: 900;
+}
+
+.profile-settings-cancel {
+  border: 1px solid #d1d5db;
+  background: #ffffff;
+  color: #111827;
+}
+
+.profile-settings-save {
+  border: 0;
+  background: #111827;
+  color: #ffffff;
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+}
+
+/* PROFILE MODAL DARK MODE */
+.theme-dark .profile-settings-modal {
+  background: #111827;
+  color: #f8fafc;
+}
+
+.theme-dark .profile-settings-heading p,
+.theme-dark .profile-settings-photo-section small,
+.theme-dark .profile-settings-field label {
+  color: #cbd5e1;
+}
+
+.theme-dark .profile-settings-field input,
+.theme-dark .profile-settings-field textarea {
+  border-color: #475569;
+  background: #1e293b;
+  color: #f8fafc;
+}
+
+.theme-dark .profile-settings-close {
+  background: #1e293b;
+  color: #ffffff;
+}
+
+.theme-dark .profile-settings-cancel {
+  border-color: #475569;
+  background: #1e293b;
+  color: #ffffff;
+}
+
+.theme-dark .profile-settings-save {
+  background: #ffffff;
+  color: #111827;
+}
+
+/* PERMANENT VIEWED STATE */
+.board-table-row.opened {
+  background: #ffffff !important;
+}
+
+.theme-dark .board-table-row.opened {
+  background: #111827 !important;
+}
+
+
+/* FINAL OWNER AVATAR DISPLAY */
+.board-avatar-stack {
+  min-width: 0;
+  flex-wrap: nowrap;
+}
+
+.board-avatar {
+  flex: 0 0 29px;
+}
+
+.board-avatar img {
+  width: 100% !important;
+  height: 100% !important;
+  border-radius: 50% !important;
+  object-fit: cover !important;
+  object-position: center !important;
+}
+
+.board-avatar-more {
+  border: 2px solid #ffffff;
+  background: #2f3542 !important;
+  color: #ffffff !important;
+  cursor: pointer !important;
+}
+
+.board-avatar-more:hover {
+  transform: translateY(-1px);
+  background: #111827 !important;
+}
+
+.board-avatar-add {
+  margin-left: 3px !important;
+}
+
+
+/* WORK SESSION FINAL CLEANUP */
+.working-designer-pill {
+  max-width: 190px;
+  min-height: 27px;
+  padding: 3px 8px 3px 4px;
+  border: 1px solid #bbf7d0;
+  border-radius: 999px;
+  background: #f0fdf4;
+  color: #166534;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.working-designer-pill img {
+  width: 21px !important;
+  height: 21px !important;
+  border-radius: 50% !important;
+  object-fit: cover !important;
+}
+
+.working-designer-pill strong {
+  overflow: hidden;
+  max-width: 90px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.working-live-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: #22c55e;
+  box-shadow: 0 0 0 4px rgba(34, 197, 94, .13);
+}
+
+.board-avatar-stack {
+  gap: 2px !important;
+}
+
+.board-avatar-more,
+.board-avatar-add {
+  margin-left: 3px !important;
+}
+/* OWNER AVATARS — NEVER OVERFLOW */
+.board-col-owner {
+  min-width: 0;
+  overflow: hidden;
+}
+
+.board-avatar-stack {
+  width: 100%;
+  min-width: 0;
+  max-width: 100%;
+  overflow: hidden;
+
+  display: flex;
+  align-items: center;
+  justify-content: flex-start;
+  flex-wrap: nowrap;
+  gap: 0;
+}
+
+.board-avatar {
+  flex: 0 0 26px;
+  width: 26px;
+  height: 26px;
+
+  margin-left: -5px;
+  border: 2px solid #ffffff;
+  border-radius: 50%;
+
+  overflow: hidden;
+  position: relative;
+
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+
+  font-size: 8px;
+  font-weight: 800;
+}
+
+.board-avatar:first-child {
+  margin-left: 0;
+}
+
+.board-avatar img {
+  width: 100% !important;
+  height: 100% !important;
+
+  border-radius: 50% !important;
+  object-fit: cover !important;
+  object-position: center !important;
+}
+
+.board-avatar-more {
+  flex: 0 0 28px;
+  width: 28px;
+  height: 28px;
+
+  margin-left: -4px !important;
+
+  background: #252b38 !important;
+  color: #ffffff !important;
+
+  border: 2px solid #ffffff;
+  font-size: 8px;
+}
+
+.board-avatar-add {
+  flex: 0 0 28px;
+  width: 28px;
+  height: 28px;
+
+  margin-left: 4px !important;
+
+  border: 1px dashed #94a3b8;
+  background: #ffffff;
+  color: #111827;
+}
+
+/* Show maximum 4 visible circles cleanly */
+.board-avatar-stack .board-avatar:nth-child(n + 6) {
+  display: none;
+}
+
+/* Dark mode */
+.theme-dark .board-avatar {
+  border-color: #111827;
+}
+
+.theme-dark .board-avatar-more {
+  border-color: #111827;
+}
+
+.theme-dark .board-avatar-add {
+  border-color: #64748b;
+  background: #111827;
+  color: #ffffff;
+}
+
+
+/* =========================================================
+   ABSOLUTE FINAL OVERRIDE
+   This block is intentionally LAST so old CSS cannot override it.
+   ========================================================= */
+
+/* Use the live draggable widths for header + every order row */
+.board-table-head,
+.board-table-row,
+.board-inline-add-row {
+  display: grid !important;
+  grid-template-columns: var(--board-grid-columns) !important;
+  width: max-content !important;
+  min-width: 100% !important;
+  column-gap: 0 !important;
+  align-items: stretch !important;
+}
+
+/* White table/background */
+.board-table-shell,
+.board-table-head,
+.board-table-row,
+.board-inline-add-row,
+.board-table-head > .board-col,
+.board-table-row > .board-col,
+.board-inline-add-row > .board-col {
+  background: #ffffff !important;
+}
+
+/* REAL full-height vertical pipelines */
+.board-table-head > .board-col,
+.board-table-row > .board-col,
+.board-inline-add-row > .board-col {
+  position: relative !important;
+  box-sizing: border-box !important;
+  min-width: 0 !important;
+  height: 100% !important;
+  border-right: 1px solid #111111 !important;
+}
+
+/* outer right edge handled by shell */
+.board-table-head > .board-col:last-child,
+.board-table-row > .board-col:last-child,
+.board-inline-add-row > .board-col:last-child {
+  border-right: 0 !important;
+}
+
+/* Remove every old short/grey fake separator */
+.board-table-head > .board-col::before,
+.board-table-head > .board-col::after,
+.board-table-row > .board-col::before,
+.board-table-row > .board-col::after,
+.board-inline-add-row > .board-col::before,
+.board-inline-add-row > .board-col::after {
+  content: none !important;
+  display: none !important;
+}
+
+/* Header line */
+.board-table-head {
+  border-bottom: 1px solid #111111 !important;
+}
+
+/* Excel-style draggable separator exactly on the pipeline */
+.resizable-head-cell {
+  position: relative !important;
+  overflow: visible !important;
+}
+
+.column-resizer {
+  position: absolute !important;
+  top: 0 !important;
+  right: -5px !important;
+  width: 10px !important;
+  height: 100% !important;
+  z-index: 99999 !important;
+  cursor: col-resize !important;
+  background: transparent !important;
+}
+
+.column-resizer::before {
+  content: "" !important;
+  display: block !important;
+  position: absolute !important;
+  top: 0 !important;
+  bottom: 0 !important;
+  left: 4px !important;
+  width: 1px !important;
+  background: #111111 !important;
+}
+
+.column-resizer:hover::before,
+body.board-column-resizing .column-resizer::before {
+  left: 3px !important;
+  width: 3px !important;
+  background: #000000 !important;
+}
+
+/* Keep content inside its resized column */
+.board-col {
+  min-width: 0 !important;
+  box-sizing: border-box !important;
+}
+
+.board-col input,
+.board-col select,
+.board-col textarea,
+.board-col button {
+  max-width: 100% !important;
+  box-sizing: border-box !important;
+}
+
+/* Keep the chevrons in one exact vertical column */
+.collapsible-active-heading {
+  padding-left: 28px !important;
+}
+
+.collapsible-active-heading > div:first-child,
+.collapsed-status-left {
+  display: flex !important;
+  align-items: center !important;
+  gap: 0 !important;
+}
+
+.section-chevron-slot {
+  flex: 0 0 28px !important;
+  width: 28px !important;
+  min-width: 28px !important;
+  margin: 0 12px 0 0 !important;
+  padding: 0 !important;
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+}
+
+.section-chevron-slot i {
+  width: 12px !important;
+  min-width: 12px !important;
+  margin: 0 !important;
+  padding: 0 !important;
+  text-align: center !important;
+}
+
+.collapsed-status-bars {
+  padding-left: 28px !important;
+}
+
+.collapsed-status-bar {
+  padding-left: 0 !important;
+}
+
+/* Cursor while dragging */
+body.board-column-resizing,
+body.board-column-resizing * {
+  cursor: col-resize !important;
+  user-select: none !important;
+}
+
+
+
+/* =========================================================
+   TEMPORARY BALANCED COLUMN RESIZE
+   - divider movement never changes total table width
+   - neighboring column absorbs the width
+   - refresh restores defaults
+   ========================================================= */
+
+.board-table-shell {
+  width: 100% !important;
+}
+
+/* Grid width is the sum of current column widths.
+   Since two adjacent widths are changed inversely, it remains stable. */
+.board-table-head,
+.board-table-row,
+.board-inline-add-row {
+  grid-template-columns: var(--board-grid-columns) !important;
+}
+
+/* Prevent any extra ghost/blank column after INFO */
+.board-table-head::after,
+.board-table-row::after,
+.board-inline-add-row::after {
+  content: none !important;
+  display: none !important;
+}
+
+/* Last visible column should simply end at the table edge */
+.board-col-info {
+  min-width: 0 !important;
+}
+
+/* Drag interaction feedback */
+.column-resizer:hover::before,
+body.board-column-resizing .column-resizer::before {
+  background: #000000 !important;
+}
+
+/* TABLE HEADER — BLACK */
+.board-table-head {
+  background: #000000 !important;
+  color: #ffffff !important;
+}
+
+/* Header text + icons white */
+.board-table-head .board-col,
+.board-table-head span,
+.board-table-head strong,
+.board-table-head i {
+  color: #ffffff !important;
+}
+
+/* Header ki pipelines white */
+.board-table-head > .board-col:not(:last-child)::after,
+.board-table-head .column-resizer::before {
+  background: #ffffff !important;
+}
+
+/* =========================================================
+   CLEAN LAYOUT FIX — only requested visual corrections
+   ========================================================= */
+
+/* ---------- ACTIVE SECTION HEADER ---------- */
+.collapsible-active-heading {
+  min-height: 58px !important;
+  padding: 9px 18px 9px 28px !important;
+  background: #ffffff !important;
+  border: 1px solid #d7dde5 !important;
+  border-left: 4px solid var(--active-section-color) !important;
+  border-radius: 7px !important;
+  box-shadow: none !important;
+}
+
+.collapsible-active-heading > div:first-child {
+  display: flex !important;
+  align-items: center !important;
+  gap: 0 !important;
+  min-width: 0 !important;
+}
+
+.active-section-title-wrap {
+  display: flex !important;
+  flex-direction: column !important;
+  align-items: flex-start !important;
+  justify-content: center !important;
+  gap: 3px !important;
+  min-width: 0 !important;
+}
+
+.active-section-title-wrap h1 {
+  margin: 0 !important;
+  padding: 0 !important;
+  line-height: 1.05 !important;
+}
+
+.active-section-meta {
+  display: block !important;
+  margin: 0 !important;
+  padding: 0 !important;
+  color: #667085 !important;
+  font-size: 9px !important;
+  font-weight: 700 !important;
+  line-height: 1.2 !important;
+  white-space: nowrap !important;
+}
+
+/* ---------- COLLAPSED CATEGORIES: clean, NO background bar ---------- */
+.collapsed-status-bars {
+  padding-top: 22px !important;
+  padding-left: 28px !important;
+  gap: 34px !important;
+  border-top: 1px dashed #dfe3e8 !important;
+}
+
+.collapsed-status-bar {
+  min-height: 26px !important;
+  padding: 0 !important;
+  margin: 0 !important;
+  border: 0 !important;
+  background: transparent !important;
+  box-shadow: none !important;
+  justify-content: flex-start !important;
+}
+
+.collapsed-status-bar:hover {
+  background: transparent !important;
+}
+
+.collapsed-status-bar strong {
+  background: transparent !important;
+  color: var(--group-color) !important;
+  font-size: 15px !important;
+  font-weight: 800 !important;
+  font-style: italic !important;
+}
+
+/* Specifically prevent any green/delivered pill/bar background */
+.collapsed-status-bar,
+.collapsed-status-bar strong,
+.collapsed-status-left {
+  background-image: none !important;
+}
+
+/* ---------- CHEVRON ALIGNMENT ---------- */
+.section-chevron-slot {
+  flex: 0 0 28px !important;
+  width: 28px !important;
+  min-width: 28px !important;
+  margin: 0 12px 0 0 !important;
+}
+
+.collapsed-status-left {
+  display: flex !important;
+  align-items: center !important;
+  gap: 0 !important;
+}
+
+/* ---------- TABLE LAYOUT ---------- */
+/* Keep the table width stable and avoid the ugly extra empty area */
+.board-table-shell {
+  width: 100% !important;
+  max-width: 100% !important;
+  background: #ffffff !important;
+  border: 1px solid #d8dde5 !important;
+  overflow-x: auto !important;
+  overflow-y: visible !important;
+  scrollbar-gutter: stable !important;
+}
+
+.board-table-head,
+.board-table-row,
+.board-inline-add-row {
+  grid-template-columns: var(--board-grid-columns) !important;
+  width: 100% !important;
+  min-width: 0 !important;
+  max-width: 100% !important;
+  column-gap: 0 !important;
+  align-items: stretch !important;
+}
+
+/* Header stays clean */
+.board-table-head {
+  background: #ffffff !important;
+  color: #111827 !important;
+  border-bottom: 1px solid #d8dde5 !important;
+}
+
+/* Rows */
+.board-table-row,
+.board-inline-add-row {
+  background: #ffffff !important;
+}
+
+/*
+ * Short vertical pipeline:
+ * line remains in the same column boundary,
+ * but does NOT touch the top/bottom of the cell.
+ */
+.board-table-head > .board-col,
+.board-table-row > .board-col,
+.board-inline-add-row > .board-col {
+  position: relative !important;
+  border-right: 0 !important;
+  background: transparent !important;
+  min-width: 0 !important;
+  box-sizing: border-box !important;
+}
+
+/* one inset separator per column */
+.board-table-head > .board-col:not(:last-child)::after,
+.board-table-row > .board-col:not(:last-child)::after,
+.board-inline-add-row > .board-col:not(:last-child)::after {
+  content: "" !important;
+  display: block !important;
+  position: absolute !important;
+  top: 8px !important;
+  bottom: 8px !important;
+  right: 0 !important;
+  width: 1px !important;
+  background: #111111 !important;
+  pointer-events: none !important;
+}
+
+/* Header pipeline a little shorter */
+.board-table-head > .board-col:not(:last-child)::after {
+  top: 6px !important;
+  bottom: 6px !important;
+}
+
+/* Keep old pseudo lines from duplicating on LEFT */
+.board-table-head > .board-col::before,
+.board-table-row > .board-col::before,
+.board-inline-add-row > .board-col::before {
+  content: none !important;
+  display: none !important;
+}
+
+/* Resize handle stays exactly on the same boundary */
+.column-resizer {
+  position: absolute !important;
+  top: 6px !important;
+  bottom: 6px !important;
+  right: -5px !important;
+  width: 10px !important;
+  height: auto !important;
+  z-index: 99999 !important;
+  cursor: col-resize !important;
+  background: transparent !important;
+}
+
+.column-resizer::before {
+  content: "" !important;
+  display: block !important;
+  position: absolute !important;
+  top: 0 !important;
+  bottom: 0 !important;
+  left: 4px !important;
+  width: 1px !important;
+  background: #111111 !important;
+}
+
+.column-resizer:hover::before,
+body.board-column-resizing .column-resizer::before {
+  left: 3px !important;
+  width: 3px !important;
+  background: #000000 !important;
+}
+
+/* Prevent excessive row whitespace */
+.board-table-row {
+  margin: 0 !important;
+  min-height: 66px !important;
+  border-bottom: 1px solid #e5e7eb !important;
+  box-shadow: none !important;
+}
+
+.board-table-row + .board-table-row {
+  margin-top: 0 !important;
+}
+
+/* ---------- PRINT ICON ---------- */
+.board-print-button {
+  color: #111827 !important;
+}
+
+.board-print-button i,
+.board-print-button small {
+  color: #111827 !important;
+}
+
+/* Dark mode => printer white */
+.theme-dark .board-print-button,
+.theme-dark .board-print-button i,
+.theme-dark .board-print-button small {
+  color: #ffffff !important;
+}
+
+/* ---------- DARK MODE CLEANUP ---------- */
+.theme-dark .collapsible-active-heading {
+  background: #111827 !important;
+  border-color: #334155 !important;
+}
+
+.theme-dark .active-section-meta {
+  color: #cbd5e1 !important;
+}
+
+.theme-dark .collapsed-status-bar,
+.theme-dark .collapsed-status-left,
+.theme-dark .collapsed-status-bar strong {
+  background: transparent !important;
+}
+
+.theme-dark .board-table-shell,
+.theme-dark .board-table-head,
+.theme-dark .board-table-row,
+.theme-dark .board-inline-add-row {
+  background: #111827 !important;
+}
+
+.theme-dark .board-table-head > .board-col:not(:last-child)::after,
+.theme-dark .board-table-row > .board-col:not(:last-child)::after,
+.theme-dark .board-inline-add-row > .board-col:not(:last-child)::after,
+.theme-dark .column-resizer::before {
+  background: #ffffff !important;
+}
+
+
+
+/* =========================================================
+   FINAL ROW SPACING FIX
+   - clean space between each order
+   - pipelines stay inside each row
+   - resize does not break layout
+   ========================================================= */
+
+/* Table shell stays stable */
+.board-table-shell {
+  width: 100% !important;
+  max-width: 100% !important;
+  overflow-x: auto !important;
+  overflow-y: visible !important;
+  background: #ffffff !important;
+  border: 0 !important;
+}
+
+/* Header stays attached, rows use the same live column widths */
+.board-table-head,
+.board-table-row,
+.board-inline-add-row {
+  display: grid !important;
+  grid-template-columns: var(--board-grid-columns) !important;
+  width: 100% !important;
+  min-width: 0 !important;
+  max-width: 100% !important;
+  column-gap: 0 !important;
+  box-sizing: border-box !important;
+}
+
+/* Clean header */
+.board-table-head {
+  min-height: 40px !important;
+  margin: 0 0 8px 0 !important;
+  background: #4a90e2 !important;
+  color: #111827 !important;
+  border: 1px solid #d9e0e7 !important;
+  border-radius: 3px !important;
+}
+
+/* Every order becomes its own clean row/card */
+.board-table-row {
+  min-height: 72px !important;
+  margin: 0 0 8px 0 !important;
+  padding: 0 !important;
+  background: #f7f8fa !important;
+  border: 1px solid #dfe4ea !important;
+  border-radius: 3px !important;
+  box-shadow: none !important;
+  overflow: visible !important;
+}
+
+/* last row does not need extra bottom gap */
+.board-table-row:last-child {
+  margin-bottom: 0 !important;
+}
+
+/* alternate row background only slightly different */
+.board-table-row:nth-of-type(even) {
+  background: #ffffff !important;
+}
+
+/* keep all cells aligned vertically */
+.board-table-head > .board-col,
+.board-table-row > .board-col,
+.board-inline-add-row > .board-col {
+  position: relative !important;
+  min-width: 0 !important;
+  height: 100% !important;
+  box-sizing: border-box !important;
+  border-right: 0 !important;
+  background: transparent !important;
+}
+
+/* pipelines remain short and INSIDE each row/header */
+.board-table-head > .board-col:not(:last-child)::after,
+.board-table-row > .board-col:not(:last-child)::after,
+.board-inline-add-row > .board-col:not(:last-child)::after {
+  content: "" !important;
+  display: block !important;
+  position: absolute !important;
+  right: 0 !important;
+  top: 10px !important;
+  bottom: 10px !important;
+  width: 1px !important;
+  background: #111111 !important;
+  pointer-events: none !important;
+}
+
+/* header separator is a little tighter */
+.board-table-head > .board-col:not(:last-child)::after {
+  top: 7px !important;
+  bottom: 7px !important;
+}
+
+/* no duplicated old lines */
+.board-table-head > .board-col::before,
+.board-table-row > .board-col::before,
+.board-inline-add-row > .board-col::before {
+  content: none !important;
+  display: none !important;
+}
+
+/* resize handle stays on the exact separator */
+.column-resizer {
+  position: absolute !important;
+  top: 7px !important;
+  bottom: 7px !important;
+  right: -5px !important;
+  width: 10px !important;
+  height: auto !important;
+  z-index: 99999 !important;
+  cursor: col-resize !important;
+  background: transparent !important;
+}
+
+.column-resizer::before {
+  content: "" !important;
+  display: block !important;
+  position: absolute !important;
+  left: 4px !important;
+  top: 0 !important;
+  bottom: 0 !important;
+  width: 1px !important;
+  background: #111111 !important;
+}
+
+/* keep content inside resized columns */
+.board-col,
+.board-col * {
+  box-sizing: border-box;
+}
+
+.board-col input,
+.board-col select,
+.board-col textarea,
+.board-col button {
+  max-width: 100% !important;
+}
+
+/* stop long content from forcing column width */
+.board-col-name,
+.board-col-address,
+.board-col-track,
+.board-col-packing,
+.board-col-payment {
+  overflow: hidden !important;
+}
+
+.board-col-name strong,
+.board-col-name small,
+.board-col-address input,
+.board-col-track input,
+.board-col-packing .packing-detail-preview,
+.board-col-payment input {
+  min-width: 0 !important;
+  text-overflow: ellipsis !important;
+}
+
+/* dark mode keeps same clean row spacing */
+.theme-dark .board-table-shell {
+  background: #0f172a !important;
+}
+
+.theme-dark .board-table-row {
+  background: #111827 !important;
+  border-color: #334155 !important;
+}
+
+.theme-dark .board-table-row:nth-of-type(even) {
+  background: #0f172a !important;
+}
+
+.theme-dark .board-table-head > .board-col:not(:last-child)::after,
+.theme-dark .board-table-row > .board-col:not(:last-child)::after,
+.theme-dark .board-inline-add-row > .board-col:not(:last-child)::after,
+.theme-dark .column-resizer::before {
+  background: #ffffff !important;
+}
+
+
+
+/* =========================================================
+   TRUE RESPONSIVE GRID + CLEAN PIPELINES
+   ========================================================= */
+
+/* Never create horizontal empty/overflow space */
+.board-table-shell {
+  width: 100% !important;
+  max-width: 100% !important;
+  overflow-x: hidden !important;
+  overflow-y: visible !important;
+  background: #ffffff !important;
+}
+
+/* Header and every row use the SAME percentage grid */
+.board-table-head,
+.board-table-row,
+.board-inline-add-row {
+  display: grid !important;
+  grid-template-columns: var(--board-grid-columns) !important;
+  width: 100% !important;
+  min-width: 100% !important;
+  max-width: 100% !important;
+  column-gap: 0 !important;
+  align-items: stretch !important;
+  box-sizing: border-box !important;
+}
+
+/* Clean order spacing */
+.board-table-head {
+  min-height: 40px !important;
+  margin: 0 0 8px 0 !important;
+}
+
+.board-table-row {
+  min-height: 72px !important;
+  margin: 0 0 8px 0 !important;
+  padding: 0 !important;
+  border: 1px solid #dfe4ea !important;
+  border-radius: 3px !important;
+  box-shadow: none !important;
+  overflow: visible !important;
+}
+
+.board-table-row:last-child {
+  margin-bottom: 0 !important;
+}
+
+/* Every cell stays inside its assigned column */
+.board-table-head > .board-col,
+.board-table-row > .board-col,
+.board-inline-add-row > .board-col {
+  position: relative !important;
+  min-width: 0 !important;
+  width: auto !important;
+  max-width: none !important;
+  height: 100% !important;
+  box-sizing: border-box !important;
+  border-right: 0 !important;
+  overflow: hidden !important;
+}
+
+/* Columns that need popovers/buttons can still show vertically */
+.board-col-packing,
+.board-col-status,
+.board-col-owner,
+.board-col-files,
+.board-col-chat {
+  overflow: visible !important;
+}
+
+/* PIPELINES:
+   same exact column boundaries in header and every order,
+   shorter from top/bottom for clean look. */
+.board-table-head > .board-col:not(:last-child)::after,
+.board-table-row > .board-col:not(:last-child)::after,
+.board-inline-add-row > .board-col:not(:last-child)::after {
+  content: "" !important;
+  display: block !important;
+  position: absolute !important;
+  right: 0 !important;
+  top: 11px !important;
+  bottom: 11px !important;
+  width: 1px !important;
+  background: #111827 !important;
+  pointer-events: none !important;
+  z-index: 3 !important;
+}
+
+.board-table-head > .board-col:not(:last-child)::after {
+  top: 7px !important;
+  bottom: 7px !important;
+}
+
+/* Kill old duplicate separators */
+.board-table-head > .board-col::before,
+.board-table-row > .board-col::before,
+.board-inline-add-row > .board-col::before {
+  content: none !important;
+  display: none !important;
+}
+
+/* Resize handle exactly follows that same boundary */
+.column-resizer {
+  position: absolute !important;
+  top: 7px !important;
+  bottom: 7px !important;
+  right: -5px !important;
+  width: 10px !important;
+  height: auto !important;
+  z-index: 99999 !important;
+  cursor: col-resize !important;
+  background: transparent !important;
+}
+
+.column-resizer::before {
+  content: "" !important;
+  display: block !important;
+  position: absolute !important;
+  top: 0 !important;
+  bottom: 0 !important;
+  left: 4px !important;
+  width: 1px !important;
+  background: #111827 !important;
+}
+
+.column-resizer:hover::before,
+body.board-column-resizing .column-resizer::before {
+  left: 3px !important;
+  width: 3px !important;
+  background: #000000 !important;
+}
+
+/* Long content must NOT push columns wider */
+.board-col-name .inline-cell-wrap,
+.board-col-name .inline-value-button,
+.board-col-address,
+.board-col-track,
+.board-col-payment,
+.board-col-packing .packing-detail-wrap {
+  min-width: 0 !important;
+  max-width: 100% !important;
+}
+
+.board-col-name strong,
+.board-col-name small,
+.board-col-address input,
+.board-col-track input,
+.board-col-payment input,
+.packing-detail-preview {
+  overflow: hidden !important;
+  text-overflow: ellipsis !important;
+  white-space: nowrap !important;
+}
+
+/* Keep content centered/clean after resize */
+.board-col-status,
+.board-col-owner,
+.board-col-files,
+.board-col-chat,
+.board-col-payment,
+.board-col-packing,
+.board-col-track,
+.board-col-info {
+  display: flex !important;
+  align-items: center !important;
+}
+
+.board-col-status,
+.board-col-files,
+.board-col-chat,
+.board-col-payment,
+.board-col-packing,
+.board-col-track,
+.board-col-info {
+  justify-content: center !important;
+}
+
+.board-col-owner {
+  justify-content: flex-start !important;
+}
+
+/* Dark mode pipelines */
+.theme-dark .board-table-head > .board-col:not(:last-child)::after,
+.theme-dark .board-table-row > .board-col:not(:last-child)::after,
+.theme-dark .board-inline-add-row > .board-col:not(:last-child)::after,
+.theme-dark .column-resizer::before {
+  background: #ffffff !important;
+}
+
+
+
+/* =========================================================
+   PIPELINE CENTER FIX ONLY
+   Keep everything else unchanged.
+   Vertical separators are centered inside header/order rows.
+   ========================================================= */
+
+/* Remove previous full/inset separator positioning */
+.board-table-head > .board-col:not(:last-child)::after,
+.board-table-row > .board-col:not(:last-child)::after,
+.board-inline-add-row > .board-col:not(:last-child)::after {
+  content: "" !important;
+  position: absolute !important;
+  right: 0 !important;
+  top: 50% !important;
+  bottom: auto !important;
+  transform: translateY(-50%) !important;
+  width: 1px !important;
+  height: 32px !important;
+  background: #111827 !important;
+  pointer-events: none !important;
+  z-index: 3 !important;
+}
+
+/* Header separator slightly shorter */
+.board-table-head > .board-col:not(:last-child)::after {
+  height: 25px !important;
+}
+
+/* Resize handle remains on same boundary, also vertically centered */
+.column-resizer {
+  top: 50% !important;
+  bottom: auto !important;
+  transform: translateY(-50%) !important;
+  height: 32px !important;
+}
+
+.board-table-head .column-resizer {
+  height: 25px !important;
+}
+
+.column-resizer::before {
+  top: 0 !important;
+  bottom: auto !important;
+  height: 100% !important;
+}
+
+/* Dark mode keeps separator visible */
+.theme-dark .board-table-head > .board-col:not(:last-child)::after,
+.theme-dark .board-table-row > .board-col:not(:last-child)::after,
+.theme-dark .board-inline-add-row > .board-col:not(:last-child)::after,
+.theme-dark .column-resizer::before {
+  background: #ffffff !important;
+}
+
+
+
+/* =========================================================
+   SECTION BAR CLEANUP ONLY
+   - active bar slightly lower
+   - white background + black border
+   - colored left strip on every section
+   ========================================================= */
+
+/* Active/open section bar */
+.collapsible-active-heading {
+  margin-top: 12px !important;
+  margin-bottom: 12px !important;
+  background: #ffffff !important;
+  border: 1px solid #111827 !important;
+  border-left: 5px solid var(--active-section-color) !important;
+  border-radius: 6px !important;
+  box-shadow: none !important;
+}
+
+/* Keep active title clean */
+.collapsible-active-heading h1 {
+  color: var(--active-section-color) !important;
+}
+
+/* Other/collapsed sections */
+.collapsed-status-bars {
+  gap: 34px !important;
+  padding-top: 12px !important;
+}
+
+.collapsed-status-bar {
+  position: relative !important;
+  min-height: 42px !important;
+  padding: 0 14px 0 28px !important;
+  background: #ffffff !important;
+  border: 1px solid #111827 !important;
+  border-left: 5px solid var(--group-color) !important;
+  border-radius: 6px !important;
+  box-shadow: none !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: flex-start !important;
+}
+
+/* No colored full background */
+.collapsed-status-bar:hover {
+  background: #f8fafc !important;
+}
+
+.collapsed-status-left {
+  background: transparent !important;
+}
+
+/* Keep each title in its own section color */
+.collapsed-status-bar strong {
+  color: var(--group-color) !important;
+  background: transparent !important;
+}
+
+/* Chevron stays aligned */
+.collapsed-status-bar .section-chevron-slot {
+  margin-right: 12px !important;
+}
+
+/* Dark mode */
+.theme-dark .collapsible-active-heading,
+.theme-dark .collapsed-status-bar {
+  background: #111827 !important;
+  border-color: #ffffff !important;
+}
+
+.theme-dark .collapsed-status-bar:hover {
+  background: #172033 !important;
+}
+
+
+
+/* =========================================================
+   UNIFORM SECTION BARS — FINAL
+   All open/closed bars same size and same clean style.
+   ========================================================= */
+
+/* OPEN / ACTIVE BAR */
+.collapsible-active-heading {
+  width: 100% !important;
+  height: 58px !important;
+  min-height: 58px !important;
+  max-height: 58px !important;
+  margin: 12px 0 !important;
+  padding: 8px 16px 8px 28px !important;
+
+  background: #ffffff !important;
+  border: 1px solid #111111 !important;
+  border-left: 5px solid #111111 !important;
+  border-radius: 6px !important;
+  box-shadow: none !important;
+  box-sizing: border-box !important;
+}
+
+/* CLOSED BARS CONTAINER */
+.collapsed-status-bars {
+  width: 100% !important;
+  padding: 0 !important;
+  margin: 0 !important;
+  gap: 12px !important;
+}
+
+/* CLOSED BAR — EXACT SAME SIZE AS OPEN BAR */
+.collapsed-status-bar {
+  width: 100% !important;
+  height: 58px !important;
+  min-height: 58px !important;
+  max-height: 58px !important;
+  margin: 0 !important;
+  padding: 8px 16px 8px 28px !important;
+
+  background: #ffffff !important;
+  border: 1px solid #111111 !important;
+  border-left: 5px solid #111111 !important;
+  border-radius: 6px !important;
+  box-shadow: none !important;
+  box-sizing: border-box !important;
+
+  display: flex !important;
+  align-items: center !important;
+  justify-content: flex-start !important;
+}
+
+/* ALL SECTION TEXT BLACK */
+.collapsible-active-heading h1,
+.collapsible-active-heading .active-section-meta,
+.collapsed-status-bar strong {
+  color: #111111 !important;
+}
+
+/* active title/meta alignment */
+.active-section-title-wrap {
+  justify-content: center !important;
+}
+
+.active-section-meta {
+  margin-top: 2px !important;
+  color: #111111 !important;
+}
+
+/* ALL CHEVRONS BLACK */
+.collapsible-active-heading .section-chevron-slot,
+.collapsed-status-bar .section-chevron-slot,
+.collapsible-active-heading .section-chevron-slot i,
+.collapsed-status-bar .section-chevron-slot i {
+  color: #111111 !important;
+}
+
+/* remove colored hover/background */
+.collapsed-status-bar:hover,
+.collapsible-active-heading:hover {
+  background: #ffffff !important;
+}
+
+/* Make sure no group color leaks into text/background */
+.collapsed-status-left,
+.collapsed-status-bar strong {
+  background: transparent !important;
+}
+
+/* DARK MODE: requested bars still clean; white surface / black content */
+.theme-dark .collapsible-active-heading,
+.theme-dark .collapsed-status-bar {
+  background: #ffffff !important;
+  border-color: #111111 !important;
+  border-left-color: #111111 !important;
+}
+
+.theme-dark .collapsible-active-heading h1,
+.theme-dark .collapsible-active-heading .active-section-meta,
+.theme-dark .collapsed-status-bar strong,
+.theme-dark .collapsible-active-heading .section-chevron-slot,
+.theme-dark .collapsed-status-bar .section-chevron-slot,
+.theme-dark .collapsible-active-heading .section-chevron-slot i,
+.theme-dark .collapsed-status-bar .section-chevron-slot i {
+  color: #111111 !important;
+}
+
+
+
+/* =========================================================
+   PROFESSIONAL WORKFLOW TABS + SECTION COLOR SYNC
+   ========================================================= */
+
+/* ---------- TOP WORKFLOW TABS ---------- */
+.workflow-tabs {
+  display: flex !important;
+  align-items: center !important;
+  gap: 10px !important;
+  flex-wrap: wrap !important;
+}
+
+.workflow-tab-wrap {
+  flex: 0 0 auto !important;
+}
+
+.workflow-tab {
+  min-width: 122px !important;
+  height: 42px !important;
+  padding: 0 !important;
+
+  display: grid !important;
+  grid-template-columns: 1fr 42px !important;
+  align-items: stretch !important;
+
+  background: #ffffff !important;
+  border: 1px solid #d9dee7 !important;
+  border-left: 4px solid var(--group-color) !important;
+  border-radius: 7px !important;
+
+  color: var(--group-color) !important;
+  box-shadow: 0 1px 2px rgba(15, 23, 42, .04) !important;
+  overflow: hidden !important;
+  transition: .16s ease !important;
+}
+
+.workflow-tab:hover {
+  transform: translateY(-1px) !important;
+  border-color: #cbd5e1 !important;
+  box-shadow: 0 5px 14px rgba(15, 23, 42, .08) !important;
+  background: #ffffff !important;
+}
+
+.workflow-tab.active {
+  border-color: var(--group-color) !important;
+  box-shadow:
+    0 0 0 2px color-mix(in srgb, var(--group-color) 18%, transparent),
+    0 5px 14px rgba(15, 23, 42, .08) !important;
+  background: #ffffff !important;
+}
+
+.workflow-tab-label {
+  display: flex !important;
+  align-items: center !important;
+  padding: 0 11px !important;
+
+  color: var(--group-color) !important;
+  background: #ffffff !important;
+
+  font-size: 9px !important;
+  font-weight: 900 !important;
+  letter-spacing: .025em !important;
+  white-space: nowrap !important;
+}
+
+.workflow-total-box {
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+
+  background: color-mix(
+    in srgb,
+    var(--group-color) 12%,
+    #ffffff
+  ) !important;
+
+  color: var(--group-color) !important;
+  border-left: 1px solid color-mix(
+    in srgb,
+    var(--group-color) 25%,
+    #e5e7eb
+  ) !important;
+
+  font-size: 14px !important;
+  font-weight: 900 !important;
+}
+
+/* Plus/add-section button matches the tabs */
+.workflow-add-button {
+  width: 42px !important;
+  height: 42px !important;
+  border: 1px dashed #94a3b8 !important;
+  border-radius: 7px !important;
+  background: #ffffff !important;
+  color: #0f172a !important;
+}
+
+.workflow-add-button:hover {
+  background: #f8fafc !important;
+  border-color: #475569 !important;
+}
+
+/* ---------- SECTION BARS ---------- */
+/* Open section: white card, but text + left strip use its exact section color */
+.collapsible-active-heading {
+  background: #ffffff !important;
+  border: 1px solid #aeb0b3 !important;
+  border-left: 5px solid var(--active-section-color) !important;
+  box-shadow: none !important;
+}
+
+.collapsible-active-heading h1 {
+  color: var(--active-section-color) !important;
+}
+
+.collapsible-active-heading .active-section-meta {
+  color: var(--active-section-color) !important;
+  opacity: .78 !important;
+}
+
+.collapsible-active-heading .section-chevron-slot,
+.collapsible-active-heading .section-chevron-slot i {
+  color: var(--active-section-color) !important;
+}
+
+/* Closed sections: exact group color on text + left strip */
+.collapsed-status-bar {
+  background: #ffffff !important;
+  border: 1px solid #111827 !important;
+  border-left: 5px solid var(--group-color) !important;
+  box-shadow: none !important;
+}
+
+.collapsed-status-bar:hover {
+  background: #fbfcfd !important;
+}
+
+.collapsed-status-bar strong,
+.collapsed-status-bar .section-chevron-slot,
+.collapsed-status-bar .section-chevron-slot i,
+.collapsed-status-bar .collapsed-status-icon {
+  color: var(--group-color) !important;
+}
+
+/* Make sure no old black override wins */
+.collapsed-status-left,
+.collapsed-status-bar strong {
+  background: transparent !important;
+}
+
+/* ---------- DARK MODE ---------- */
+.theme-dark .workflow-tab,
+.theme-dark .workflow-tab-label,
+.theme-dark .workflow-add-button {
+  background: #111827 !important;
+}
+
+.theme-dark .workflow-tab {
+  border-color: #334155 !important;
+  border-left-color: var(--group-color) !important;
+}
+
+.theme-dark .workflow-total-box {
+  background: color-mix(
+    in srgb,
+    var(--group-color) 18%,
+    #111827
+  ) !important;
+}
+
+.theme-dark .collapsible-active-heading,
+.theme-dark .collapsed-status-bar {
+  background: #111827 !important;
+  border-color: #ffffff !important;
+}
+
+.theme-dark .collapsible-active-heading {
+  border-left-color: var(--active-section-color) !important;
+}
+
+.theme-dark .collapsed-status-bar {
+  border-left-color: var(--group-color) !important;
+}
+
+
+
+
+
+/* ===== Status dropdown reference style ===== */
+.board-table-shell,
+.board-table-row,
+.row-status-cell,
+.status-ref-wrap {
+  overflow: visible !important;
+}
+
+.board-table-row {
+  position: relative !important;
+  z-index: 1 !important;
+}
+
+.board-table-row:has(.status-ref-menu) {
+  z-index: 5000 !important;
+}
+
+.row-status-cell {
+  position: relative !important;
+  z-index: 30 !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+}
+
+.status-ref-wrap {
+  position: relative !important;
+  width: 160px !important;
+  max-width: 100% !important;
+}
+
+.status-ref-trigger {
+  width: 160px !important;
+  max-width: 100% !important;
+  height: 38px !important;
+  padding: 0 13px !important;
+
+  display: grid !important;
+  grid-template-columns: 8px minmax(0, 1fr) 18px !important;
+  align-items: center !important;
+  gap: 10px !important;
+
+  background: #e9e9e9 !important;
+  border: 1px solid #b8b8b8 !important;
+  border-radius: 10px !important;
+
+  color: #2f3540 !important;
+  cursor: pointer !important;
+  box-shadow: inset 0 1px 0 rgba(255,255,255,.65) !important;
+}
+
+.status-ref-trigger.open {
+  background: #eeeeee !important;
+}
+
+.status-ref-dot {
+  display: block !important;
+  width: 8px !important;
+  height: 8px !important;
+  min-width: 8px !important;
+  border-radius: 50% !important;
+}
+
+.status-ref-label,
+.status-ref-option-label {
+  min-width: 0 !important;
+  overflow: hidden !important;
+  white-space: nowrap !important;
+  text-overflow: ellipsis !important;
+}
+
+.status-ref-label {
+  color: #31343a !important;
+  font-size: 12px !important;
+  font-weight: 500 !important;
+  text-align: left !important;
+}
+
+.status-ref-chevron {
+  color: #111827 !important;
+  font-size: 13px !important;
+  transition: transform .15s ease !important;
+}
+
+.status-ref-chevron.rotate {
+  transform: rotate(180deg) !important;
+}
+
+.status-ref-menu {
+  position: absolute !important;
+  top: calc(100% + 7px) !important;
+  left: 0 !important;
+  z-index: 2147483647 !important;
+
+  width: 240px !important;
+  max-height: 310px !important;
+  overflow-y: auto !important;
+  overflow-x: hidden !important;
+
+  padding: 9px !important;
+  background: #ffffff !important;
+  border: 1px solid #e0e3e7 !important;
+  border-radius: 12px !important;
+
+  box-shadow:
+    0 18px 42px rgba(15,23,42,.14),
+    0 3px 10px rgba(15,23,42,.05) !important;
+}
+
+.status-ref-option {
+  width: 100% !important;
+  min-height: 40px !important;
+  padding: 0 10px !important;
+
+  display: grid !important;
+  grid-template-columns: 8px minmax(0,1fr) 14px !important;
+  align-items: center !important;
+  gap: 10px !important;
+
+  border: 0 !important;
+  border-radius: 8px !important;
+  background: transparent !important;
+
+  color: #666b73 !important;
+  text-align: left !important;
+  cursor: pointer !important;
+}
+
+.status-ref-option:hover,
+.status-ref-option.active {
+  background: #f5f6f8 !important;
+}
+
+.status-ref-option-label {
+  color: #666b73 !important;
+  font-size: 12px !important;
+  font-weight: 500 !important;
+}
+
+.status-ref-check {
+  color: #111827 !important;
+  font-size: 10px !important;
+}
+
+/* Keep packing centered and clean */
+.board-col-packing {
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+}
+
+.packing-clean-input,
+.packing-inline-input {
+  margin: 0 !important;
+  align-self: center !important;
+}
+
+/* Dark mode */
+.theme-dark .status-ref-trigger {
+  background: #1f2937 !important;
+  border-color: #475569 !important;
+}
+
+.theme-dark .status-ref-label,
+.theme-dark .status-ref-chevron {
+  color: #f8fafc !important;
+}
+
+.theme-dark .status-ref-menu {
+  background: #111827 !important;
+  border-color: #334155 !important;
+}
+
+.theme-dark .status-ref-option:hover,
+.theme-dark .status-ref-option.active {
+  background: #1f2937 !important;
+}
+
+.theme-dark .status-ref-option-label,
+.theme-dark .status-ref-check {
+  color: #f8fafc !important;
+}
+
+
+/* =========================================================
+   STATUS DROPDOWN OUTSIDE ROW / TABLE
+   ========================================================= */
+
+.status-ref-wrap {
+  position: relative !important;
+  width: 160px !important;
+  max-width: 100% !important;
+}
+
+.status-ref-trigger {
+  width: 160px !important;
+  max-width: 100% !important;
+  height: 38px !important;
+  padding: 0 13px !important;
+  display: grid !important;
+  grid-template-columns: 8px minmax(0,1fr) 18px !important;
+  align-items: center !important;
+  gap: 10px !important;
+  background: #e9e9e9 !important;
+  border: 1px solid #b8b8b8 !important;
+  border-radius: 10px !important;
+  color: #2f3540 !important;
+  cursor: pointer !important;
+}
+
+.status-ref-trigger.open {
+  background: #eeeeee !important;
+  border-color: #9aa1aa !important;
+}
+
+.status-ref-dot {
+  display: block !important;
+  width: 8px !important;
+  height: 8px !important;
+  min-width: 8px !important;
+  border-radius: 50% !important;
+}
+
+.status-ref-label {
+  min-width: 0 !important;
+  overflow: hidden !important;
+  text-overflow: ellipsis !important;
+  white-space: nowrap !important;
+  text-align: left !important;
+  color: #31343a !important;
+  font-size: 12px !important;
+  font-weight: 500 !important;
+}
+
+.status-ref-chevron {
+  color: #111827 !important;
+  font-size: 13px !important;
+  transition: transform .15s ease !important;
+}
+
+.status-ref-chevron.rotate {
+  transform: rotate(180deg) !important;
+}
+
+/* IMPORTANT: menu is teleported to body, so it can never push rows down */
+.status-ref-menu-portal {
+  position: fixed !important;
+  z-index: 2147483647 !important;
+  max-height: 310px !important;
+  overflow-y: auto !important;
+  overflow-x: hidden !important;
+  padding: 9px !important;
+  margin: 0 !important;
+
+  background: #ffffff !important;
+  border: 1px solid #e0e3e7 !important;
+  border-radius: 12px !important;
+
+  box-shadow:
+    0 18px 42px rgba(15,23,42,.16),
+    0 4px 12px rgba(15,23,42,.06) !important;
+}
+
+.status-ref-menu-portal .status-ref-option {
+  width: 100% !important;
+  min-height: 40px !important;
+  padding: 0 10px !important;
+
+  display: grid !important;
+  grid-template-columns: 8px minmax(0,1fr) 14px !important;
+  align-items: center !important;
+  gap: 10px !important;
+
+  border: 0 !important;
+  border-radius: 8px !important;
+  background: transparent !important;
+  color: #666b73 !important;
+  text-align: left !important;
+  cursor: pointer !important;
+}
+
+.status-ref-menu-portal .status-ref-option:hover,
+.status-ref-menu-portal .status-ref-option.active {
+  background: #f5f6f8 !important;
+}
+
+.status-ref-option-label {
+  min-width: 0 !important;
+  overflow: hidden !important;
+  white-space: nowrap !important;
+  text-overflow: ellipsis !important;
+  color: #666b73 !important;
+  font-size: 12px !important;
+  font-weight: 500 !important;
+}
+
+.status-ref-check {
+  color: #111827 !important;
+  font-size: 10px !important;
+}
+
+/* smooth open/close */
+.status-ref-menu-enter-active,
+.status-ref-menu-leave-active {
+  transition: opacity .14s ease, transform .14s ease !important;
+  transform-origin: top left !important;
+}
+
+.status-ref-menu-enter-from,
+.status-ref-menu-leave-to {
+  opacity: 0 !important;
+  transform: translateY(-4px) scale(.985) !important;
+}
+
+.theme-dark .status-ref-menu-portal {
+  background: #111827 !important;
+  border-color: #334155 !important;
+}
+
+.theme-dark .status-ref-menu-portal .status-ref-option:hover,
+.theme-dark .status-ref-menu-portal .status-ref-option.active {
+  background: #1f2937 !important;
+}
+
+.theme-dark .status-ref-option-label,
+.theme-dark .status-ref-check {
+  color: #f8fafc !important;
+}
+
+
+
+/* START-ONLY ORDER STATE */
+.working-locked-label {
+  display: inline-flex !important;
+  align-items: center !important;
+  gap: 5px !important;
+  padding: 4px 9px !important;
+  border-radius: 999px !important;
+  background: #eef2f7 !important;
+  color: #475467 !important;
+  font-size: 9px !important;
+  font-weight: 700 !important;
+  white-space: nowrap !important;
+}
+
+.working-locked-label i {
+  font-size: 8px !important;
+}
+
+
+
+/* =========================================================
+   WORKING STATUS DROPDOWN — FINAL
+   ========================================================= */
+.status-fixed-dropdown {
+  position: fixed !important;
+  z-index: 2147483647 !important;
+  display: block !important;
+
+  padding: 8px !important;
+  max-height: 310px !important;
+  overflow-y: auto !important;
+  overflow-x: hidden !important;
+
+  background: #ffffff !important;
+  border: 1px solid #d9dee5 !important;
+  border-radius: 12px !important;
+
+  box-shadow:
+    0 18px 42px rgba(15,23,42,.18),
+    0 4px 12px rgba(15,23,42,.07) !important;
+}
+
+.status-fixed-option {
+  width: 100% !important;
+  min-height: 38px !important;
+  padding: 0 10px !important;
+
+  display: grid !important;
+  grid-template-columns: 8px minmax(0,1fr) 14px !important;
+  align-items: center !important;
+  gap: 10px !important;
+
+  border: 0 !important;
+  border-radius: 8px !important;
+  background: transparent !important;
+
+  color: #5f6670 !important;
+  text-align: left !important;
+  cursor: pointer !important;
+}
+
+.status-fixed-option:hover,
+.status-fixed-option.active {
+  background: #f3f4f6 !important;
+}
+
+.status-fixed-dot {
+  width: 8px !important;
+  height: 8px !important;
+  min-width: 8px !important;
+  border-radius: 50% !important;
+}
+
+.status-fixed-label {
+  color: #5f6670 !important;
+  font-size: 12px !important;
+  font-weight: 500 !important;
+}
+
+.status-fixed-check {
+  color: #111827 !important;
+  font-size: 10px !important;
+}
+
+.theme-dark .status-fixed-dropdown {
+  background: #111827 !important;
+  border-color: #334155 !important;
+}
+
+.theme-dark .status-fixed-option:hover,
+.theme-dark .status-fixed-option.active {
+  background: #1f2937 !important;
+}
+
+.theme-dark .status-fixed-label,
+.theme-dark .status-fixed-check {
+  color: #ffffff !important;
+}
+/* MAIN TABLE HEADER BAR */
+.board-table-header,
+.board-grid-header {
+    background: #000 !important;
+    color: #fff !important;
+}
+
+/* Header ke tamam text white */
+.board-table-header *,
+.board-grid-header * {
+    color: #fff !important;
+}
+
+/* Header ki pipeline white/light */
+.board-table-header .board-col,
+.board-grid-header .board-col {
+    border-right-color: rgba(255, 255, 255, 0.65) !important;
+}
+/* ===== MAIN TABLE HEADER BLACK ONLY ===== */
+
+.factory-board-page .board-table-head {
+  background: #000000 !important;
+  background-color: #000000 !important;
+  color: #ffffff !important;
+  border-color: #000000 !important;
+}
+
+/* All header cells black + text white */
+.factory-board-page .board-table-head > .board-col {
+  background: #000000 !important;
+  background-color: #000000 !important;
+  color: #ffffff !important;
+}
+
+/* Header text + icons white */
+.factory-board-page .board-table-head > .board-col *,
+.factory-board-page .board-table-head i {
+  color: #ffffff !important;
+}
+
+/* Vertical lines white */
+.factory-board-page
+.board-table-head
+> .board-col:not(:last-child)::after {
+  background: #ffffff !important;
+}
+
+/* Resize lines white */
+.factory-board-page .board-table-head .column-resizer::before {
+  background: #ffffff !important;
+}
+/* ===== PAGE BACKGROUND ===== */
+.factory-board-page {
+  background: #f4f5f8 !important;
+  min-height: 100vh;
+}
+
+
+/* =========================================================
+   REUSABLE HEADER PAGE SPACING
+   ========================================================= */
+.factory-board-page {
+  background: #f4f5f8 !important;
+}
+
+.factory-board-page .board-toolbar {
+  padding-top: 20px !important;
+}
+
+/* Old header is no longer used; keep it harmless if referenced elsewhere */
+.factory-board-page .board-brand-header {
+  display: none !important;
+}
+
+
+/* =========================================================
+   CHAT NOTIFICATION DROPDOWN - REAL PAGE CSS
+   ========================================================= */
+
+.chat-notification-wrap {
+  position: relative !important;
+  flex: 0 0 auto !important;
+  z-index: 1000 !important;
+}
+
+.chat-notification-button {
+  position: relative !important;
+  width: 40px !important;
+  height: 38px !important;
+  padding: 0 !important;
+
+  display: grid !important;
+  place-items: center !important;
+
+  border: 1px solid #0f172a !important;
+  border-radius: 999px !important;
+
+  background: #ffffff !important;
+  color: #0f172a !important;
+
+  cursor: pointer !important;
+}
+
+.chat-notification-count {
+  position: absolute !important;
+  top: -6px !important;
+  right: -7px !important;
+
+  min-width: 19px !important;
+  height: 19px !important;
+  padding: 0 5px !important;
+
+  display: grid !important;
+  place-items: center !important;
+
+  background: #ef4444 !important;
+  color: #ffffff !important;
+
+  border: 2px solid #ffffff !important;
+  border-radius: 999px !important;
+
+  font-size: 9px !important;
+  font-weight: 900 !important;
+  line-height: 1 !important;
+}
+
+.chat-notification-dropdown {
+  position: absolute !important;
+
+  top: calc(100% + 10px) !important;
+  right: 0 !important;
+  left: auto !important;
+
+  z-index: 2147483647 !important;
+
+  width: 360px !important;
+  min-width: 360px !important;
+  max-width: min(360px, calc(100vw - 24px)) !important;
+  max-height: 420px !important;
+
+  overflow-y: auto !important;
+  overflow-x: hidden !important;
+
+  background: #ffffff !important;
+
+  border: 1px solid #dbe2ea !important;
+  border-radius: 14px !important;
+
+  box-shadow:
+    0 22px 55px rgba(15, 23, 42, .18),
+    0 4px 12px rgba(15, 23, 42, .06) !important;
+}
+
+.chat-notification-head {
+  position: sticky !important;
+  top: 0 !important;
+  z-index: 2 !important;
+
+  width: 100% !important;
+  padding: 13px 14px !important;
+
+  display: flex !important;
+  align-items: center !important;
+  justify-content: space-between !important;
+  gap: 12px !important;
+
+  background: #ffffff !important;
+
+  border-bottom: 1px solid #e8edf3 !important;
+}
+
+.chat-notification-head strong {
+  color: #0f172a !important;
+  font-size: 13px !important;
+  font-weight: 900 !important;
+  white-space: nowrap !important;
+}
+
+.chat-notification-head span {
+  color: #64748b !important;
+  font-size: 10px !important;
+  font-weight: 700 !important;
+  white-space: nowrap !important;
+}
+
+.chat-notification-item {
+  width: 100% !important;
+  min-width: 0 !important;
+
+  padding: 11px 12px !important;
+
+  display: grid !important;
+  grid-template-columns: 36px minmax(0, 1fr) 26px !important;
+  align-items: center !important;
+  gap: 10px !important;
+
+  border: 0 !important;
+  border-bottom: 1px solid #eef2f7 !important;
+
+  background: #ffffff !important;
+  color: #0f172a !important;
+
+  cursor: pointer !important;
+  text-align: left !important;
+}
+
+.chat-notification-item:last-of-type {
+  border-bottom: 0 !important;
+}
+
+.chat-notification-item:hover {
+  background: #f8fafc !important;
+}
+
+.chat-notification-icon {
+  width: 36px !important;
+  height: 36px !important;
+  min-width: 36px !important;
+
+  display: grid !important;
+  place-items: center !important;
+
+  border-radius: 50% !important;
+
+  background: #0f172a !important;
+  color: #ffffff !important;
+
+  font-size: 12px !important;
+}
+
+.chat-notification-content {
+  min-width: 0 !important;
+  width: 100% !important;
+
+  display: flex !important;
+  flex-direction: column !important;
+  gap: 3px !important;
+}
+
+.chat-notification-content strong {
+  display: block !important;
+
+  min-width: 0 !important;
+  max-width: none !important;
+
+  overflow: hidden !important;
+
+  color: #0f172a !important;
+
+  font-size: 11px !important;
+  font-weight: 900 !important;
+
+  white-space: nowrap !important;
+  text-overflow: ellipsis !important;
+}
+
+.chat-notification-content small {
+  display: block !important;
+
+  min-width: 0 !important;
+  max-width: none !important;
+
+  overflow: hidden !important;
+
+  color: #64748b !important;
+
+  font-size: 9px !important;
+  font-weight: 600 !important;
+
+  white-space: nowrap !important;
+  text-overflow: ellipsis !important;
+}
+
+.chat-notification-badge {
+  width: 24px !important;
+  height: 24px !important;
+  min-width: 24px !important;
+
+  display: grid !important;
+  place-items: center !important;
+
+  padding: 0 !important;
+
+  border-radius: 999px !important;
+
+  background: #ef4444 !important;
+  color: #ffffff !important;
+
+  font-size: 9px !important;
+  font-weight: 900 !important;
+}
+
+.chat-notification-empty {
+  min-height: 110px !important;
+
+  display: flex !important;
+  flex-direction: column !important;
+  align-items: center !important;
+  justify-content: center !important;
+  gap: 8px !important;
+
+  padding: 20px !important;
+
+  color: #64748b !important;
+
+  font-size: 11px !important;
+  font-weight: 700 !important;
+}
+
+/* Keep toolbar controls aligned */
+.board-toolbar-actions {
+  display: flex !important;
+  align-items: center !important;
+  justify-content: flex-end !important;
+  gap: 10px !important;
+  overflow: visible !important;
+}
+
+.board-toolbar {
+  overflow: visible !important;
+}
+
+/* DARK */
+.theme-dark .chat-notification-button,
+.theme-dark .chat-notification-dropdown,
+.theme-dark .chat-notification-head,
+.theme-dark .chat-notification-item {
+  background: #111827 !important;
+  color: #f8fafc !important;
+  border-color: #334155 !important;
+}
+
+.theme-dark .chat-notification-item:hover {
+  background: #1e293b !important;
+}
+
+.theme-dark .chat-notification-head strong,
+.theme-dark .chat-notification-content strong {
+  color: #f8fafc !important;
+}
+
+.theme-dark .chat-notification-head span,
+.theme-dark .chat-notification-content small,
+.theme-dark .chat-notification-empty {
+  color: #cbd5e1 !important;
+}
+
+/* MOBILE */
+@media (max-width: 767px) {
+  .chat-notification-dropdown {
+    position: fixed !important;
+
+    top: 72px !important;
+    right: 12px !important;
+    left: 12px !important;
+
+    width: auto !important;
+    min-width: 0 !important;
+    max-width: none !important;
+
+    max-height: calc(100vh - 90px) !important;
+  }
+}
+
+
+
+/* =========================================================
+   FINAL STATUS CELL STYLE
+   Full name + square box + full status color
+   ========================================================= */
+
+.factory-board-page .board-col-status {
+  overflow: visible !important;
+}
+
+.factory-board-page .status-ref-wrap {
+  width: 100% !important;
+  max-width: none !important;
+  padding: 0 6px !important;
+}
+
+.factory-board-page .status-ref-trigger,
+.factory-board-page .status-ref-trigger.open {
+  width: 100% !important;
+  min-width: 150px !important;
+  max-width: none !important;
+  height: 38px !important;
+
+  padding: 0 11px !important;
+
+  display: grid !important;
+  grid-template-columns: 8px minmax(0, 1fr) 16px !important;
+  align-items: center !important;
+  gap: 8px !important;
+
+  background: var(--status-fill) !important;
+  background-color: var(--status-fill) !important;
+
+  border: 1px solid var(--status-fill) !important;
+  border-radius: 0 !important;
+
+  color: var(--status-text) !important;
+
+  box-shadow: none !important;
+  overflow: visible !important;
+}
+
+.factory-board-page .status-ref-label {
+  min-width: 0 !important;
+
+  overflow: visible !important;
+  text-overflow: clip !important;
+  white-space: nowrap !important;
+
+  color: var(--status-text) !important;
+
+  font-size: 11px !important;
+  font-weight: 800 !important;
+  line-height: 1 !important;
+
+  text-align: left !important;
+}
+
+.factory-board-page .status-ref-chevron {
+  color: var(--status-text) !important;
+  flex: 0 0 auto !important;
+}
+
+.factory-board-page .status-ref-dot {
+  width: 7px !important;
+  height: 7px !important;
+  min-width: 7px !important;
+
+  background: var(--status-text) !important;
+  opacity: .75 !important;
+
+  border-radius: 50% !important;
+}
+
+/* Keep the status cell centered */
+.factory-board-page .row-status-cell {
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+}
+
+/* Do not let dark-mode rules replace the selected status color */
+.factory-board-page.theme-dark .status-ref-trigger,
+.factory-board-page.theme-dark .status-ref-trigger.open {
+  background: var(--status-fill) !important;
+  background-color: var(--status-fill) !important;
+  border-color: var(--status-fill) !important;
+  color: var(--status-text) !important;
+}
+
+.factory-board-page.theme-dark .status-ref-label,
+.factory-board-page.theme-dark .status-ref-chevron {
+  color: var(--status-text) !important;
+}
+
+
+
+/* =========================================================
+   FINAL STATUS / PIPELINE ALIGNMENT FIX
+   - no status dot
+   - status text centered
+   - status box never spills outside its column
+   - vertical pipelines touch row top + bottom
+   ========================================================= */
+
+/* Every row cell clips its own content so resize never pushes
+   status/owner controls outside the assigned column. */
+.factory-board-page .board-table-row > .board-col {
+  position: relative !important;
+  min-width: 0 !important;
+  overflow: hidden !important;
+}
+
+/* Status cell specifically */
+.factory-board-page .board-table-row .row-status-cell {
+  width: 100% !important;
+  min-width: 0 !important;
+
+  padding: 0 8px !important;
+
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+
+  overflow: hidden !important;
+}
+
+/* Wrapper must follow resized column width */
+.factory-board-page .board-table-row .status-ref-wrap {
+  width: 100% !important;
+  min-width: 0 !important;
+  max-width: 100% !important;
+
+  padding: 0 !important;
+  margin: 0 !important;
+
+  overflow: hidden !important;
+}
+
+/* Full colored status box */
+.factory-board-page .board-table-row .status-ref-trigger,
+.factory-board-page .board-table-row .status-ref-trigger.open {
+  width: 100% !important;
+  min-width: 0 !important;
+  max-width: 100% !important;
+  height: 38px !important;
+
+  margin: 0 !important;
+  padding: 0 10px !important;
+
+  display: grid !important;
+  grid-template-columns: minmax(0, 1fr) 28px !important;
+  align-items: stretch !important;
+
+  background: var(--status-fill) !important;
+  background-color: var(--status-fill) !important;
+
+  border: 1px solid var(--status-fill) !important;
+  border-radius: 0 !important;
+
+  color: var(--status-text) !important;
+
+  box-shadow: none !important;
+  overflow: hidden !important;
+}
+
+/* Remove any old dot generated by CSS/template */
+.factory-board-page .board-table-row .status-ref-dot {
+  display: none !important;
+}
+
+/* Exact centered status name */
+.factory-board-page .board-table-row .status-ref-label {
+  min-width: 0 !important;
+  width: 100% !important;
+
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+
+  padding: 0 4px !important;
+
+  color: var(--status-text) !important;
+
+  font-size: 11px !important;
+  font-weight: 800 !important;
+  line-height: 1 !important;
+
+  white-space: nowrap !important;
+  overflow: hidden !important;
+  text-overflow: ellipsis !important;
+
+  text-align: center !important;
+}
+
+/* Arrow gets its own clean right section */
+.factory-board-page .board-table-row .status-ref-chevron {
+  width: 28px !important;
+  height: 100% !important;
+
+  margin: 0 !important;
+
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+
+  color: var(--status-text) !important;
+
+  border-left: 1px solid color-mix(in srgb, var(--status-text), transparent 45%) !important;
+}
+
+/* =========================================================
+   ROW VERTICAL PIPELINES — TOP TO BOTTOM ATTACHED
+   ========================================================= */
+
+/* Remove older short pseudo pipeline */
+.factory-board-page .board-table-row > .board-col::before,
+.factory-board-page .board-table-row > .board-col::after {
+  content: none !important;
+}
+
+/* One full-height divider on the RIGHT of every column */
+.factory-board-page .board-table-row > .board-col:not(:last-child) {
+  border-right: 1px solid #111827 !important;
+}
+
+/* Do not add extra left/right margin around dividers */
+.factory-board-page .board-table-row {
+  column-gap: 0 !important;
+}
+
+/* Header pipelines also touch top and bottom */
+.factory-board-page .board-table-head > .board-col {
+  position: relative !important;
+  min-width: 0 !important;
+}
+
+.factory-board-page .board-table-head > .board-col::before,
+.factory-board-page .board-table-head > .board-col::after {
+  content: none !important;
+}
+
+.factory-board-page .board-table-head > .board-col:not(:last-child) {
+  border-right: 1px solid rgba(255,255,255,.78) !important;
+}
+
+/* The actual resize handle still stays draggable, but visually
+   becomes the same full-height pipeline. */
+.factory-board-page .column-resizer {
+  position: absolute !important;
+  top: 0 !important;
+  right: -4px !important;
+  bottom: 0 !important;
+
+  width: 8px !important;
+  height: 100% !important;
+
+  cursor: col-resize !important;
+  z-index: 20 !important;
+
+  background: transparent !important;
+}
+
+.factory-board-page .column-resizer::before {
+  content: "" !important;
+
+  position: absolute !important;
+  top: 0 !important;
+  bottom: 0 !important;
+  left: 50% !important;
+
+  width: 1px !important;
+  height: 100% !important;
+
+  transform: translateX(-50%) !important;
+
+  background: rgba(255,255,255,.78) !important;
+}
+
+/* When resizing, controls must remain inside their own cells */
+.factory-board-page .board-table-row,
+.factory-board-page .board-table-head {
+  overflow: visible !important;
+}
+
+/* Keep owner/avatar content contained after status column resize */
+.factory-board-page .board-col-owner {
+  min-width: 0 !important;
+  overflow: hidden !important;
+}
+
+.factory-board-page .board-avatar-stack {
+  max-width: 100% !important;
+  min-width: 0 !important;
+  overflow: hidden !important;
+}
+
+/* Dark theme */
+.factory-board-page.theme-dark .board-table-row > .board-col:not(:last-child) {
+  border-right-color: rgba(255,255,255,.45) !important;
+}
+
+
+/* =========================================================
+   FINAL COMPACT ROW + FULL STATUS FILL
+   Added 2026-08-08
+========================================================= */
+.factory-board-page .board-table-row {
+  min-height: 48px !important;
+  height: 48px !important;
+}
+
+.factory-board-page .board-table-row > .board-col {
+  min-height: 48px !important;
+  height: 48px !important;
+  padding-top: 0 !important;
+  padding-bottom: 0 !important;
+  align-items: center !important;
+}
+
+.factory-board-page .board-table-row .board-col-status.row-status-cell {
+  height: 48px !important;
+  min-height: 48px !important;
+  padding: 0 !important;
+  margin: 0 !important;
+  overflow: hidden !important;
+}
+
+.factory-board-page .board-table-row .row-status-cell .status-ref-wrap {
+  width: 100% !important;
+  height: 100% !important;
+  min-height: 48px !important;
+  padding: 0 !important;
+  margin: 0 !important;
+}
+
+.factory-board-page .board-table-row .row-status-cell .status-ref-trigger {
+  width: 100% !important;
+  height: 100% !important;
+  min-height: 48px !important;
+  margin: 0 !important;
+  padding: 0 12px !important;
+  border: 0 !important;
+  border-radius: 0 !important;
+  outline: 0 !important;
+  box-shadow: none !important;
+  background: var(--status-fill) !important;
+  color: var(--status-text) !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: space-between !important;
+  gap: 8px !important;
+}
+
+.factory-board-page .board-table-row .row-status-cell .status-ref-label {
+  flex: 1 1 auto !important;
+  min-width: 0 !important;
+  text-align: center !important;
+  font-size: 12px !important;
+  font-weight: 700 !important;
+  line-height: 1 !important;
+  color: inherit !important;
+  white-space: nowrap !important;
+  overflow: hidden !important;
+  text-overflow: ellipsis !important;
+}
+
+.factory-board-page .board-table-row .row-status-cell .status-ref-chevron {
+  flex: 0 0 auto !important;
+  width: auto !important;
+  min-width: 0 !important;
+  height: auto !important;
+  margin: 0 !important;
+  padding: 0 !important;
+  border: 0 !important;
+  border-left: 0 !important;
+  border-right: 0 !important;
+  box-shadow: none !important;
+  font-size: 10px !important;
+  color: inherit !important;
+}
+
+.factory-board-page .board-table-row .row-status-cell .status-ref-trigger::before,
+.factory-board-page .board-table-row .row-status-cell .status-ref-trigger::after,
+.factory-board-page .board-table-row .row-status-cell .status-ref-chevron::before,
+.factory-board-page .board-table-row .row-status-cell .status-ref-chevron::after {
+  border-left: 0 !important;
+  border-right: 0 !important;
+}
+
+.factory-board-page .board-table-row .row-status-cell .status-ref-chevron.rotate {
+  transform: rotate(180deg) !important;
+}
+/* =========================================================
+   ORDER NAME CELL - CLEAN COMPACT LAYOUT
+========================================================= */
+
+.board-table-row {
+  min-height: 64px !important;
+  height: 64px !important;
+}
+
+/* Name cell */
+.board-col-name {
+  position: relative !important;
+
+  display: flex !important;
+  align-items: center !important;
+
+  min-width: 0 !important;
+  height: 64px !important;
+
+  padding: 6px 12px !important;
+
+  overflow: hidden !important;
+}
+
+/* Main wrapper */
+.board-col-name .inline-cell-wrap {
+  width: 100% !important;
+  min-width: 0 !important;
+
+  display: flex !important;
+  flex-direction: column !important;
+  align-items: flex-start !important;
+  justify-content: center !important;
+
+  gap: 2px !important;
+}
+
+/* Order name button */
+.board-col-name .name-value {
+  width: 100% !important;
+  min-width: 0 !important;
+
+  display: flex !important;
+  flex-direction: column !important;
+  align-items: flex-start !important;
+
+  padding: 0 !important;
+  margin: 0 !important;
+
+  background: transparent !important;
+  border: 0 !important;
+
+  text-align: left !important;
+}
+
+/* ORDER NAME bigger */
+.board-col-name .name-value > strong {
+  display: flex !important;
+  align-items: center !important;
+  gap: 6px !important;
+
+  max-width: 100% !important;
+
+  margin: 0 !important;
+
+  color: #111827 !important;
+
+  font-size: 13px !important;
+  font-weight: 800 !important;
+  line-height: 1.2 !important;
+
+  white-space: nowrap !important;
+  overflow: hidden !important;
+  text-overflow: ellipsis !important;
+}
+
+/* small order icon */
+.board-col-name .name-value > strong::before {
+  content: "\f07b";
+
+  font-family: "Font Awesome 6 Free";
+  font-weight: 900;
+
+  color: #94a3b8;
+
+  font-size: 10px;
+
+  flex: 0 0 auto;
+}
+
+/* PO NUMBER */
+.board-col-name .name-value > small {
+  display: flex !important;
+  align-items: center !important;
+  gap: 5px !important;
+
+  margin-top: 2px !important;
+
+  color: #94a3b8 !important;
+
+  font-size: 9px !important;
+  font-weight: 500 !important;
+  line-height: 1 !important;
+
+  white-space: nowrap !important;
+}
+
+/* PO icon */
+.board-col-name .name-value > small::before {
+  content: "\f02b";
+
+  font-family: "Font Awesome 6 Free";
+  font-weight: 900;
+
+  color: #b0b8c4;
+
+  font-size: 8px;
+}
+
+/* Start Order area */
+.board-col-name .order-working-actions {
+  margin-top: 4px !important;
+
+  display: flex !important;
+  align-items: center !important;
+}
+
+/* Start Order */
+.board-col-name .start-working-btn {
+  height: 19px !important;
+
+  padding: 0 9px !important;
+
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+
+  gap: 4px !important;
+
+  border: 0 !important;
+  border-radius: 999px !important;
+
+  background: #dcfce7 !important;
+  color: #087443 !important;
+
+  font-size: 8px !important;
+  font-weight: 800 !important;
+  line-height: 1 !important;
+
+  white-space: nowrap !important;
+}
+
+/* Better play icon */
+.board-col-name .start-working-btn i {
+  font-size: 6px !important;
+}
+
+/* Started badge */
+.board-col-name .working-locked-label {
+  height: 19px !important;
+
+  padding: 0 8px !important;
+
+  display: inline-flex !important;
+  align-items: center !important;
+
+  gap: 4px !important;
+
+  border-radius: 999px !important;
+
+  background: #edf2f7 !important;
+  color: #475569 !important;
+
+  font-size: 8px !important;
+  font-weight: 700 !important;
+}
+
+/* unread/new dot */
+.board-col-name .board-new-dot {
+  position: absolute !important;
+
+  left: 5px !important;
+  top: 10px !important;
+
+  width: 6px !important;
+  height: 6px !important;
+
+  border-radius: 50% !important;
+
+  background: #94a3b8 !important;
+}
+
+/* Leave small space when new dot exists */
+.board-col-name:has(.board-new-dot) {
+  padding-left: 18px !important;
+}
+
+/* Other cells remain vertically centered */
+.board-table-row > .board-col:not(.board-col-name) {
+  min-height: 64px !important;
+  height: 64px !important;
+
+  display: flex !important;
+  align-items: center !important;
+}
+
+/* don't clip name content vertically */
+.board-col-name,
+.board-col-name .inline-cell-wrap,
+.board-col-name .name-value {
+  overflow-y: visible !important;
+}
+
+
+/* =========================================================
+   FINAL WORKING USER POSITION
+   User appears in the SAME right-side slot as Start Order
+========================================================= */
+
+.factory-board-page .board-col-name {
+  position: relative !important;
+  min-width: 0 !important;
+  height: 64px !important;
+  min-height: 64px !important;
+
+  padding: 6px 180px 6px 14px !important;
+
+  display: flex !important;
+  align-items: center !important;
+
+  overflow: hidden !important;
+}
+
+.factory-board-page .board-col-name .inline-cell-wrap {
+  width: 100% !important;
+  min-width: 0 !important;
+  height: 100% !important;
+
+  display: flex !important;
+  align-items: center !important;
+
+  margin: 0 !important;
+  padding: 0 !important;
+
+  overflow: hidden !important;
+}
+
+.factory-board-page .board-col-name .name-value {
+  width: 100% !important;
+  min-width: 0 !important;
+
+  display: flex !important;
+  flex-direction: column !important;
+  align-items: flex-start !important;
+  justify-content: center !important;
+
+  padding: 0 !important;
+  margin: 0 !important;
+
+  border: 0 !important;
+  background: transparent !important;
+
+  overflow: hidden !important;
+}
+
+.factory-board-page .board-col-name .name-value > strong {
+  width: 100% !important;
+  min-width: 0 !important;
+
+  margin: 0 !important;
+
+  color: #111827 !important;
+
+  font-size: 13px !important;
+  font-weight: 800 !important;
+  line-height: 1.2 !important;
+
+  white-space: nowrap !important;
+  overflow: hidden !important;
+  text-overflow: ellipsis !important;
+}
+
+.factory-board-page .board-col-name .name-value > small {
+  width: 100% !important;
+  min-width: 0 !important;
+
+  margin-top: 3px !important;
+
+  color: #94a3b8 !important;
+
+  font-size: 9px !important;
+  font-weight: 500 !important;
+  line-height: 1.1 !important;
+
+  white-space: nowrap !important;
+  overflow: hidden !important;
+  text-overflow: ellipsis !important;
+}
+
+/* Old pill must never appear under the name */
+.factory-board-page .working-designer-pill {
+  display: none !important;
+}
+
+/* Same right-side slot */
+.factory-board-page .board-col-name .order-working-actions {
+  position: absolute !important;
+
+  right: 8px !important;
+  top: 50% !important;
+
+  transform: translateY(-50%) !important;
+
+  margin: 0 !important;
+  padding: 0 !important;
+
+  display: flex !important;
+  align-items: center !important;
+  justify-content: flex-end !important;
+
+  z-index: 5 !important;
+}
+
+/* Start icon */
+.factory-board-page .board-col-name .start-working-btn {
+  position: static !important;
+  transform: none !important;
+
+  width: 30px !important;
+  height: 30px !important;
+  min-width: 30px !important;
+
+  padding: 0 !important;
+  margin: 0 !important;
+
+  display: grid !important;
+  place-items: center !important;
+
+  border: 1px solid #bbf7d0 !important;
+  border-radius: 50% !important;
+
+  background: #ecfdf3 !important;
+  color: #059669 !important;
+
+  cursor: pointer !important;
+  box-shadow: none !important;
+}
+
+.factory-board-page .board-col-name .start-working-btn i {
+  margin: 0 !important;
+  padding: 0 !important;
+  color: #059669 !important;
+  font-size: 9px !important;
+}
+
+/* Working user */
+.factory-board-page .board-col-name .row-working-user {
+  height: 30px !important;
+  max-width: 166px !important;
+
+  padding: 3px 8px 3px 5px !important;
+
+  display: flex !important;
+  align-items: center !important;
+  gap: 5px !important;
+
+  border: 1px solid #a7f3d0 !important;
+  border-radius: 15px !important;
+
+  background: #ecfdf5 !important;
+
+  white-space: nowrap !important;
+  overflow: hidden !important;
+}
+
+.factory-board-page .row-working-live-dot {
+  width: 6px !important;
+  height: 6px !important;
+  min-width: 6px !important;
+
+  border-radius: 50% !important;
+  background: #22c55e !important;
+
+  flex: 0 0 auto !important;
+}
+
+.factory-board-page .row-working-user img,
+.factory-board-page .row-working-avatar-fallback {
+  width: 21px !important;
+  height: 21px !important;
+  min-width: 21px !important;
+
+  border-radius: 50% !important;
+  object-fit: cover !important;
+
+  display: grid !important;
+  place-items: center !important;
+
+  background: #111827 !important;
+  color: #fff !important;
+
+  font-size: 8px !important;
+  font-weight: 800 !important;
+
+  flex: 0 0 auto !important;
+}
+
+.factory-board-page .row-working-user strong {
+  min-width: 0 !important;
+  max-width: 84px !important;
+
+  color: #047857 !important;
+
+  font-size: 10px !important;
+  font-weight: 800 !important;
+
+  overflow: hidden !important;
+  text-overflow: ellipsis !important;
+  white-space: nowrap !important;
+}
+
+.factory-board-page .row-working-user small {
+  color: #16a34a !important;
+  font-size: 7px !important;
+  font-weight: 600 !important;
+  flex: 0 0 auto !important;
+}
+
+/* Hide old Started badge if old CSS/template survives anywhere */
+.factory-board-page .working-locked-label {
+  display: none !important;
+}
+
+
+
+/* =========================================================
+   FINAL COMPACT ORDER ROW
+   - order name + PO stay inside same fixed row
+   - Start icon stays on right
+   - after click, icon is replaced by working user in SAME place
+   - row height never grows
+========================================================= */
+
+.factory-board-page .board-table-row {
+  height: 54px !important;
+  min-height: 54px !important;
+  max-height: 54px !important;
+}
+
+/* all cells same fixed height and vertically centered */
+.factory-board-page .board-table-row > .board-col {
+  height: 54px !important;
+  min-height: 54px !important;
+  max-height: 54px !important;
+
+  display: flex !important;
+  align-items: center !important;
+
+  padding-top: 0 !important;
+  padding-bottom: 0 !important;
+
+  overflow: hidden !important;
+}
+
+/* =========================
+   ORDER NAME CELL
+========================= */
+.factory-board-page .board-col-name {
+  position: relative !important;
+
+  padding: 5px 145px 5px 14px !important;
+
+  display: flex !important;
+  align-items: center !important;
+
+  overflow: hidden !important;
+}
+
+.factory-board-page .board-col-name .inline-cell-wrap {
+  width: 100% !important;
+  min-width: 0 !important;
+  height: 44px !important;
+
+  display: flex !important;
+  align-items: center !important;
+
+  padding: 0 !important;
+  margin: 0 !important;
+
+  overflow: hidden !important;
+}
+
+.factory-board-page .board-col-name .name-value {
+  width: 100% !important;
+  min-width: 0 !important;
+  height: 44px !important;
+
+  display: flex !important;
+  flex-direction: column !important;
+  align-items: flex-start !important;
+  justify-content: center !important;
+
+  gap: 2px !important;
+
+  padding: 0 !important;
+  margin: 0 !important;
+
+  border: 0 !important;
+  background: transparent !important;
+
+  text-align: left !important;
+
+  overflow: hidden !important;
+}
+
+/* order name */
+.factory-board-page .board-col-name .name-value > strong {
+  width: 100% !important;
+  min-width: 0 !important;
+
+  display: block !important;
+
+  margin: 0 !important;
+  padding: 0 !important;
+
+  color: #111827 !important;
+
+  font-size: 12px !important;
+  font-weight: 800 !important;
+  line-height: 15px !important;
+
+  white-space: nowrap !important;
+  overflow: hidden !important;
+  text-overflow: ellipsis !important;
+}
+
+/* PO under name */
+.factory-board-page .board-col-name .name-value > small {
+  width: 100% !important;
+  min-width: 0 !important;
+
+  display: block !important;
+
+  margin: 0 !important;
+  padding: 0 !important;
+
+  color: #94a3b8 !important;
+
+  font-size: 8px !important;
+  font-weight: 500 !important;
+  line-height: 12px !important;
+
+  white-space: nowrap !important;
+  overflow: hidden !important;
+  text-overflow: ellipsis !important;
+}
+
+/* do not create extra icons/lines before name or PO */
+.factory-board-page .board-col-name .name-value > strong::before,
+.factory-board-page .board-col-name .name-value > small::before {
+  content: none !important;
+  display: none !important;
+}
+
+/* unread dot stays left and does not disturb layout */
+.factory-board-page .board-col-name .board-new-dot {
+  position: absolute !important;
+  left: 6px !important;
+  top: 10px !important;
+
+  width: 5px !important;
+  height: 5px !important;
+  min-width: 5px !important;
+
+  border-radius: 50% !important;
+
+  z-index: 2 !important;
+}
+
+/* =========================
+   RIGHT SLOT
+========================= */
+.factory-board-page .board-col-name .order-working-actions {
+  position: absolute !important;
+
+  right: 8px !important;
+  top: 50% !important;
+
+  transform: translateY(-50%) !important;
+
+  width: 128px !important;
+  height: 30px !important;
+
+  display: flex !important;
+  align-items: center !important;
+  justify-content: flex-end !important;
+
+  margin: 0 !important;
+  padding: 0 !important;
+
+  overflow: hidden !important;
+
+  z-index: 6 !important;
+}
+
+/* =========================
+   START ICON BEFORE CLICK
+========================= */
+.factory-board-page .board-col-name .start-working-btn {
+  position: static !important;
+  inset: auto !important;
+  transform: none !important;
+
+  width: 28px !important;
+  height: 28px !important;
+  min-width: 28px !important;
+  max-width: 28px !important;
+
+  padding: 0 !important;
+  margin: 0 !important;
+
+  display: grid !important;
+  place-items: center !important;
+
+  border: 1px solid #bbf7d0 !important;
+  border-radius: 50% !important;
+
+  background: #ecfdf3 !important;
+  color: #059669 !important;
+
+  box-shadow: none !important;
+}
+
+.factory-board-page .board-col-name .start-working-btn i {
+  margin: 0 !important;
+  padding: 0 !important;
+
+  color: #059669 !important;
+  font-size: 8px !important;
+}
+
+/* =========================
+   AFTER CLICK: SAME SLOT
+========================= */
+.factory-board-page .board-col-name .row-working-user {
+  width: 128px !important;
+  max-width: 128px !important;
+  height: 28px !important;
+  min-height: 28px !important;
+
+  padding: 2px 7px 2px 5px !important;
+  margin: 0 !important;
+
+  display: flex !important;
+  align-items: center !important;
+  gap: 4px !important;
+
+  border: 1px solid #a7f3d0 !important;
+  border-radius: 14px !important;
+
+  background: #ecfdf5 !important;
+
+  white-space: nowrap !important;
+  overflow: hidden !important;
+}
+
+.factory-board-page .row-working-live-dot {
+  width: 5px !important;
+  height: 5px !important;
+  min-width: 5px !important;
+
+  border-radius: 50% !important;
+  background: #22c55e !important;
+
+  flex: 0 0 auto !important;
+}
+
+.factory-board-page .row-working-user img,
+.factory-board-page .row-working-avatar-fallback {
+  width: 20px !important;
+  height: 20px !important;
+  min-width: 20px !important;
+
+  border-radius: 50% !important;
+  object-fit: cover !important;
+
+  flex: 0 0 auto !important;
+}
+
+.factory-board-page .row-working-user strong {
+  min-width: 0 !important;
+  max-width: 67px !important;
+
+  color: #047857 !important;
+
+  font-size: 9px !important;
+  font-weight: 800 !important;
+  line-height: 1 !important;
+
+  overflow: hidden !important;
+  text-overflow: ellipsis !important;
+  white-space: nowrap !important;
+}
+
+.factory-board-page .row-working-user small {
+  color: #16a34a !important;
+
+  font-size: 6px !important;
+  font-weight: 700 !important;
+  line-height: 1 !important;
+
+  flex: 0 0 auto !important;
+}
+
+/* old under-name working pill / started badge never display */
+.factory-board-page .working-designer-pill,
+.factory-board-page .working-locked-label {
+  display: none !important;
+}
+
+/* keep status and all other controls centered in same 54px row */
+.factory-board-page .row-status-cell,
+.factory-board-page .board-col-owner,
+.factory-board-page .board-col-files,
+.factory-board-page .board-col-packing,
+.factory-board-page .board-col-chat,
+.factory-board-page .board-col-payment,
+.factory-board-page .board-col-address,
+.factory-board-page .board-col-track,
+.factory-board-page .board-col-info {
+  height: 54px !important;
+  min-height: 54px !important;
+  max-height: 54px !important;
+
+  display: flex !important;
+  align-items: center !important;
+}
+
+/* status still fills its column height cleanly */
+.factory-board-page .row-status-cell .status-ref-wrap,
+.factory-board-page .row-status-cell .status-ref-trigger {
+  height: 54px !important;
+  min-height: 54px !important;
+  max-height: 54px !important;
+}
+
+/* packing stays compact */
+.factory-board-page .board-col-packing .packing-clean-input {
+  height: 28px !important;
+  min-height: 28px !important;
+  line-height: 28px !important;
+}
+/* =========================================
+   STATUS COLUMN PERFECT ALIGNMENT
+========================================= */
+
+/* status cell ke apne extra borders hatao */
+.factory-board-page .row-status-cell {
+  padding: 0 !important;
+  margin: 0 !important;
+
+  border-left: 0 !important;
+  border-right: 0 !important;
+
+  display: flex !important;
+  align-items: stretch !important;
+  justify-content: stretch !important;
+
+  overflow: hidden !important;
+}
+
+/* wrapper full cell */
+.factory-board-page .row-status-cell .status-ref-wrap {
+  width: 100% !important;
+  height: 100% !important;
+
+  padding: 0 !important;
+  margin: 0 !important;
+
+  display: flex !important;
+  align-items: stretch !important;
+}
+
+/* orange/colored box full equal width */
+.factory-board-page .row-status-cell .status-ref-trigger {
+  width: 100% !important;
+  height: 100% !important;
+
+  min-width: 0 !important;
+  max-width: 100% !important;
+
+  padding: 0 12px !important;
+  margin: 0 !important;
+
+  border: 0 !important;
+  border-radius: 0 !important;
+
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+
+  box-sizing: border-box !important;
+}
+
+/* actual column divider only */
+.factory-board-page .board-table-row > .board-col-status {
+  border-left: 1px solid #111827 !important;
+  border-right: 1px solid #111827 !important;
+}
+
+/* avoid duplicate line from neighbor columns */
+.factory-board-page .board-table-row > .board-col-name {
+  border-right: 0 !important;
+}
+
+.factory-board-page .board-table-row > .board-col-owner {
+  border-left: 0 !important;
+}
+
+/* =========================================
+   PACKING DETAIL - SAME SIZE AS TRACKING
+========================================= */
+
+.factory-board-page .board-col-packing {
+  padding: 0 8px !important;
+}
+
+.factory-board-page .packing-clean-input {
+  width: 100% !important;
+  height: 28px !important;
+  min-height: 28px !important;
+
+  padding: 0 6px !important;
+  margin: 0 !important;
+
+  border: 0 !important;
+  border-radius: 0 !important;
+
+  background: transparent !important;
+  color: #111827 !important;
+
+  font-size: 9px !important;
+  font-weight: 500 !important;
+  line-height: 28px !important;
+
+  white-space: nowrap !important;
+  overflow: hidden !important;
+  text-overflow: ellipsis !important;
+
+  outline: none !important;
+  box-shadow: none !important;
+}
+
+.factory-board-page .packing-clean-input::placeholder {
+  color: #98a2b3 !important;
+
+  font-size: 9px !important;
+  font-weight: 500 !important;
+}
+
+/* focus same clean tracking style */
+.factory-board-page .packing-clean-input:focus {
+  background: #ffffff !important;
+  border: 1px solid #d0d5dd !important;
+  border-radius: 4px !important;
+}
+
+
+/* =========================================================
+   FINAL STATUS COLUMN FIX
+   Equal black pipelines + full cell color + custom footer
+========================================================= */
+
+/* ROW STATUS CELL: exactly one line on each side */
+.factory-board-page .board-table-row > .board-col-name {
+  border-right: 0 !important;
+}
+
+.factory-board-page .board-table-row > .board-col-status.row-status-cell {
+  position: relative !important;
+
+  height: 54px !important;
+  min-height: 54px !important;
+  max-height: 54px !important;
+
+  padding: 0 !important;
+  margin: 0 !important;
+
+  border-left: 1px solid #111827 !important;
+  border-right: 1px solid #111827 !important;
+
+  display: flex !important;
+  align-items: stretch !important;
+  justify-content: stretch !important;
+
+  overflow: hidden !important;
+  box-sizing: border-box !important;
+}
+
+.factory-board-page .board-table-row > .board-col-owner {
+  border-left: 0 !important;
+}
+
+/* Kill old pseudo pipelines only in status cell */
+.factory-board-page .board-table-row > .board-col-status::before,
+.factory-board-page .board-table-row > .board-col-status::after {
+  content: none !important;
+  display: none !important;
+}
+
+/* Wrapper fills the exact space between both black lines */
+.factory-board-page .row-status-cell .status-ref-wrap {
+  width: 100% !important;
+  min-width: 0 !important;
+  max-width: 100% !important;
+
+  height: 100% !important;
+  min-height: 100% !important;
+  max-height: 100% !important;
+
+  padding: 0 !important;
+  margin: 0 !important;
+
+  display: flex !important;
+  align-items: stretch !important;
+
+  overflow: hidden !important;
+}
+
+/* Colored status fills ALL available cell area */
+.factory-board-page .row-status-cell .status-ref-trigger,
+.factory-board-page .row-status-cell .status-ref-trigger.open {
+  width: 100% !important;
+  min-width: 0 !important;
+  max-width: 100% !important;
+
+  height: 100% !important;
+  min-height: 100% !important;
+  max-height: 100% !important;
+
+  margin: 0 !important;
+  padding: 0 12px !important;
+
+  display: grid !important;
+  grid-template-columns: minmax(0, 1fr) 18px !important;
+  align-items: center !important;
+  gap: 6px !important;
+
+  background: var(--status-fill) !important;
+  background-color: var(--status-fill) !important;
+
+  color: var(--status-text) !important;
+
+  border: 0 !important;
+  border-radius: 0 !important;
+
+  outline: 0 !important;
+  box-shadow: none !important;
+
+  box-sizing: border-box !important;
+  overflow: hidden !important;
+}
+
+/* centered full status name */
+.factory-board-page .row-status-cell .status-ref-label {
+  width: 100% !important;
+  min-width: 0 !important;
+
+  display: block !important;
+
+  color: var(--status-text) !important;
+
+  font-size: 10px !important;
+  font-weight: 800 !important;
+  line-height: 1 !important;
+
+  text-align: center !important;
+
+  white-space: nowrap !important;
+  overflow: hidden !important;
+  text-overflow: ellipsis !important;
+}
+
+/* Arrow has NO inner divider line */
+.factory-board-page .row-status-cell .status-ref-chevron {
+  width: 18px !important;
+  min-width: 18px !important;
+  height: auto !important;
+
+  margin: 0 !important;
+  padding: 0 !important;
+
+  display: grid !important;
+  place-items: center !important;
+
+  color: var(--status-text) !important;
+
+  border: 0 !important;
+  border-left: 0 !important;
+  border-right: 0 !important;
+
+  font-size: 9px !important;
+}
+
+/* Header status/owner divider alignment */
+.factory-board-page .board-table-head > .board-col-status {
+  border-left: 1px solid rgba(255,255,255,.85) !important;
+  border-right: 1px solid rgba(255,255,255,.85) !important;
+  box-sizing: border-box !important;
+}
+
+.factory-board-page .board-table-head > .board-col-name {
+  border-right: 0 !important;
+}
+
+.factory-board-page .board-table-head > .board-col-owner {
+  border-left: 0 !important;
+}
+
+/* =========================================================
+   ROW STATUS DROPDOWN
+========================================================= */
+
+.factory-board-page .status-fixed-dropdown {
+  padding: 7px !important;
+
+  background: #ffffff !important;
+
+  border: 1px solid #d8dee8 !important;
+  border-radius: 12px !important;
+
+  box-shadow:
+    0 18px 45px rgba(15,23,42,.16),
+    0 4px 12px rgba(15,23,42,.08) !important;
+
+  overflow: visible !important;
+}
+
+.factory-board-page .status-fixed-option-row {
+  width: 100% !important;
+
+  display: flex !important;
+  align-items: center !important;
+
+  border-radius: 7px !important;
+
+  overflow: hidden !important;
+}
+
+.factory-board-page .status-fixed-option-row:hover,
+.factory-board-page .status-fixed-option-row.active {
+  background: #f4f6f8 !important;
+}
+
+.factory-board-page .status-fixed-option-row .status-fixed-option {
+  flex: 1 1 auto !important;
+  min-width: 0 !important;
+
+  border-radius: 0 !important;
+  background: transparent !important;
+}
+
+.factory-board-page .status-fixed-color-edit {
+  position: relative !important;
+
+  width: 32px !important;
+  height: 32px !important;
+  min-width: 32px !important;
+
+  display: grid !important;
+  place-items: center !important;
+
+  color: #667085 !important;
+
+  cursor: pointer !important;
+}
+
+.factory-board-page .status-fixed-color-edit i {
+  font-size: 10px !important;
+}
+
+.factory-board-page .status-fixed-color-edit input {
+  position: absolute !important;
+  inset: 0 !important;
+
+  width: 100% !important;
+  height: 100% !important;
+
+  opacity: 0 !important;
+  cursor: pointer !important;
+}
+
+/* =========================================================
+   ADD CUSTOM STATUS AT END OF DROPDOWN
+========================================================= */
+
+.factory-board-page .status-fixed-custom-add {
+  margin-top: 7px !important;
+  padding-top: 8px !important;
+
+  border-top: 1px solid #e7ebf0 !important;
+}
+
+.factory-board-page .status-fixed-custom-title {
+  margin-bottom: 7px !important;
+
+  display: flex !important;
+  align-items: center !important;
+  gap: 6px !important;
+
+  color: #344054 !important;
+
+  font-size: 9px !important;
+  font-weight: 800 !important;
+}
+
+.factory-board-page .status-fixed-custom-fields {
+  display: grid !important;
+  grid-template-columns: minmax(0, 1fr) 32px 42px !important;
+  align-items: center !important;
+  gap: 5px !important;
+}
+
+.factory-board-page .status-fixed-custom-input {
+  width: 100% !important;
+  height: 31px !important;
+
+  padding: 0 8px !important;
+
+  border: 1px solid #d0d5dd !important;
+  border-radius: 6px !important;
+
+  background: #ffffff !important;
+  color: #101828 !important;
+
+  outline: none !important;
+
+  font-size: 9px !important;
+  font-weight: 600 !important;
+}
+
+.factory-board-page .status-fixed-custom-input:focus {
+  border-color: #98a2b3 !important;
+  box-shadow: 0 0 0 3px rgba(15,23,42,.05) !important;
+}
+
+.factory-board-page .status-fixed-custom-color {
+  width: 32px !important;
+  height: 31px !important;
+
+  display: block !important;
+
+  overflow: hidden !important;
+
+  border: 1px solid #d0d5dd !important;
+  border-radius: 6px !important;
+
+  background: #ffffff !important;
+}
+
+.factory-board-page .status-fixed-custom-color input {
+  width: 42px !important;
+  height: 41px !important;
+
+  margin: -5px !important;
+  padding: 0 !important;
+
+  border: 0 !important;
+  cursor: pointer !important;
+}
+
+.factory-board-page .status-fixed-custom-button {
+  height: 31px !important;
+
+  padding: 0 8px !important;
+
+  border: 0 !important;
+  border-radius: 6px !important;
+
+  background: #101828 !important;
+  color: #ffffff !important;
+
+  font-size: 8px !important;
+  font-weight: 800 !important;
+
+  cursor: pointer !important;
+}
+
+.factory-board-page .status-fixed-custom-button:disabled {
+  opacity: .4 !important;
+  cursor: not-allowed !important;
+}
+
+/* Dark mode */
+.factory-board-page.theme-dark .status-fixed-dropdown {
+  background: #111827 !important;
+  border-color: #334155 !important;
+}
+
+.factory-board-page.theme-dark .status-fixed-option-row:hover,
+.factory-board-page.theme-dark .status-fixed-option-row.active {
+  background: #1f2937 !important;
+}
+
+.factory-board-page.theme-dark .status-fixed-custom-add {
+  border-top-color: #334155 !important;
+}
+
+.factory-board-page.theme-dark .status-fixed-custom-title {
+  color: #f8fafc !important;
+}
+
+.factory-board-page.theme-dark .status-fixed-custom-input,
+.factory-board-page.theme-dark .status-fixed-custom-color {
+  background: #0f172a !important;
+  border-color: #475569 !important;
+  color: #f8fafc !important;
+}
+
+
+
+/* =========================================================
+   MONDAY-STYLE ROW STATUS MANAGER
+   Keep this block at the VERY END
+========================================================= */
+
+.factory-board-page .monday-status-menu {
+  width: 320px !important;
+  min-width: 320px !important;
+  max-width: min(320px, calc(100vw - 24px)) !important;
+
+  padding: 0 !important;
+
+  overflow: hidden !important;
+
+  background: #ffffff !important;
+
+  border: 1px solid #d9dee7 !important;
+  border-radius: 12px !important;
+
+  box-shadow:
+    0 20px 55px rgba(15, 23, 42, .18),
+    0 4px 14px rgba(15, 23, 42, .08) !important;
+}
+
+/* header */
+.factory-board-page .monday-status-menu-head {
+  min-height: 56px !important;
+
+  padding: 10px 12px !important;
+
+  display: flex !important;
+  align-items: center !important;
+  justify-content: space-between !important;
+  gap: 10px !important;
+
+  background: #ffffff !important;
+
+  border-bottom: 1px solid #edf0f4 !important;
+}
+
+.factory-board-page .monday-status-menu-head > div {
+  min-width: 0 !important;
+
+  display: flex !important;
+  flex-direction: column !important;
+  gap: 2px !important;
+}
+
+.factory-board-page .monday-status-menu-head strong {
+  color: #101828 !important;
+
+  font-size: 12px !important;
+  font-weight: 800 !important;
+}
+
+.factory-board-page .monday-status-menu-head small {
+  max-width: 235px !important;
+
+  color: #98a2b3 !important;
+
+  font-size: 8px !important;
+  font-weight: 600 !important;
+
+  white-space: nowrap !important;
+  overflow: hidden !important;
+  text-overflow: ellipsis !important;
+}
+
+.factory-board-page .monday-status-close {
+  width: 29px !important;
+  height: 29px !important;
+  min-width: 29px !important;
+
+  padding: 0 !important;
+
+  display: grid !important;
+  place-items: center !important;
+
+  border: 0 !important;
+  border-radius: 7px !important;
+
+  background: transparent !important;
+  color: #667085 !important;
+
+  cursor: pointer !important;
+}
+
+.factory-board-page .monday-status-close:hover {
+  background: #f2f4f7 !important;
+  color: #101828 !important;
+}
+
+/* list */
+.factory-board-page .monday-status-options {
+  max-height: 310px !important;
+
+  padding: 6px !important;
+
+  overflow-y: auto !important;
+  overflow-x: hidden !important;
+}
+
+.factory-board-page .monday-status-row {
+  position: relative !important;
+
+  width: 100% !important;
+  min-height: 38px !important;
+
+  display: flex !important;
+  align-items: center !important;
+
+  border-radius: 7px !important;
+
+  transition: background .15s ease !important;
+}
+
+.factory-board-page .monday-status-row:hover,
+.factory-board-page .monday-status-row.active {
+  background: #f5f6f8 !important;
+}
+
+.factory-board-page .monday-status-row.active {
+  box-shadow: inset 3px 0 0 #101828 !important;
+}
+
+/* selectable status */
+.factory-board-page .monday-status-select {
+  flex: 1 1 auto !important;
+  min-width: 0 !important;
+  height: 38px !important;
+
+  padding: 0 8px !important;
+
+  display: grid !important;
+  grid-template-columns: 9px minmax(0, 1fr) 18px !important;
+  align-items: center !important;
+  gap: 8px !important;
+
+  border: 0 !important;
+  border-radius: 7px !important;
+
+  background: transparent !important;
+  color: #475467 !important;
+
+  text-align: left !important;
+  cursor: pointer !important;
+}
+
+.factory-board-page .monday-status-dot {
+  width: 8px !important;
+  height: 8px !important;
+  min-width: 8px !important;
+
+  border-radius: 50% !important;
+}
+
+.factory-board-page .monday-status-name {
+  min-width: 0 !important;
+
+  color: #475467 !important;
+
+  font-size: 10px !important;
+  font-weight: 600 !important;
+
+  white-space: nowrap !important;
+  overflow: hidden !important;
+  text-overflow: ellipsis !important;
+}
+
+.factory-board-page .monday-status-check {
+  color: #101828 !important;
+  font-size: 9px !important;
+}
+
+/* edit/delete actions */
+.factory-board-page .monday-status-actions {
+  width: 58px !important;
+  min-width: 58px !important;
+
+  padding-right: 4px !important;
+
+  display: flex !important;
+  align-items: center !important;
+  justify-content: flex-end !important;
+  gap: 2px !important;
+
+  opacity: 0 !important;
+  transform: translateX(4px) !important;
+
+  transition:
+    opacity .15s ease,
+    transform .15s ease !important;
+}
+
+.factory-board-page .monday-status-row:hover .monday-status-actions {
+  opacity: 1 !important;
+  transform: translateX(0) !important;
+}
+
+.factory-board-page .monday-status-actions button {
+  width: 26px !important;
+  height: 26px !important;
+
+  padding: 0 !important;
+
+  display: grid !important;
+  place-items: center !important;
+
+  border: 0 !important;
+  border-radius: 6px !important;
+
+  background: transparent !important;
+  color: #667085 !important;
+
+  cursor: pointer !important;
+}
+
+.factory-board-page .monday-status-actions button:hover {
+  background: #e9edf2 !important;
+  color: #101828 !important;
+}
+
+.factory-board-page .monday-status-actions button.danger:hover {
+  background: #fff0f0 !important;
+  color: #d92d20 !important;
+}
+
+/* inline edit */
+.factory-board-page .monday-status-row.editing {
+  padding: 5px !important;
+  background: #f7f8fa !important;
+}
+
+.factory-board-page .monday-status-edit-row {
+  width: 100% !important;
+
+  display: grid !important;
+  grid-template-columns: 30px minmax(0, 1fr) 28px 28px !important;
+  align-items: center !important;
+  gap: 5px !important;
+}
+
+.factory-board-page .monday-status-color-button {
+  position: relative !important;
+
+  width: 30px !important;
+  height: 30px !important;
+
+  display: grid !important;
+  place-items: center !important;
+
+  border: 1px solid #d0d5dd !important;
+  border-radius: 7px !important;
+
+  background: #ffffff !important;
+
+  overflow: hidden !important;
+  cursor: pointer !important;
+}
+
+.factory-board-page .monday-status-color-button > span {
+  width: 16px !important;
+  height: 16px !important;
+
+  border-radius: 5px !important;
+}
+
+.factory-board-page .monday-status-color-button input {
+  position: absolute !important;
+  inset: 0 !important;
+
+  width: 100% !important;
+  height: 100% !important;
+
+  opacity: 0 !important;
+  cursor: pointer !important;
+}
+
+.factory-board-page .monday-status-edit-input {
+  width: 100% !important;
+  min-width: 0 !important;
+  height: 30px !important;
+
+  padding: 0 8px !important;
+
+  border: 1px solid #d0d5dd !important;
+  border-radius: 7px !important;
+
+  background: #ffffff !important;
+  color: #101828 !important;
+
+  outline: none !important;
+
+  font-size: 9px !important;
+  font-weight: 600 !important;
+}
+
+.factory-board-page .monday-status-edit-input:focus {
+  border-color: #8b95a7 !important;
+  box-shadow: 0 0 0 3px rgba(15, 23, 42, .05) !important;
+}
+
+.factory-board-page .monday-status-save-edit,
+.factory-board-page .monday-status-cancel-edit {
+  width: 28px !important;
+  height: 28px !important;
+
+  padding: 0 !important;
+
+  display: grid !important;
+  place-items: center !important;
+
+  border: 0 !important;
+  border-radius: 6px !important;
+
+  cursor: pointer !important;
+}
+
+.factory-board-page .monday-status-save-edit {
+  background: #101828 !important;
+  color: #ffffff !important;
+}
+
+.factory-board-page .monday-status-cancel-edit {
+  background: #eaecf0 !important;
+  color: #475467 !important;
+}
+
+/* add status footer */
+.factory-board-page .monday-status-add {
+  padding: 10px !important;
+
+  background: #fafbfc !important;
+
+  border-top: 1px solid #e7ebf0 !important;
+}
+
+.factory-board-page .monday-status-add-title {
+  margin-bottom: 8px !important;
+
+  display: flex !important;
+  align-items: center !important;
+  gap: 8px !important;
+}
+
+.factory-board-page .monday-status-add-icon {
+  width: 27px !important;
+  height: 27px !important;
+
+  display: grid !important;
+  place-items: center !important;
+
+  border: 1px solid #d0d5dd !important;
+  border-radius: 7px !important;
+
+  background: #ffffff !important;
+  color: #344054 !important;
+
+  font-size: 9px !important;
+}
+
+.factory-board-page .monday-status-add-title > div {
+  min-width: 0 !important;
+
+  display: flex !important;
+  flex-direction: column !important;
+  gap: 1px !important;
+}
+
+.factory-board-page .monday-status-add-title strong {
+  color: #344054 !important;
+
+  font-size: 9px !important;
+  font-weight: 800 !important;
+}
+
+.factory-board-page .monday-status-add-title small {
+  color: #98a2b3 !important;
+
+  font-size: 7px !important;
+  font-weight: 500 !important;
+}
+
+.factory-board-page .monday-status-add-form {
+  display: grid !important;
+  grid-template-columns: 34px minmax(0, 1fr) 48px !important;
+  align-items: center !important;
+  gap: 6px !important;
+}
+
+.factory-board-page .monday-status-add-color {
+  position: relative !important;
+
+  width: 34px !important;
+  height: 32px !important;
+
+  display: grid !important;
+  place-items: center !important;
+
+  border: 1px solid #d0d5dd !important;
+  border-radius: 7px !important;
+
+  background: #ffffff !important;
+
+  overflow: hidden !important;
+  cursor: pointer !important;
+}
+
+.factory-board-page .monday-status-add-color > span {
+  width: 18px !important;
+  height: 18px !important;
+
+  border-radius: 5px !important;
+}
+
+.factory-board-page .monday-status-add-color input {
+  position: absolute !important;
+  inset: 0 !important;
+
+  width: 100% !important;
+  height: 100% !important;
+
+  opacity: 0 !important;
+  cursor: pointer !important;
+}
+
+.factory-board-page .monday-status-add-input {
+  width: 100% !important;
+  min-width: 0 !important;
+  height: 32px !important;
+
+  padding: 0 8px !important;
+
+  border: 1px solid #d0d5dd !important;
+  border-radius: 7px !important;
+
+  background: #ffffff !important;
+  color: #101828 !important;
+
+  outline: none !important;
+
+  font-size: 9px !important;
+  font-weight: 600 !important;
+}
+
+.factory-board-page .monday-status-add-input:focus {
+  border-color: #8b95a7 !important;
+  box-shadow: 0 0 0 3px rgba(15, 23, 42, .05) !important;
+}
+
+.factory-board-page .monday-status-add-button {
+  height: 32px !important;
+
+  padding: 0 10px !important;
+
+  border: 0 !important;
+  border-radius: 7px !important;
+
+  background: #101828 !important;
+  color: #ffffff !important;
+
+  font-size: 8px !important;
+  font-weight: 800 !important;
+
+  cursor: pointer !important;
+}
+
+.factory-board-page .monday-status-add-button:disabled {
+  opacity: .35 !important;
+  cursor: not-allowed !important;
+}
+
+/* Dark */
+.factory-board-page.theme-dark .monday-status-menu,
+.factory-board-page.theme-dark .monday-status-menu-head {
+  background: #111827 !important;
+  border-color: #334155 !important;
+}
+
+.factory-board-page.theme-dark .monday-status-menu-head strong,
+.factory-board-page.theme-dark .monday-status-name {
+  color: #f8fafc !important;
+}
+
+.factory-board-page.theme-dark .monday-status-row:hover,
+.factory-board-page.theme-dark .monday-status-row.active,
+.factory-board-page.theme-dark .monday-status-row.editing {
+  background: #1f2937 !important;
+}
+
+.factory-board-page.theme-dark .monday-status-add {
+  background: #0f172a !important;
+  border-color: #334155 !important;
+}
+
+.factory-board-page.theme-dark .monday-status-add-title strong {
+  color: #f8fafc !important;
+}
+
+.factory-board-page.theme-dark .monday-status-edit-input,
+.factory-board-page.theme-dark .monday-status-add-input,
+.factory-board-page.theme-dark .monday-status-color-button,
+.factory-board-page.theme-dark .monday-status-add-color {
+  background: #111827 !important;
+  border-color: #475569 !important;
+  color: #f8fafc !important;
+}
+
+</style>
+
+
+<style>
+/* =========================================================
+   GLOBAL STATUS DROPDOWN FIX
+   This block is intentionally NOT scoped.
+   The status popup uses position:fixed and had old rules
+   overriding the newer scoped styles.
+========================================================= */
+
+.monday-status-menu.status-fixed-dropdown {
+  position: fixed !important;
+  z-index: 2147483647 !important;
+
+  width: 320px !important;
+  min-width: 320px !important;
+  max-width: min(320px, calc(100vw - 24px)) !important;
+
+  max-height: none !important;
+  padding: 0 !important;
+
+  overflow: hidden !important;
+
+  background: #ffffff !important;
+  border: 1px solid #d9dee7 !important;
+  border-radius: 12px !important;
+
+  box-shadow:
+    0 22px 60px rgba(15, 23, 42, .18),
+    0 5px 16px rgba(15, 23, 42, .08) !important;
+
+  color: #101828 !important;
+
+  font-family: inherit !important;
+}
+
+/* HEADER */
+.monday-status-menu .monday-status-menu-head {
+  min-height: 55px !important;
+  padding: 10px 12px !important;
+
+  display: flex !important;
+  align-items: center !important;
+  justify-content: space-between !important;
+  gap: 10px !important;
+
+  background: #ffffff !important;
+  border-bottom: 1px solid #edf0f4 !important;
+}
+
+.monday-status-menu .monday-status-menu-head > div {
+  min-width: 0 !important;
+
+  display: flex !important;
+  flex-direction: column !important;
+  gap: 2px !important;
+}
+
+.monday-status-menu .monday-status-menu-head strong {
+  color: #101828 !important;
+  font-size: 12px !important;
+  font-weight: 800 !important;
+  line-height: 1.2 !important;
+}
+
+.monday-status-menu .monday-status-menu-head small {
+  display: block !important;
+  max-width: 235px !important;
+
+  color: #98a2b3 !important;
+  font-size: 8px !important;
+  font-weight: 600 !important;
+
+  white-space: nowrap !important;
+  overflow: hidden !important;
+  text-overflow: ellipsis !important;
+}
+
+.monday-status-menu .monday-status-close {
+  width: 29px !important;
+  height: 29px !important;
+  min-width: 29px !important;
+
+  padding: 0 !important;
+
+  display: grid !important;
+  place-items: center !important;
+
+  border: 0 !important;
+  border-radius: 7px !important;
+
+  background: transparent !important;
+  color: #667085 !important;
+
+  cursor: pointer !important;
+}
+
+.monday-status-menu .monday-status-close:hover {
+  background: #f2f4f7 !important;
+  color: #101828 !important;
+}
+
+/* OPTIONS AREA ONLY SCROLLS */
+.monday-status-menu .monday-status-options {
+  max-height: 285px !important;
+
+  padding: 6px !important;
+
+  overflow-y: auto !important;
+  overflow-x: hidden !important;
+
+  background: #ffffff !important;
+}
+
+.monday-status-menu .monday-status-row {
+  position: relative !important;
+
+  width: 100% !important;
+  min-height: 38px !important;
+
+  display: flex !important;
+  align-items: center !important;
+
+  margin: 0 !important;
+  padding: 0 !important;
+
+  border: 0 !important;
+  border-radius: 7px !important;
+
+  background: transparent !important;
+}
+
+.monday-status-menu .monday-status-row + .monday-status-row {
+  margin-top: 2px !important;
+}
+
+.monday-status-menu .monday-status-row:hover,
+.monday-status-menu .monday-status-row.active {
+  background: #f4f5f7 !important;
+}
+
+.monday-status-menu .monday-status-row.active {
+  box-shadow: inset 3px 0 0 #111827 !important;
+}
+
+/* STATUS SELECT BUTTON */
+.monday-status-menu .monday-status-select {
+  flex: 1 1 auto !important;
+  min-width: 0 !important;
+  height: 38px !important;
+
+  padding: 0 8px !important;
+  margin: 0 !important;
+
+  display: grid !important;
+  grid-template-columns: 9px minmax(0, 1fr) 18px !important;
+  align-items: center !important;
+  gap: 8px !important;
+
+  border: 0 !important;
+  border-radius: 7px !important;
+
+  background: transparent !important;
+  color: #475467 !important;
+
+  text-align: left !important;
+  cursor: pointer !important;
+}
+
+.monday-status-menu .monday-status-dot {
+  width: 8px !important;
+  height: 8px !important;
+  min-width: 8px !important;
+
+  display: block !important;
+  border-radius: 50% !important;
+}
+
+.monday-status-menu .monday-status-name {
+  min-width: 0 !important;
+
+  display: block !important;
+
+  color: #475467 !important;
+  font-size: 10px !important;
+  font-weight: 600 !important;
+  line-height: 1 !important;
+
+  white-space: nowrap !important;
+  overflow: hidden !important;
+  text-overflow: ellipsis !important;
+}
+
+.monday-status-menu .monday-status-check {
+  color: #101828 !important;
+  font-size: 9px !important;
+}
+
+/* EDIT + DELETE ONLY FOR CUSTOM STATUS */
+.monday-status-menu .monday-status-actions {
+  width: 58px !important;
+  min-width: 58px !important;
+
+  padding-right: 4px !important;
+
+  display: flex !important;
+  align-items: center !important;
+  justify-content: flex-end !important;
+  gap: 2px !important;
+
+  opacity: 0 !important;
+  visibility: hidden !important;
+
+  transition: opacity .15s ease !important;
+}
+
+.monday-status-menu .monday-status-row:hover .monday-status-actions {
+  opacity: 1 !important;
+  visibility: visible !important;
+}
+
+.monday-status-menu .monday-status-actions button {
+  width: 26px !important;
+  height: 26px !important;
+  min-width: 26px !important;
+
+  padding: 0 !important;
+  margin: 0 !important;
+
+  display: grid !important;
+  place-items: center !important;
+
+  border: 0 !important;
+  border-radius: 6px !important;
+
+  background: transparent !important;
+  color: #667085 !important;
+
+  cursor: pointer !important;
+}
+
+.monday-status-menu .monday-status-actions button:hover {
+  background: #e9edf2 !important;
+  color: #101828 !important;
+}
+
+.monday-status-menu .monday-status-actions button.danger:hover {
+  background: #fff0f0 !important;
+  color: #d92d20 !important;
+}
+
+/* INLINE EDIT MODE */
+.monday-status-menu .monday-status-row.editing {
+  padding: 5px !important;
+  background: #f7f8fa !important;
+}
+
+.monday-status-menu .monday-status-edit-row {
+  width: 100% !important;
+
+  display: grid !important;
+  grid-template-columns: 30px minmax(0, 1fr) 28px 28px !important;
+  align-items: center !important;
+  gap: 5px !important;
+}
+
+.monday-status-menu .monday-status-color-button {
+  position: relative !important;
+
+  width: 30px !important;
+  height: 30px !important;
+
+  display: grid !important;
+  place-items: center !important;
+
+  border: 1px solid #d0d5dd !important;
+  border-radius: 7px !important;
+
+  background: #ffffff !important;
+
+  overflow: hidden !important;
+  cursor: pointer !important;
+}
+
+.monday-status-menu .monday-status-color-button > span {
+  width: 16px !important;
+  height: 16px !important;
+  display: block !important;
+  border-radius: 5px !important;
+}
+
+.monday-status-menu .monday-status-color-button input {
+  position: absolute !important;
+  inset: 0 !important;
+
+  width: 100% !important;
+  height: 100% !important;
+
+  opacity: 0 !important;
+  cursor: pointer !important;
+}
+
+.monday-status-menu .monday-status-edit-input {
+  width: 100% !important;
+  min-width: 0 !important;
+  height: 30px !important;
+
+  padding: 0 8px !important;
+
+  border: 1px solid #d0d5dd !important;
+  border-radius: 7px !important;
+
+  background: #ffffff !important;
+  color: #101828 !important;
+
+  outline: none !important;
+
+  font-size: 9px !important;
+  font-weight: 600 !important;
+}
+
+.monday-status-menu .monday-status-edit-input:focus {
+  border-color: #98a2b3 !important;
+  box-shadow: 0 0 0 3px rgba(15, 23, 42, .05) !important;
+}
+
+.monday-status-menu .monday-status-save-edit,
+.monday-status-menu .monday-status-cancel-edit {
+  width: 28px !important;
+  height: 28px !important;
+
+  padding: 0 !important;
+
+  display: grid !important;
+  place-items: center !important;
+
+  border: 0 !important;
+  border-radius: 6px !important;
+
+  cursor: pointer !important;
+}
+
+.monday-status-menu .monday-status-save-edit {
+  background: #101828 !important;
+  color: #ffffff !important;
+}
+
+.monday-status-menu .monday-status-cancel-edit {
+  background: #eaecf0 !important;
+  color: #475467 !important;
+}
+
+/* ADD CUSTOM STATUS FOOTER */
+.monday-status-menu .monday-status-add {
+  padding: 10px !important;
+
+  background: #fafbfc !important;
+  border-top: 1px solid #e7ebf0 !important;
+}
+
+.monday-status-menu .monday-status-add-title {
+  margin-bottom: 8px !important;
+
+  display: flex !important;
+  align-items: center !important;
+  gap: 8px !important;
+}
+
+.monday-status-menu .monday-status-add-icon {
+  width: 27px !important;
+  height: 27px !important;
+  min-width: 27px !important;
+
+  display: grid !important;
+  place-items: center !important;
+
+  border: 1px solid #d0d5dd !important;
+  border-radius: 7px !important;
+
+  background: #ffffff !important;
+  color: #344054 !important;
+
+  font-size: 9px !important;
+}
+
+.monday-status-menu .monday-status-add-title > div {
+  min-width: 0 !important;
+
+  display: flex !important;
+  flex-direction: column !important;
+  gap: 1px !important;
+}
+
+.monday-status-menu .monday-status-add-title strong {
+  color: #344054 !important;
+  font-size: 9px !important;
+  font-weight: 800 !important;
+}
+
+.monday-status-menu .monday-status-add-title small {
+  color: #98a2b3 !important;
+  font-size: 7px !important;
+  font-weight: 500 !important;
+}
+
+.monday-status-menu .monday-status-add-form {
+  display: grid !important;
+  grid-template-columns: 34px minmax(0, 1fr) 48px !important;
+  align-items: center !important;
+  gap: 6px !important;
+}
+
+.monday-status-menu .monday-status-add-color {
+  position: relative !important;
+
+  width: 34px !important;
+  height: 32px !important;
+
+  display: grid !important;
+  place-items: center !important;
+
+  border: 1px solid #d0d5dd !important;
+  border-radius: 7px !important;
+
+  background: #ffffff !important;
+
+  overflow: hidden !important;
+  cursor: pointer !important;
+}
+
+.monday-status-menu .monday-status-add-color > span {
+  width: 18px !important;
+  height: 18px !important;
+
+  display: block !important;
+  border-radius: 5px !important;
+}
+
+.monday-status-menu .monday-status-add-color input {
+  position: absolute !important;
+  inset: 0 !important;
+
+  width: 100% !important;
+  height: 100% !important;
+
+  opacity: 0 !important;
+  cursor: pointer !important;
+}
+
+.monday-status-menu .monday-status-add-input {
+  width: 100% !important;
+  min-width: 0 !important;
+  height: 32px !important;
+
+  padding: 0 8px !important;
+
+  border: 1px solid #d0d5dd !important;
+  border-radius: 7px !important;
+
+  background: #ffffff !important;
+  color: #101828 !important;
+
+  outline: none !important;
+
+  font-size: 9px !important;
+  font-weight: 600 !important;
+}
+
+.monday-status-menu .monday-status-add-input:focus {
+  border-color: #98a2b3 !important;
+  box-shadow: 0 0 0 3px rgba(15, 23, 42, .05) !important;
+}
+
+.monday-status-menu .monday-status-add-button {
+  height: 32px !important;
+
+  padding: 0 10px !important;
+
+  border: 0 !important;
+  border-radius: 7px !important;
+
+  background: #101828 !important;
+  color: #ffffff !important;
+
+  font-size: 8px !important;
+  font-weight: 800 !important;
+
+  cursor: pointer !important;
+}
+
+.monday-status-menu .monday-status-add-button:disabled {
+  opacity: .35 !important;
+  cursor: not-allowed !important;
+}
+
+/* DARK MODE */
+.theme-dark .monday-status-menu.status-fixed-dropdown,
+.theme-dark .monday-status-menu .monday-status-menu-head,
+.theme-dark .monday-status-menu .monday-status-options {
+  background: #111827 !important;
+  border-color: #334155 !important;
+}
+
+.theme-dark .monday-status-menu .monday-status-menu-head strong,
+.theme-dark .monday-status-menu .monday-status-name {
+  color: #f8fafc !important;
+}
+
+.theme-dark .monday-status-menu .monday-status-row:hover,
+.theme-dark .monday-status-menu .monday-status-row.active,
+.theme-dark .monday-status-menu .monday-status-row.editing {
+  background: #1f2937 !important;
+}
+
+.theme-dark .monday-status-menu .monday-status-add {
+  background: #0f172a !important;
+  border-color: #334155 !important;
+}
+
+.theme-dark .monday-status-menu .monday-status-add-title strong {
+  color: #f8fafc !important;
+}
+
+.theme-dark .monday-status-menu .monday-status-edit-input,
+.theme-dark .monday-status-menu .monday-status-add-input,
+.theme-dark .monday-status-menu .monday-status-color-button,
+.theme-dark .monday-status-menu .monday-status-add-color {
+  background: #111827 !important;
+  border-color: #475569 !important;
+  color: #f8fafc !important;
+}
+
+
+/* ================= FILES: 5 THUMBS + DELETE + VIEW ALL ================= */
+.board-row-file-thumb-wrap {
+  position: relative;
+  width: 42px;
+  height: 42px;
+  flex: 0 0 42px;
+  cursor: pointer;
+}
+
+.board-row-file-thumb-wrap .board-row-file-thumb {
+  width: 100%;
+  height: 100%;
+  margin: 0;
+}
+
+.board-row-file-remove {
+  position: absolute;
+  top: -6px;
+  right: -6px;
+  width: 18px;
+  height: 18px;
+  border: 0;
+  border-radius: 50%;
+  background: #ef4444;
+  color: #fff;
+  display: grid;
+  place-items: center;
+  font-size: 10px;
+  cursor: pointer;
+  z-index: 4;
+  opacity: 0;
+  transform: scale(.85);
+  transition: .15s ease;
+}
+
+.board-row-file-thumb-wrap:hover .board-row-file-remove {
+  opacity: 1;
+  transform: scale(1);
+}
+
+.board-more-files {
+  border: 0;
+  background: transparent;
+  cursor: pointer;
+}
+
+.detail-more-files {
+  min-width: 42px;
+  height: 42px;
+  border: 1px dashed #94a3b8;
+  border-radius: 8px;
+  background: #f8fafc;
+  color: #172b4d;
+  font-size: 12px;
+  font-weight: 800;
+  cursor: pointer;
+}
+
+.files-modal-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 1000000;
+  background: rgba(15, 23, 42, .72);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+  backdrop-filter: blur(3px);
+}
+
+.files-modal {
+  width: min(1050px, 96vw);
+  max-height: 90vh;
+  background: #fff;
+  border-radius: 16px;
+  box-shadow: 0 28px 90px rgba(0,0,0,.35);
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+}
+
+.files-modal-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 16px 18px;
+  border-bottom: 1px solid #e5e7eb;
+}
+
+.files-modal-header h3 { margin: 0; color: #0f172a; font-size: 18px; }
+.files-modal-header p { margin: 3px 0 0; color: #64748b; font-size: 12px; }
+.files-modal-header-actions { display: flex; align-items: center; gap: 8px; }
+
+.files-modal-download-all,
+.files-modal-close {
+  border: 0;
+  border-radius: 9px;
+  height: 36px;
+  padding: 0 12px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+  cursor: pointer;
+  font-weight: 800;
+}
+
+.files-modal-download-all { background: #172b4d; color: #fff; }
+.files-modal-close { width: 36px; padding: 0; background: #f1f5f9; color: #0f172a; }
+
+.files-modal-grid {
+  padding: 18px;
+  overflow: auto;
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+  gap: 14px;
+}
+
+.files-modal-item {
+  border: 1px solid #e5e7eb;
+  border-radius: 12px;
+  overflow: hidden;
+  background: #fff;
+}
+
+.files-modal-preview {
+  width: 100%;
+  height: 135px;
+  border: 0;
+  background: #f8fafc;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  overflow: hidden;
+}
+
+.files-modal-preview img { width: 100%; height: 100%; object-fit: contain; }
+.files-modal-icon i { font-size: 46px; color: #64748b; }
+.files-modal-item-info { padding: 10px 11px 7px; min-width: 0; }
+.files-modal-item-info strong { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: #0f172a; font-size: 12px; }
+.files-modal-item-info small { color: #94a3b8; font-size: 10px; }
+.files-modal-item-actions { display: flex; gap: 6px; padding: 0 10px 10px; }
+.files-modal-item-actions button { width: 32px; height: 30px; border: 1px solid #e2e8f0; border-radius: 7px; background: #fff; color: #334155; cursor: pointer; }
+.files-modal-item-actions button:hover { background: #f1f5f9; }
+.files-modal-item-actions button.danger { color: #ef4444; }
+.files-modal-empty { min-height: 260px; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 10px; color: #94a3b8; }
+.files-modal-empty i { font-size: 42px; }
+
+.universal-preview-modal {
+  width: min(1100px, 96vw);
+  height: min(800px, 92vh);
+  padding: 0;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+}
+
+.preview-modal-topbar {
+  min-height: 52px;
+  padding: 10px 12px 10px 16px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  border-bottom: 1px solid #e5e7eb;
+}
+
+.preview-modal-topbar strong { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: #0f172a; }
+.preview-modal-topbar > div { display: flex; gap: 7px; }
+.preview-modal-topbar button { width: 34px; height: 34px; border: 0; border-radius: 8px; background: #f1f5f9; color: #0f172a; cursor: pointer; }
+.preview-modal-body { flex: 1; min-height: 0; display: flex; align-items: center; justify-content: center; background: #eef2f7; overflow: auto; }
+.file-preview-frame { width: 100%; height: 100%; background: #fff; }
+
+@media (max-width: 700px) {
+  .files-modal-overlay { padding: 10px; }
+  .files-modal-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); padding: 10px; gap: 10px; }
+  .files-modal-download-all span { display: none; }
+  .universal-preview-modal { width: 98vw; height: 90vh; }
+}
+
+
+/* =========================================================
+   OUTER BOARD FILES: 4 THUMBNAILS + EXTRA COUNT + ADD BUTTON
+   Detail page / View All is NOT limited.
+   ========================================================= */
+.board-col-files .board-row-files {
+  display: flex;
+  align-items: center;
+  justify-content: flex-start;
+  gap: 3px;
+  width: 100%;
+  min-width: 0;
+  overflow: visible;
+  flex-wrap: nowrap;
+}
+
+.board-col-files .board-row-file-thumb-wrap {
+  position: relative;
+  width: 28px !important;
+  height: 32px !important;
+  min-width: 28px !important;
+  flex: 0 0 28px !important;
+}
+
+.board-col-files .board-row-file-thumb-wrap .board-row-file-thumb {
+  width: 28px !important;
+  height: 32px !important;
+  min-width: 28px !important;
+  padding: 0 !important;
+  border: 1px solid #d8dee9;
+  border-radius: 5px;
+  background: #fff;
+  overflow: hidden;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+}
+
+.board-col-files .board-row-file-thumb img {
+  width: 100% !important;
+  height: 100% !important;
+  display: block;
+  object-fit: cover;
+}
+
+.board-col-files .board-row-file-thumb i {
+  font-size: 13px !important;
+}
+
+.board-col-files .board-more-files-button {
+  width: 28px !important;
+  height: 32px !important;
+  min-width: 28px !important;
+  flex: 0 0 28px !important;
+  margin: 0 !important;
+  padding: 0 !important;
+  border: 1px dashed #9aa8bc;
+  border-radius: 5px;
+  background: #f8fafc;
+  color: #172b4d;
+  font-size: 10px;
+  line-height: 1;
+  font-weight: 900;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+}
+
+.board-col-files .board-more-files-button:hover {
+  background: #eef2ff;
+  border-color: #64748b;
+}
+
+.board-col-files .board-row-file-add {
+  width: 30px !important;
+  height: 32px !important;
+  min-width: 30px !important;
+  flex: 0 0 30px !important;
+  margin: 0 !important;
+  padding: 0 !important;
+  border: 1px dashed #aab6c7;
+  border-radius: 5px;
+  background: #fff;
+  color: #172b4d;
+  display: inline-flex !important;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+}
+
+.board-col-files .board-row-file-add i {
+  font-size: 14px !important;
+}
+
+.board-col-files .board-row-file-remove {
+  width: 14px !important;
+  height: 14px !important;
+  min-width: 14px !important;
+  right: -3px !important;
+  top: -4px !important;
+  font-size: 8px !important;
+}
+
+
+/* =========================================================
+   CHAT + ORDER NOTIFICATION CENTER
+========================================================= */
+
+.notification-center-dropdown {
+  overflow: hidden !important;
+  max-height: 460px !important;
+}
+
+.notification-center-head {
+  position: relative !important;
+}
+
+.notification-center-head > div {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  width: 100%;
+  gap: 12px;
+}
+
+.notification-center-head small {
+  color: #64748b;
+  font-size: 10px;
+  font-weight: 800;
+  white-space: nowrap;
+}
+
+.notification-tabs {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 6px;
+  padding: 8px;
+  border-bottom: 1px solid #e8edf3;
+  background: #f8fafc;
+}
+
+.notification-tabs button {
+  min-height: 36px;
+  border: 1px solid transparent;
+  border-radius: 8px;
+  background: transparent;
+  color: #64748b;
+  font-size: 11px;
+  font-weight: 900;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+}
+
+.notification-tabs button:hover {
+  background: #ffffff;
+  color: #0f172a;
+}
+
+.notification-tabs button.active {
+  background: #ffffff;
+  border-color: #dbe2ea;
+  color: #0f172a;
+  box-shadow: 0 2px 8px rgba(15, 23, 42, .06);
+}
+
+.notification-tabs button > span {
+  min-width: 18px;
+  height: 18px;
+  padding: 0 5px;
+  border-radius: 999px;
+  background: #111827;
+  color: #ffffff;
+  font-size: 9px;
+  font-weight: 900;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.notification-list {
+  max-height: 340px;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+
+.order-notification-item {
+  position: relative;
+}
+
+.order-notification-icon {
+  background: #ecfdf5 !important;
+  color: #059669 !important;
+}
+
+.order-notification-new-dot {
+  width: 8px;
+  height: 8px;
+  flex: 0 0 8px;
+  border-radius: 50%;
+  background: #22c55e;
+  box-shadow: 0 0 0 3px rgba(34, 197, 94, .12);
+}
+
+.theme-dark .notification-center-head,
+.theme-dark .notification-tabs {
+  background: #111827 !important;
+  border-color: #334155 !important;
+}
+
+.theme-dark .notification-center-head small {
+  color: #cbd5e1 !important;
+}
+
+.theme-dark .notification-tabs button {
+  color: #cbd5e1 !important;
+}
+
+.theme-dark .notification-tabs button:hover,
+.theme-dark .notification-tabs button.active {
+  background: #1e293b !important;
+  color: #ffffff !important;
+  border-color: #475569 !important;
+}
+
+.theme-dark .notification-tabs button > span {
+  background: #ffffff !important;
+  color: #111827 !important;
+}
+
+@media (max-width: 767px) {
+  .notification-center-dropdown {
+    max-height: calc(100vh - 95px) !important;
+  }
+
+  .notification-list {
+    max-height: calc(100vh - 210px);
+  }
+}
+
 </style>
