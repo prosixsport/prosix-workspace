@@ -8,16 +8,19 @@ const routes = [
 
   {
     path: '/login',
+    name: 'login',
     component: () => import('./auth/Login.vue')
   },
 
   {
     path: '/register',
+    name: 'register',
     component: () => import('./auth/Register.vue')
   },
 
   {
     path: '/dashboard',
+    name: 'dashboard',
     component: () => import('./Dashboard.vue'),
     meta: {
       requiresAuth: true
@@ -26,59 +29,66 @@ const routes = [
 
   {
     path: '/members',
+    name: 'members',
     component: () => import('./views/Members.vue'),
     meta: {
       requiresAuth: true
     }
   },
 
-  // =========================
+  // ==========================================
   // FACTORY ORDERS
-  // =========================
+  // ==========================================
   {
     path: '/orders',
+    name: 'factory-orders',
     component: () => import('./views/AllOrdersView.vue'),
     meta: {
-      requiresAuth: true
+      requiresAuth: true,
+      section: 'factory'
     }
   },
 
-  // =========================
+  // ==========================================
   // PLACE ORDERS
-  // =========================
+  // ==========================================
   {
     path: '/place-orders',
+    name: 'place-orders',
     component: () => import('./views/PlaceOrdersView.vue'),
     meta: {
       requiresAuth: true
     }
   },
 
-  // =========================
+  // ==========================================
   // TEAMSTORE ORDERS
-  // =========================
+  // ==========================================
   {
     path: '/teamstore-orders',
+    name: 'teamstore-orders',
     component: () => import('./views/TeamStoreOrdersView.vue'),
     meta: {
       requiresAuth: true
     }
   },
 
-  // =========================
-  // ARTWORK REQUESTS
-  // =========================
+  // ==========================================
+  // ARTWORK REQUESTS - COMPLETELY SEPARATE
+  // ==========================================
   {
     path: '/artwork-requests',
+    name: 'artwork-requests',
     component: () => import('./views/ArtworkRequestsView.vue'),
     meta: {
-      requiresAuth: true
+      requiresAuth: true,
+      section: 'artwork'
     }
   },
 
-  // =========================
+  // ==========================================
   // PROFILE
-  // =========================
+  // ==========================================
   {
     path: '/profile',
     name: 'profile',
@@ -88,11 +98,12 @@ const routes = [
     }
   },
 
-  // =========================
+  // ==========================================
   // CLIENTS
-  // =========================
+  // ==========================================
   {
     path: '/clients',
+    name: 'clients',
     component: () => import('./views/ClientsView.vue'),
     meta: {
       requiresAuth: true,
@@ -100,11 +111,12 @@ const routes = [
     }
   },
 
-  // =========================
+  // ==========================================
   // INVOICES
-  // =========================
+  // ==========================================
   {
     path: '/invoices',
+    name: 'invoices',
     component: () => import('./views/InvoicesView.vue'),
     meta: {
       requiresAuth: true,
@@ -112,11 +124,12 @@ const routes = [
     }
   },
 
-  // =========================
+  // ==========================================
   // ACTIVITY LOGS
-  // =========================
+  // ==========================================
   {
     path: '/activity-logs',
+    name: 'activity-logs',
     component: () => import('./views/ActivityLogsView.vue'),
     meta: {
       requiresAuth: true,
@@ -124,16 +137,23 @@ const routes = [
     }
   },
 
-  // =========================
+  // ==========================================
   // RECYCLE BIN
-  // =========================
+  // ==========================================
   {
     path: '/recycle-bin',
+    name: 'recycle-bin',
     component: () => import('./views/RecycleBinView.vue'),
     meta: {
       requiresAuth: true,
       superAdmin: true
     }
+  },
+
+  // UNKNOWN ROUTES
+  {
+    path: '/:pathMatch(.*)*',
+    redirect: '/dashboard'
   }
 ]
 
@@ -155,12 +175,12 @@ router.beforeEach((to, from, next) => {
     user = null
   }
 
-  // Not logged in
+  // Login required
   if (to.meta.requiresAuth && !token) {
     return next('/login')
   }
 
-  // Super admin only pages
+  // Super Admin only pages
   if (
     to.meta.superAdmin &&
     user?.role !== 'super_admin'
@@ -168,7 +188,7 @@ router.beforeEach((to, from, next) => {
     return next('/dashboard')
   }
 
-  // Logged-in user should not return to login/register
+  // Logged in user should not see login/register again
   if (
     token &&
     (
