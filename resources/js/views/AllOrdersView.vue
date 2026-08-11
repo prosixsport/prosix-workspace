@@ -25,8 +25,12 @@
           activeSectionCollapsed = false
         "
       >
-        <span class="summary-home-icon">
-          <i class="fa-solid fa-house"></i>
+        <span class="summary-home-icon prosix-summary-icon">
+          <img
+            src="/public/assets/images/P LOGO BLACK.png"
+            alt="Prosix"
+            class="prosix-summary-logo"
+          />
         </span>
 
         <span>
@@ -117,7 +121,7 @@
 
       <div class="board-toolbar-actions">
         <!-- CHAT + NEW ORDER NOTIFICATIONS -->
-        <div class="chat-notification-wrap" @click.stop>
+        <div v-show="!detailOpen" class="chat-notification-wrap" @click.stop>
           <button
             type="button"
             class="chat-notification-button"
@@ -286,7 +290,8 @@
           '--active-section-color': activeBoardGroup.color,
           background: '#ffffff',
           color: activeBoardGroup.color,
-          borderLeftColor: activeBoardGroup.color
+          borderLeftColor: activeBoardGroup.color,
+          order: boardSectionOrder(activeGroup, 0)
         }"
         @click="activeSectionCollapsed = !activeSectionCollapsed"
       >
@@ -340,6 +345,7 @@
       <section
         v-if="selectedOrders.length > 0"
         class="board-bulk-toolbar"
+        :style="{ order: boardSectionOrder(activeGroup, 1) }"
         @click.stop
       >
         <div class="bulk-selected-count">
@@ -397,6 +403,7 @@
       <section
         v-show="!activeSectionCollapsed"
         class="board-table-shell"
+        :style="{ order: boardSectionOrder(activeGroup, 2) }"
       >
         <div class="board-table-head" :style="boardGridStyle">
           <div class="board-col board-col-check resizable-head-cell">
@@ -871,7 +878,8 @@
             '--group-color': group.color,
             background: '#ffffff',
             color: group.color,
-            borderLeftColor: group.color
+            borderLeftColor: group.color,
+            order: boardSectionOrder(group.key, 0)
           }"
           @click="
             activeGroup = group.key;
@@ -5787,6 +5795,20 @@ body.board-column-resizing .column-resizer::before {
         .replace(/"/g, '&quot;')
         .replace(/'/g, '&#039;')
     },
+    boardSectionOrder(groupKey, part = 0) {
+      if (groupKey === 'all') {
+        return Number(part)
+      }
+
+      const index = this.boardGroups.findIndex(
+        group => group.key === groupKey
+      )
+
+      const safeIndex = index >= 0 ? index : 0
+
+      return ((safeIndex + 1) * 10) + Number(part)
+    },
+
 
     countForGroup(groupKey) {
       if (groupKey === 'all') {
@@ -5911,8 +5933,18 @@ body.board-column-resizing .column-resizer::before {
     },
 
     async openBoardOrder(order) {
-      await this.selectOrder(order)
+      if (!order) return
+
+      // Show detail immediately, then fetch heavier data in background.
+      this.selectedOrder = order
       this.detailOpen = true
+      this.closeAllMenus()
+
+      await this.$nextTick()
+
+      this.selectOrder(order).catch(error => {
+        console.error('openBoardOrder load error:', error)
+      })
     },
 
     async openOrderFromNotification(order) {
@@ -5952,13 +5984,24 @@ body.board-column-resizing .column-resizer::before {
     },
 
     async openBoardChat(order) {
-      await this.selectOrder(order)
+      if (!order) return
+
+      this.selectedOrder = order
       this.detailOpen = true
       this.showChat = true
+      this.closeAllMenus()
 
-      if (this.markChatRead) {
-        await this.markChatRead()
-      }
+      await this.$nextTick()
+
+      this.selectOrder(order)
+        .then(async () => {
+          if (this.markChatRead) {
+            await this.markChatRead()
+          }
+        })
+        .catch(error => {
+          console.error('openBoardChat load error:', error)
+        })
     },
 
     async openChatFromNotification(order) {
@@ -10091,8 +10134,7 @@ grid-template-columns: 32px 1fr 118px 38px;
 .summary-home-icon {
   width: 32px;
   height: 32px;
-  border-radius: 2px;
-  background: #4a90e2;
+  border-radius: 100%;
   display: grid;
   place-items: center;
 }
@@ -18195,6 +18237,448 @@ body.board-column-resizing .column-resizer::before {
   .notification-list {
     max-height: calc(100vh - 210px);
   }
+}
+
+
+
+/* =========================================================
+   FINAL FIX — KEEP APP SIDEBAR VISIBLE IN ORDER DETAIL
+   =========================================================
+   AppLayout desktop sidebar width = 250px.
+   Detail overlay starts AFTER the sidebar instead of covering it.
+========================================================= */
+
+.board-detail-overlay {
+  position: fixed !important;
+  top: 0 !important;
+  right: 0 !important;
+  bottom: 0 !important;
+  left: 250px !important;
+
+  width: auto !important;
+  height: 100vh !important;
+
+  margin: 0 !important;
+  padding: 14px !important;
+
+  z-index: 900 !important;
+
+  background: rgba(15, 23, 42, 0.50) !important;
+
+  display: flex !important;
+  align-items: stretch !important;
+  justify-content: stretch !important;
+
+  overflow: hidden !important;
+  box-sizing: border-box !important;
+}
+
+/* Full available area on the RIGHT of sidebar */
+.board-detail-overlay .board-detail-panel,
+.board-detail-overlay .clean-detail-panel {
+  position: relative !important;
+
+  top: auto !important;
+  right: auto !important;
+  bottom: auto !important;
+  left: auto !important;
+
+  width: 100% !important;
+  max-width: none !important;
+
+  height: calc(100vh - 28px) !important;
+  max-height: calc(100vh - 28px) !important;
+
+  margin: 0 !important;
+
+  border-radius: 16px !important;
+
+  overflow-y: auto !important;
+  overflow-x: hidden !important;
+
+  overscroll-behavior: contain;
+
+  box-sizing: border-box !important;
+}
+
+/* Keep detail header/topbar inside the right-side panel */
+.board-detail-overlay .clean-detail-header {
+  width: 100% !important;
+  flex: 0 0 auto;
+}
+
+.board-detail-overlay .detail-topbar-wrapper {
+  width: 100% !important;
+}
+
+/* Avoid accidental width spilling */
+.board-detail-overlay .orders-right,
+.board-detail-overlay .detail-body,
+.board-detail-overlay .cards-area,
+.board-detail-overlay .cards-grid {
+  max-width: 100% !important;
+  box-sizing: border-box !important;
+}
+
+/* =========================================================
+   TABLET / MOBILE
+   App sidebar becomes drawer, so detail can use full screen.
+========================================================= */
+
+@media (max-width: 991px) {
+  .board-detail-overlay {
+    left: 0 !important;
+    width: 100% !important;
+    padding: 8px !important;
+  }
+
+  .board-detail-overlay .board-detail-panel,
+  .board-detail-overlay .clean-detail-panel {
+    width: 100% !important;
+    height: calc(100vh - 16px) !important;
+    max-height: calc(100vh - 16px) !important;
+    border-radius: 12px !important;
+  }
+}
+
+@media (max-width: 576px) {
+  .board-detail-overlay {
+    padding: 0 !important;
+  }
+
+  .board-detail-overlay .board-detail-panel,
+  .board-detail-overlay .clean-detail-panel {
+    width: 100% !important;
+    height: 100vh !important;
+    max-height: 100vh !important;
+    border-radius: 0 !important;
+  }
+}
+
+
+
+/* =========================================================
+   FINAL BOARD UX FIX
+   Requested:
+   - background #f4f5f8
+   - sections stay in their own original position
+   - only one section open, others collapsed
+   - gap after final order row
+========================================================= */
+
+.factory-board-page,
+.factory-board {
+  background: #f4f5f8 !important;
+}
+
+.factory-board-page {
+  min-height: 100vh !important;
+}
+
+.factory-board {
+  display: flex !important;
+  flex-direction: column !important;
+  align-items: stretch !important;
+  gap: 0 !important;
+}
+
+/* Allow each collapsed status button to be ordered independently. */
+.collapsed-status-bars {
+  display: contents !important;
+}
+
+.collapsed-status-bar {
+  width: 100% !important;
+  flex: 0 0 auto !important;
+  margin-top: 10px !important;
+  margin-bottom: 0 !important;
+}
+
+.board-section-heading.collapsible-active-heading {
+  flex: 0 0 auto !important;
+  margin-top: 10px !important;
+  margin-bottom: 0 !important;
+}
+
+.board-table-shell {
+  flex: 0 0 auto !important;
+  margin-bottom: 14px !important;
+  padding-bottom: 0 !important;
+}
+
+.board-bulk-toolbar {
+  flex: 0 0 auto !important;
+  margin-top: 6px !important;
+  margin-bottom: 6px !important;
+}
+
+@media (max-width: 991px) {
+  .collapsed-status-bar,
+  .board-section-heading.collapsible-active-heading {
+    margin-top: 8px !important;
+  }
+
+  .board-table-shell {
+    margin-bottom: 10px !important;
+  }
+}
+
+
+
+/* =========================================================
+   FINAL VISUAL UPDATE
+   - 50px breathing space after an open order section
+   - exposed gap/background = #f4f5f8
+   - Prosix P logo replaces Home icon in All Orders card
+========================================================= */
+
+/* Whole Factory Orders canvas */
+.factory-board-page,
+.factory-board {
+  background: #f4f5f8 !important;
+}
+
+/*
+ * Give the open section 50px of breathing room before the
+ * next collapsed workflow section. Because this is margin,
+ * the parent #f4f5f8 background is visible in that space.
+ */
+.board-table-shell {
+  margin-bottom: 50px !important;
+}
+
+/* Do not add another large gap on top of the following bar. */
+.collapsed-status-bar {
+  margin-top: 0 !important;
+}
+
+/*
+ * If the selected/open section has no orders, the same
+ * 50px separation should still remain before the next section.
+ */
+.board-empty-state {
+  background: #f4f5f8;
+}
+
+/* Prosix icon inside the All Orders / To Open summary card */
+.prosix-summary-icon {
+  overflow: hidden;
+  padding: 4px !important;
+  background: #ffffff !important;
+}
+
+.prosix-summary-logo {
+  width: 80%;
+  height: 80%;
+  max-width: 28px;
+  max-height: 28px;
+  display: block;
+  object-fit: contain;
+}
+
+/* Keep the icon clean in dark mode as well */
+.theme-dark .prosix-summary-icon {
+  background: #ffffff !important;
+}
+
+/* Mobile: keep a slightly smaller but still clear section gap */
+@media (max-width: 991px) {
+  .board-table-shell {
+    margin-bottom: 32px !important;
+  }
+}
+
+
+
+/* =========================================================
+   FINAL ACCORDION POSITION FIX
+   Every section opens in ITS OWN ORIGINAL POSITION.
+   Closed sections remain where they belong.
+========================================================= */
+
+/*
+  IMPORTANT:
+  collapsed-status-bars is only a wrapper.
+  display: contents makes each collapsed button participate
+  directly in .factory-board flex ordering, so the existing
+  boardSectionOrder(...) values actually work.
+*/
+.collapsed-status-bars {
+  display: contents !important;
+}
+
+/* Closed sections keep the requested 50px spacing */
+.collapsed-status-bar {
+  margin-top: 0 !important;
+  margin-bottom: 50px !important;
+}
+
+/* Open section/table also leaves the same spacing below it */
+.board-table-shell {
+  margin-bottom: 50px !important;
+}
+
+/* Active heading and its table stay together in the same slot */
+.board-section-heading.collapsible-active-heading {
+  margin-top: 0 !important;
+}
+
+/* Requested gray canvas in all gaps */
+.factory-board-page,
+.factory-board {
+  background: #f4f5f8 !important;
+}
+/* =========================================================
+   FINAL ORDER ROW GAP COLOR FIX
+   KEEP THIS AT VERY END OF <style>
+   ========================================================= */
+
+/* Table ke andar rows ke beech exposed area */
+.factory-board-page.theme-light .board-table-shell {
+  background: #f4f5f8 !important;
+}
+
+/* Header black hi rahe */
+.factory-board-page.theme-light .board-table-head {
+  background: #000000 !important;
+}
+
+/* Individual order row white */
+.factory-board-page.theme-light .board-table-row {
+  background: #ffffff !important;
+
+  /* gap between orders */
+  margin-top: 0 !important;
+  margin-bottom: 8px !important;
+
+  border-top: 0 !important;
+  border-bottom: 0 !important;
+}
+
+/* Row ke andar cells white */
+.factory-board-page.theme-light .board-table-row > .board-col {
+  background: #ffffff !important;
+}
+
+/* IMPORTANT:
+   kisi old red border / shadow ko completely remove karo
+*/
+.factory-board-page.theme-light .board-table-row,
+.factory-board-page.theme-light .board-table-row.opened,
+.factory-board-page.theme-light .board-table-row.unread,
+.factory-board-page.theme-light .board-table-row.selected {
+  border-top-color: transparent !important;
+  border-bottom-color: transparent !important;
+  box-shadow: none !important;
+}
+
+/* Do rows ke darmiyan exact requested color */
+.factory-board-page.theme-light
+.board-table-row + .board-table-row {
+  margin-top: 0 !important;
+}
+
+/* Inline add row */
+.factory-board-page.theme-light .board-inline-add-row {
+  background: #ffffff !important;
+}
+
+/* Empty area */
+.factory-board-page.theme-light .board-empty-state {
+  background: #f4f5f8 !important;
+}
+
+/* Whole board background */
+.factory-board-page.theme-light,
+.factory-board-page.theme-light .factory-board {
+  background: #f4f5f8 !important;
+}
+
+
+/* =========================================================
+   FINAL DETAIL PAGE UPDATE
+   - order detail outer/padding background = #f4f5f8
+   - detail canvas = #f4f5f8
+   - board notification bell hidden while detailOpen via v-show
+========================================================= */
+
+.factory-board-page.theme-light .board-detail-overlay,
+.board-detail-overlay {
+  background: #f4f5f8 !important;
+  background-color: #f4f5f8 !important;
+}
+
+/* Main order detail panel/canvas */
+.board-detail-overlay .board-detail-panel,
+.board-detail-overlay .clean-detail-panel,
+.board-detail-overlay .orders-right,
+.board-detail-overlay .detail-body,
+.board-detail-overlay .cards-area {
+  background: #f4f5f8 !important;
+  background-color: #f4f5f8 !important;
+}
+
+/* Keep actual cards white on gray canvas */
+.board-detail-overlay .order-card,
+.board-detail-overlay .detail-topbar-wrapper,
+.board-detail-overlay .detail-topbar,
+.board-detail-overlay .card-preview-area,
+.board-detail-overlay .card-footer-inner {
+  background-color: #ffffff !important;
+}
+
+/* Detail header stays black */
+.board-detail-overlay .clean-detail-header,
+.board-detail-overlay .detail-header {
+  background: #000000 !important;
+  background-image: none !important;
+}
+
+
+
+/* =========================================================
+   SAME BACKGROUND AS P LOGO AREA - CLEAN FINAL OVERRIDE
+   Exact color: #f4f5f8
+========================================================= */
+
+.factory-board-page,
+.factory-board-page.theme-light,
+.factory-board-page.theme-light .factory-board,
+.factory-board,
+.board-detail-overlay,
+.board-detail-overlay .board-detail-panel,
+.board-detail-overlay .clean-detail-panel,
+.board-detail-overlay .orders-right,
+.board-detail-overlay .detail-body,
+.board-detail-overlay .cards-area {
+  background: #f4f5f8 !important;
+  background-color: #f4f5f8 !important;
+}
+
+/* Remove any outer detail shadow/border that makes the two grays look different */
+.board-detail-overlay .board-detail-panel,
+.board-detail-overlay .clean-detail-panel,
+.board-detail-overlay .orders-right {
+  box-shadow: none !important;
+  border-color: transparent !important;
+}
+
+/* Actual content cards remain clean white */
+.board-detail-overlay .order-card,
+.board-detail-overlay .detail-topbar-wrapper,
+.board-detail-overlay .detail-topbar,
+.board-detail-overlay .card-preview-area,
+.board-detail-overlay .card-footer-inner {
+  background: #ffffff !important;
+  background-color: #ffffff !important;
+}
+
+/* Header remains black */
+.board-detail-overlay .clean-detail-header,
+.board-detail-overlay .detail-header {
+  background: #000000 !important;
+  background-color: #000000 !important;
+  background-image: none !important;
 }
 
 </style>
