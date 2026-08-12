@@ -604,11 +604,41 @@
                   <i class="fa-solid fa-play"></i>
                 </button>
 
-                <!-- AFTER START: ONLY USER IMAGE / AVATAR -->
+                <!-- AFTER START: SUPER ADMIN CAN CLICK AVATAR TO STOP WORK -->
                 <button
-                  v-else-if="isInProductionOrder(order) && workingDesigner(order)"
+                  v-else-if="
+                    isInProductionOrder(order) &&
+                    workingDesigner(order) &&
+                    isSuperAdmin
+                  "
                   type="button"
-                  class="working-user-avatar-only"
+                  class="working-user-avatar-only working-user-avatar-stop"
+                  :title="'Stop work for ' + workingDesigner(order).name"
+                  aria-label="Stop Work"
+                  @click.stop="stopWorking(order)"
+                >
+                  <img
+                    v-if="workingDesigner(order).profile_photo_url"
+                    :src="workingDesigner(order).profile_photo_url"
+                    :alt="workingDesigner(order).name"
+                  />
+
+                  <span
+                    v-else
+                    class="row-working-avatar-fallback"
+                  >
+                    {{ initial(workingDesigner(order).name) }}
+                  </span>
+
+                  <span class="working-stop-badge">
+                    <i class="fa-solid fa-stop"></i>
+                  </span>
+                </button>
+
+                <!-- NON SUPER ADMIN: IMAGE ONLY, NO STOP / NO CLICK -->
+                <div
+                  v-else-if="isInProductionOrder(order) && workingDesigner(order)"
+                  class="working-user-avatar-only working-user-avatar-readonly"
                   :title="workingDesigner(order).name + ' is working'"
                   @click.stop
                 >
@@ -624,7 +654,7 @@
                   >
                     {{ initial(workingDesigner(order).name) }}
                   </span>
-                </button>
+                </div>
               </div>
             </div>
           </div>
@@ -3004,7 +3034,10 @@ beforeUnmount()  {
     async stopWorking(order) {
       if (!order?.id) return
 
-      if (!this.isSuperAdmin) {
+      // STRICT RULE:
+      // Only role === "super_admin" can stop/release work.
+      // Admin/member/can_create_orders/full-access users cannot stop it.
+      if (String(this.currentUser?.role || '').trim().toLowerCase() !== 'super_admin') {
         alert('Only Super Admin can stop this work.')
         return
       }
@@ -19093,6 +19126,50 @@ body.board-column-resizing .column-resizer::before {
 .factory-board-page .payment-chip-paid {
   background: #dcfce7 !important;
   color: #15803d !important;
+}
+
+
+
+/* =========================================================
+   WORK STOP PERMISSION
+   ONLY SUPER ADMIN CAN CLICK WORKER AVATAR TO STOP
+   ========================================================= */
+
+.working-user-avatar-stop {
+  position: relative;
+  cursor: pointer !important;
+}
+
+.working-user-avatar-stop:hover {
+  transform: translateY(-1px);
+}
+
+.working-stop-badge {
+  position: absolute;
+  right: -4px;
+  bottom: -3px;
+
+  width: 15px;
+  height: 15px;
+
+  display: grid;
+  place-items: center;
+
+  background: #ef4444;
+  color: #ffffff;
+
+  border: 2px solid #ffffff;
+  border-radius: 50%;
+
+  font-size: 6px;
+  line-height: 1;
+
+  pointer-events: none;
+}
+
+.working-user-avatar-readonly {
+  cursor: default !important;
+  user-select: none;
 }
 
 </style>
