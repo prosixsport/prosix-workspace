@@ -1179,53 +1179,6 @@
           </strong>
         </button>
 
-        <div
-          v-if="selectedOrder"
-          class="detail-pipeline-strip"
-        >
-          <span class="detail-pipeline-label">
-            Pipeline
-          </span>
-
-          <button
-            v-for="group in boardGroups"
-            :key="group.key"
-            type="button"
-            class="detail-pipeline-step"
-            :class="{
-              active:
-                selectedOrder.group === group.key ||
-                (
-                  group.key === 'delivered' &&
-                  String(
-                    selectedOrder.status || ''
-                  ).toLowerCase() === 'delivered'
-                )
-            }"
-            :style="{
-              '--pipeline-color': group.color,
-              background:
-                (
-                  selectedOrder.group === group.key ||
-                  (
-                    group.key === 'delivered' &&
-                    String(
-                      selectedOrder.status || ''
-                    ).toLowerCase() === 'delivered'
-                  )
-                )
-                  ? group.color
-                  : 'rgba(255,255,255,.08)'
-            }"
-            @click.stop="moveSelectedOrderToPipeline(group)"
-          >
-            <span
-              :style="{ background: group.color }"
-            ></span>
-
-            {{ group.label }}
-          </button>
-        </div>
       </div>
 
  <!-- INFO BAR -->
@@ -19988,6 +19941,124 @@ body.board-column-resizing .column-resizer::before {
 
   .board-detail-overlay .clean-detail-header .detail-pipeline-strip {
     flex: 1 0 100% !important;
+  }
+}
+
+
+
+/* =========================================================
+   FINAL CLEANUP: NO PIPELINE + STICKY ACTIVE SECTION
+   ========================================================= */
+
+/* Detail toolbar: Back | Order | Working User | Chat */
+.board-detail-overlay .clean-detail-header {
+  min-height: 74px !important;
+  height: auto !important;
+  padding: 12px 14px !important;
+
+  display: grid !important;
+  grid-template-columns:
+    auto
+    minmax(220px, 1fr)
+    minmax(170px, auto)
+    auto !important;
+  grid-template-rows: 48px !important;
+
+  align-items: center !important;
+  gap: 10px !important;
+
+  background: #050505 !important;
+  overflow: visible !important;
+}
+
+/* Pipeline removed from detail view */
+.board-detail-overlay .detail-pipeline-strip,
+.board-detail-overlay .detail-pipeline-label,
+.board-detail-overlay .detail-pipeline-step {
+  display: none !important;
+}
+
+/* Clean info bar directly below toolbar */
+.board-detail-overlay .detail-topbar-wrapper {
+  position: relative !important;
+  top: auto !important;
+  margin-top: 0 !important;
+  padding: 8px 10px !important;
+  transform: none !important;
+
+  width: 100% !important;
+
+  background: #f4f5f8 !important;
+
+  overflow-x: auto !important;
+  overflow-y: visible !important;
+
+  z-index: 2500 !important;
+}
+
+.board-detail-overlay .detail-topbar,
+.board-detail-overlay .table-border {
+  position: relative !important;
+  top: auto !important;
+  margin-top: 0 !important;
+  transform: none !important;
+}
+
+/* =========================================================
+   FACTORY LIST STICKY HEADERS
+   ========================================================= */
+
+/* IN PRODUCTION / active status title stays visible while page scrolls */
+.factory-board .board-section-heading.collapsible-active-heading {
+  position: sticky !important;
+  top: 0 !important;
+  z-index: 8500 !important;
+
+  background: #ffffff !important;
+
+  box-shadow:
+    0 2px 10px rgba(15, 23, 42, .08) !important;
+}
+
+/* Black table header stays immediately under IN PRODUCTION title */
+.factory-board .board-table-head {
+  position: sticky !important;
+  top: 58px !important;
+  z-index: 8400 !important;
+
+  background: #000000 !important;
+}
+
+/* Do not clip sticky children */
+.factory-board,
+.factory-board .board-table-shell {
+  overflow: visible !important;
+}
+
+/* Rows remain behind sticky headers */
+.factory-board .board-table-row {
+  position: relative;
+  z-index: 1;
+}
+
+@media (max-width: 780px) {
+  .board-detail-overlay .clean-detail-header {
+    display: flex !important;
+    flex-wrap: wrap !important;
+    min-height: auto !important;
+  }
+
+  .board-detail-overlay .clean-detail-order-name,
+  .detail-working-user {
+    flex: 1 1 180px !important;
+  }
+
+  .factory-board .board-section-heading.collapsible-active-heading {
+    top: 0 !important;
+  }
+
+  .factory-board .board-table-head {
+    top: 54px !important;
   }
 }
 
