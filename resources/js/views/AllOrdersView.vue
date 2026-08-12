@@ -447,6 +447,15 @@
             ></span>
           </div>
 
+          <div class="board-col board-col-notes resizable-head-cell">
+            NOTES
+            <span
+              class="column-resizer"
+              title="Drag to resize"
+              @mousedown.stop.prevent="startColumnResize('notes', $event)"
+            ></span>
+          </div>
+
           <div class="board-col board-col-chat resizable-head-cell">
             CHAT
             <span
@@ -604,7 +613,7 @@
                   <i class="fa-solid fa-play"></i>
                 </button>
 
-                <!-- AFTER START: SUPER ADMIN CAN CLICK AVATAR TO STOP WORK -->
+                <!-- AFTER START: ONLY SUPER ADMIN CAN STOP -->
                 <button
                   v-else-if="
                     isInProductionOrder(order) &&
@@ -635,7 +644,7 @@
                   </span>
                 </button>
 
-                <!-- NON SUPER ADMIN: IMAGE ONLY, NO STOP / NO CLICK -->
+                <!-- OTHER USERS: IMAGE ONLY -->
                 <div
                   v-else-if="isInProductionOrder(order) && workingDesigner(order)"
                   class="working-user-avatar-only working-user-avatar-readonly"
@@ -813,6 +822,21 @@
               @click.stop
               @keydown.enter.prevent="savePackingInline(order, $event)"
               @blur="savePackingInline(order, $event, true)"
+            />
+          </div>
+
+          <!-- NOTES: EDIT DIRECTLY FROM OUTER ORDER ROW -->
+          <div class="board-col board-col-notes">
+            <input
+              class="board-notes-inline-input"
+              :value="orderNotesText(order)"
+              type="text"
+              placeholder="Write notes..."
+              :title="orderNotesText(order) || 'Write notes'"
+              :readonly="!canEditOrderNotes"
+              @click.stop
+              @keydown.enter.prevent="saveNotesInline(order, $event)"
+              @blur="saveNotesInline(order, $event, true)"
             />
           </div>
 
@@ -2134,6 +2158,7 @@ export default {
         owner: 120,
         files: 190,
         packing: 130,
+        notes: 190,
         chat: 85,
         payment: 120,
         address: 240,
@@ -2345,6 +2370,12 @@ canUploadFiles() {
   return this.hasFullOrderAccess
     || this.currentUser?.can_create_orders === true
 },
+
+canEditOrderNotes() {
+  return this.hasFullOrderAccess
+    || this.currentUser?.can_create_orders === true
+},
+
 canEditWorkflowFields() {
   const role = this.currentUser?.role
 
@@ -2526,6 +2557,7 @@ filteredOrders() {
         'owner',
         'files',
         'packing',
+        'notes',
         'chat',
         'payment',
         'address',
@@ -3034,10 +3066,16 @@ beforeUnmount()  {
     async stopWorking(order) {
       if (!order?.id) return
 
-      // STRICT RULE:
-      // Only role === "super_admin" can stop/release work.
-      // Admin/member/can_create_orders/full-access users cannot stop it.
-      if (String(this.currentUser?.role || '').trim().toLowerCase() !== 'super_admin') {
+      /*
+       * STRICT:
+       * Sirf exact super_admin role Stop Work kar sakta hai.
+       * admin/member/can_create_orders access is permission mein count nahi hoga.
+       */
+      if (
+        String(this.currentUser?.role || '')
+          .trim()
+          .toLowerCase() !== 'super_admin'
+      ) {
         alert('Only Super Admin can stop this work.')
         return
       }
@@ -6391,6 +6429,111 @@ body.board-column-resizing .column-resizer::before {
       this.showStatusMenu = true
     },
 
+    orderNotesText(order) {
+      const noteCard = (order?.cards || []).find(
+        card =>
+          card?.type === 'notes' ||
+          card?.title === 'Notes'
+      )
+
+      return String(
+        noteCard?.noteText ??
+        order?.notes ??
+        ''
+      ).trim()
+    },
+
+    async saveNotesInline(order, event, fromBlur = false) {
+      const input = event?.target
+
+      if (
+        !input ||
+        !order?.id ||
+        !this.canEditOrderNotes
+      ) {
+        return
+      }
+
+      const value = String(input.value || '').trim()
+      const oldValue = this.orderNotesText(order)
+
+      /*
+       * Enter ke baad blur duplicate request na bheje.
+       */
+      if (fromBlur && value === oldValue) {
+        return
+      }
+
+      try {
+        await axios.put(
+          `/api/orders/${order.id}`,
+          {
+            notes: value
+          },
+          {
+            headers: this.headers()
+          }
+        )
+
+        order.notes = value
+
+        let noteCard = (order.cards || []).find(
+          card =>
+            card?.type === 'notes' ||
+            card?.title === 'Notes'
+        )
+
+        if (noteCard) {
+          noteCard.noteText = value
+        }
+
+        /*
+         * Agar same order detail panel mein open ho,
+         * Notes card ko bhi instantly sync rakho.
+         */
+        if (
+          this.selectedOrder &&
+          Number(this.selectedOrder.id) === Number(order.id)
+        ) {
+          this.selectedOrder.notes = value
+
+          const selectedNoteCard =
+            (this.selectedOrder.cards || []).find(
+              card =>
+                card?.type === 'notes' ||
+                card?.title === 'Notes'
+            )
+
+          if (selectedNoteCard) {
+            selectedNoteCard.noteText = value
+            selectedNoteCard.saved = true
+
+            setTimeout(() => {
+              selectedNoteCard.saved = false
+            }, 1200)
+          }
+        }
+
+        input.value = value
+
+        if (!fromBlur) {
+          input.blur()
+        }
+      } catch (error) {
+        console.error(
+          'Inline notes save error:',
+          error
+        )
+
+        input.value = oldValue
+
+        alert(
+          error.response?.data?.message ||
+          'Notes save nahi huay.'
+        )
+      }
+    },
+
     packingDetailText(order) {
       return String(
         order?.packing_detail ??
@@ -8136,6 +8279,7 @@ async onFileChange(event, card) {
         owner: 85,
         files: 90,
         packing: 105,
+        notes: 150,
         chat: 65,
         payment: 90,
         address: 130,
@@ -19131,17 +19275,113 @@ body.board-column-resizing .column-resizer::before {
 
 
 /* =========================================================
-   WORK STOP PERMISSION
-   ONLY SUPER ADMIN CAN CLICK WORKER AVATAR TO STOP
+   FINAL OUTER ROW NOTES + DETAIL TOOLBAR FIX
    ========================================================= */
 
+/* NOTES column */
+.board-col-notes {
+  min-width: 0 !important;
+}
+
+.board-notes-inline-input {
+  width: 100%;
+  min-width: 0;
+  height: 34px;
+
+  padding: 0 10px;
+
+  background: transparent;
+  color: #111827;
+
+  border: 1px solid transparent;
+  border-radius: 7px;
+
+  outline: none;
+
+  font-size: 10px;
+  font-weight: 600;
+
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+
+  transition:
+    background .15s ease,
+    border-color .15s ease,
+    box-shadow .15s ease;
+}
+
+.board-notes-inline-input:not(:read-only):hover {
+  background: #f8fafc;
+  border-color: #dbe2ea;
+}
+
+.board-notes-inline-input:not(:read-only):focus {
+  background: #ffffff;
+  border-color: #94a3b8;
+  box-shadow: 0 0 0 3px rgba(148, 163, 184, .12);
+}
+
+.board-notes-inline-input:read-only {
+  cursor: default;
+  color: #667085;
+}
+
+/*
+ * IMPORTANT:
+ * Global PageHeader is 165px high.
+ * Detail overlay now starts UNDER it, so:
+ * Back to Orders + Order Name + Chat + Pipeline
+ * are never hidden behind the header.
+ */
+.board-detail-overlay {
+  top: 165px !important;
+  bottom: 0 !important;
+  height: calc(100vh - 165px) !important;
+  min-height: 0 !important;
+  z-index: 900 !important;
+}
+
+.board-detail-overlay .board-detail-panel,
+.board-detail-overlay .clean-detail-panel {
+  height: calc(100vh - 193px) !important;
+  max-height: calc(100vh - 193px) !important;
+}
+
+/* Keep the order toolbar visible at the top while detail scrolls. */
+.board-detail-overlay .clean-detail-header,
+.board-detail-overlay .detail-header {
+  display: flex !important;
+  position: sticky !important;
+  top: 0 !important;
+  z-index: 5000 !important;
+
+  width: 100% !important;
+  flex-wrap: wrap !important;
+
+  background: #000000 !important;
+}
+
+/* Order name + chat should never disappear */
+.board-detail-overlay .clean-detail-order-name,
+.board-detail-overlay .clean-detail-chat-button,
+.board-detail-overlay .board-detail-back {
+  display: flex !important;
+  visibility: visible !important;
+  opacity: 1 !important;
+}
+
+/* Pipeline remains visible in toolbar */
+.board-detail-overlay .clean-detail-header .detail-pipeline-strip {
+  display: flex !important;
+  visibility: visible !important;
+  opacity: 1 !important;
+}
+
+/* SUPER ADMIN STOP */
 .working-user-avatar-stop {
   position: relative;
   cursor: pointer !important;
-}
-
-.working-user-avatar-stop:hover {
-  transform: translateY(-1px);
 }
 
 .working-stop-badge {
@@ -19162,14 +19402,31 @@ body.board-column-resizing .column-resizer::before {
   border-radius: 50%;
 
   font-size: 6px;
-  line-height: 1;
-
   pointer-events: none;
 }
 
 .working-user-avatar-readonly {
   cursor: default !important;
-  user-select: none;
+}
+
+/* Mobile/tablet: global header is shorter */
+@media (max-width: 780px) {
+  .board-detail-overlay {
+    top: 74px !important;
+    left: 0 !important;
+    height: calc(100vh - 74px) !important;
+  }
+
+  .board-detail-overlay .board-detail-panel,
+  .board-detail-overlay .clean-detail-panel {
+    height: calc(100vh - 94px) !important;
+    max-height: calc(100vh - 94px) !important;
+  }
+
+  .board-detail-overlay .clean-detail-header,
+  .board-detail-overlay .detail-header {
+    flex-wrap: wrap !important;
+  }
 }
 
 </style>
