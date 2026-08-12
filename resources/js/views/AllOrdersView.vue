@@ -1129,6 +1129,41 @@
           </div>
         </div>
 
+        <!-- WHO STARTED THIS ORDER -->
+        <div
+          v-if="workingDesigner(selectedOrder)"
+          class="detail-working-user"
+          :title="workingDesigner(selectedOrder).name + ' is working on this order'"
+        >
+          <span class="detail-working-avatar">
+            <img
+              v-if="workingDesigner(selectedOrder).profile_photo_url"
+              :src="workingDesigner(selectedOrder).profile_photo_url"
+              :alt="workingDesigner(selectedOrder).name"
+            />
+            <span v-else>
+              {{ initial(workingDesigner(selectedOrder).name) }}
+            </span>
+
+            <span class="detail-working-live-dot"></span>
+          </span>
+
+          <span class="detail-working-copy">
+            <small>Working</small>
+            <strong>{{ workingDesigner(selectedOrder).name }}</strong>
+          </span>
+
+          <button
+            v-if="isSuperAdmin"
+            type="button"
+            class="detail-stop-work-button"
+            title="Stop Work"
+            @click.stop="stopWorking(selectedOrder)"
+          >
+            <i class="fa-solid fa-stop"></i>
+          </button>
+        </div>
+
         <button
           v-if="!isClient"
           type="button"
@@ -3056,8 +3091,26 @@ beforeUnmount()  {
       } catch (error) {
         console.error('Start working error:', error)
 
-        alert(
+        const message = String(
           error.response?.data?.message ||
+          ''
+        )
+
+        /*
+         * Another user already started it:
+         * no browser alert. Refresh the board and show that user's avatar.
+         */
+        if (
+          error.response?.status === 409 ||
+          message.toLowerCase().includes('already working') ||
+          message.toLowerCase().includes('already claimed')
+        ) {
+          await this.fetchOrders()
+          return
+        }
+
+        alert(
+          message ||
           'Working status could not be started.'
         )
       }
@@ -3173,8 +3226,30 @@ beforeUnmount()  {
     },
 
     workingDesigner(order) {
+      if (!order) return null
+
+      /*
+       * IMPORTANT:
+       * Agar backend working_by bhej raha hai to iska matlab order
+       * kisi user ne already claim/start kiya hua hai.
+       *
+       * Is se doosre user ko Play button dobara nazar nahi aayega;
+       * uski jagah actual worker ki profile image nazar aayegi.
+       */
+      if (
+        order?.working_by &&
+        (
+          order.working_by.id ||
+          order.working_by.name ||
+          order.working_by.profile_photo_url
+        )
+      ) {
+        return order.working_by
+      }
+
       if (!this.hasOrderWorkStarted(order)) return null
-      return order?.working_by || this.currentUser || null
+
+      return this.currentUser || null
     },
 
     async claimOrder(order) {
@@ -19426,6 +19501,493 @@ body.board-column-resizing .column-resizer::before {
   .board-detail-overlay .clean-detail-header,
   .board-detail-overlay .detail-header {
     flex-wrap: wrap !important;
+  }
+}
+
+
+
+/* =========================================================
+   FINAL CLEAN DETAIL TOOLBAR + ACTIVE WORKER PROFILE
+   ========================================================= */
+
+/*
+ * Header layout:
+ * Back | Order | Working User | Chat
+ * Pipeline gets its own clean full-width row.
+ */
+.board-detail-overlay .clean-detail-header {
+  min-height: 132px !important;
+  padding: 14px 16px !important;
+
+  display: grid !important;
+  grid-template-columns:
+    auto
+    minmax(190px, 1fr)
+    minmax(170px, auto)
+    auto !important;
+  grid-template-rows: 50px auto !important;
+
+  align-items: center !important;
+  gap: 10px !important;
+
+  background: #050505 !important;
+  border-radius: 0 !important;
+  border-bottom: 1px solid #202020 !important;
+
+  overflow: visible !important;
+}
+
+/* Back button is now part of normal grid; no absolute positioning. */
+.board-detail-overlay .clean-detail-header .board-detail-back {
+  position: static !important;
+  top: auto !important;
+  left: auto !important;
+
+  height: 40px !important;
+  padding: 0 13px !important;
+
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  gap: 7px !important;
+
+  background: #111111 !important;
+  color: #ffffff !important;
+
+  border: 1px solid #343434 !important;
+  border-radius: 9px !important;
+
+  white-space: nowrap !important;
+}
+
+/* Order card */
+.board-detail-overlay .clean-detail-order-name {
+  width: 100% !important;
+  min-width: 0 !important;
+  height: 46px !important;
+
+  padding: 0 12px !important;
+
+  background: #111111 !important;
+  border: 1px solid #343434 !important;
+  border-radius: 9px !important;
+}
+
+.board-detail-overlay .clean-detail-order-name > i {
+  color: #ffffff !important;
+}
+
+.board-detail-overlay .clean-detail-order-name small {
+  color: #9ca3af !important;
+}
+
+.board-detail-overlay .clean-detail-order-name strong {
+  color: #ffffff !important;
+}
+
+/* Active worker */
+.detail-working-user {
+  min-width: 170px;
+  max-width: 250px;
+  height: 46px;
+
+  padding: 5px 7px;
+
+  display: grid;
+  grid-template-columns: 34px minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 8px;
+
+  background: #111111;
+  border: 1px solid #343434;
+  border-radius: 9px;
+
+  color: #ffffff;
+}
+
+.detail-working-avatar {
+  position: relative;
+
+  width: 34px;
+  height: 34px;
+
+  display: grid;
+  place-items: center;
+
+  overflow: visible;
+
+  background: #232323;
+  color: #ffffff;
+
+  border-radius: 50%;
+
+  font-size: 10px;
+  font-weight: 900;
+}
+
+.detail-working-avatar img {
+  width: 34px;
+  height: 34px;
+
+  display: block;
+
+  object-fit: cover;
+  border-radius: 50%;
+
+  border: 1px solid #ffffff;
+}
+
+.detail-working-live-dot {
+  position: absolute;
+  right: -1px;
+  bottom: 0;
+
+  width: 9px;
+  height: 9px;
+
+  background: #22c55e;
+
+  border: 2px solid #111111;
+  border-radius: 50%;
+}
+
+.detail-working-copy {
+  min-width: 0;
+}
+
+.detail-working-copy small,
+.detail-working-copy strong {
+  display: block;
+
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.detail-working-copy small {
+  color: #9ca3af;
+
+  font-size: 7px;
+  line-height: 1;
+  font-weight: 800;
+
+  text-transform: uppercase;
+}
+
+.detail-working-copy strong {
+  margin-top: 4px;
+
+  color: #ffffff;
+
+  font-size: 10px;
+  line-height: 1.1;
+  font-weight: 900;
+}
+
+.detail-stop-work-button {
+  width: 28px;
+  height: 28px;
+
+  padding: 0;
+
+  display: grid;
+  place-items: center;
+
+  background: #fee2e2;
+  color: #dc2626;
+
+  border: 1px solid #fecaca;
+  border-radius: 7px;
+
+  cursor: pointer;
+}
+
+.detail-stop-work-button i {
+  font-size: 8px;
+}
+
+/* Chat */
+.board-detail-overlay .clean-detail-chat-button {
+  position: static !important;
+
+  height: 40px !important;
+  min-height: 40px !important;
+
+  padding: 0 13px !important;
+
+  background: #111111 !important;
+  color: #ffffff !important;
+
+  border: 1px solid #343434 !important;
+  border-radius: 9px !important;
+
+  white-space: nowrap !important;
+}
+
+.board-detail-overlay .clean-detail-chat-button:hover,
+.board-detail-overlay .clean-detail-chat-button.active {
+  background: #ffffff !important;
+  color: #111111 !important;
+}
+
+/* Pipeline = clean second row */
+.board-detail-overlay .clean-detail-header .detail-pipeline-strip {
+  grid-column: 1 / -1 !important;
+  grid-row: 2 !important;
+
+  width: 100% !important;
+  min-width: 0 !important;
+  min-height: 42px !important;
+
+  margin: 0 !important;
+  padding: 5px !important;
+
+  display: flex !important;
+  align-items: center !important;
+  gap: 5px !important;
+
+  overflow-x: auto !important;
+  overflow-y: hidden !important;
+
+  background: #0d0d0d !important;
+
+  border: 1px solid #272727 !important;
+  border-radius: 9px !important;
+
+  scrollbar-width: thin;
+}
+
+.board-detail-overlay .detail-pipeline-label {
+  flex: 0 0 auto !important;
+
+  padding: 0 8px !important;
+
+  color: #8f98a5 !important;
+
+  font-size: 8px !important;
+  font-weight: 900 !important;
+
+  text-transform: uppercase !important;
+}
+
+.board-detail-overlay .detail-pipeline-step {
+  flex: 0 0 auto !important;
+
+  min-height: 30px !important;
+  padding: 0 10px !important;
+
+  border-radius: 7px !important;
+
+  font-size: 8px !important;
+  font-weight: 900 !important;
+
+  white-space: nowrap !important;
+}
+
+/* =========================================================
+   CLEAN INFO STRIP
+   No overlap / no text on top of another field.
+   ========================================================= */
+
+.board-detail-overlay .detail-topbar-wrapper {
+  position: relative !important;
+  top: auto !important;
+  z-index: 3000 !important;
+
+  width: 100% !important;
+
+  padding: 8px 10px !important;
+
+  background: #f4f5f8 !important;
+
+  overflow-x: auto !important;
+  overflow-y: visible !important;
+}
+
+.board-detail-overlay .detail-topbar {
+  width: 100% !important;
+  min-width: 1120px !important;
+  max-width: none !important;
+
+  min-height: 58px !important;
+
+  display: flex !important;
+  flex-wrap: nowrap !important;
+  align-items: stretch !important;
+
+  background: #ffffff !important;
+
+  border: 1px solid #dfe3e8 !important;
+  border-radius: 10px !important;
+
+  overflow: visible !important;
+}
+
+.board-detail-overlay .detail-info-item {
+  position: relative !important;
+
+  min-width: 145px !important;
+  min-height: 56px !important;
+
+  padding: 8px 12px !important;
+
+  display: flex !important;
+  flex-direction: column !important;
+  align-items: flex-start !important;
+  justify-content: center !important;
+  gap: 4px !important;
+
+  background: #ffffff !important;
+
+  border-right: 1px solid #e5e7eb !important;
+
+  overflow: visible !important;
+}
+
+.board-detail-overlay .detail-info-item:last-child {
+  border-right: 0 !important;
+}
+
+.board-detail-overlay .detail-info-item .info-label {
+  display: block !important;
+
+  margin: 0 !important;
+
+  color: #98a2b3 !important;
+
+  font-size: 7px !important;
+  line-height: 1 !important;
+  font-weight: 900 !important;
+
+  text-transform: uppercase !important;
+  white-space: nowrap !important;
+}
+
+.board-detail-overlay .detail-info-item .info-value,
+.board-detail-overlay .detail-info-item .status-badge,
+.board-detail-overlay .detail-info-item .trk-badge,
+.board-detail-overlay .detail-info-item .payment-badge {
+  position: relative !important;
+  inset: auto !important;
+
+  margin: 0 !important;
+
+  max-width: 100% !important;
+
+  line-height: 1.2 !important;
+}
+
+/* Specific widths so content never crashes into neighbors. */
+.board-detail-overlay .detail-info-item:nth-child(1) {
+  min-width: 175px !important;
+}
+
+.board-detail-overlay .detail-info-item:nth-child(2) {
+  min-width: 145px !important;
+}
+
+.board-detail-overlay .detail-info-item:nth-child(3) {
+  min-width: 190px !important;
+}
+
+.board-detail-overlay .detail-info-item:nth-child(4) {
+  min-width: 145px !important;
+}
+
+.board-detail-overlay .invoice-info-item {
+  min-width: 150px !important;
+}
+
+.board-detail-overlay .tracking-info-item {
+  min-width: 205px !important;
+}
+
+/* Payment gets enough room for all 3 chips. */
+.board-detail-overlay .detail-info-item:has(.payment-summary-badge) {
+  min-width: 265px !important;
+}
+
+.board-detail-overlay .payment-summary-badge {
+  width: auto !important;
+
+  display: flex !important;
+  align-items: center !important;
+  gap: 5px !important;
+
+  flex-wrap: nowrap !important;
+}
+
+.board-detail-overlay .payment-chip {
+  flex: 0 0 auto !important;
+  white-space: nowrap !important;
+}
+
+/* Dropdowns always sit above info strip. */
+.board-detail-overlay .date-dropdown,
+.board-detail-overlay .status-dropdown,
+.board-detail-overlay .tracking-dropdown,
+.board-detail-overlay .payment-dropdown {
+  z-index: 20000 !important;
+}
+
+/* Detail body starts cleanly after info strip. */
+.board-detail-overlay .detail-body {
+  padding-top: 12px !important;
+}
+
+/* ---------------------------------------------------------
+   TABLE ROW: another worker already claimed it
+   -> show worker avatar; don't show Play again.
+   --------------------------------------------------------- */
+.order-working-actions .working-user-avatar-only img {
+  object-fit: cover !important;
+}
+
+/* Responsive */
+@media (max-width: 980px) {
+  .board-detail-overlay .clean-detail-header {
+    grid-template-columns:
+      auto
+      minmax(160px, 1fr)
+      auto !important;
+    grid-template-rows: 46px 46px auto !important;
+  }
+
+  .detail-working-user {
+    grid-column: 2 / 3 !important;
+    grid-row: 2 !important;
+
+    max-width: none !important;
+  }
+
+  .board-detail-overlay .clean-detail-chat-button {
+    grid-column: 3 !important;
+    grid-row: 1 !important;
+  }
+
+  .board-detail-overlay .clean-detail-header .detail-pipeline-strip {
+    grid-row: 3 !important;
+  }
+}
+
+@media (max-width: 650px) {
+  .board-detail-overlay .clean-detail-header {
+    display: flex !important;
+    flex-wrap: wrap !important;
+  }
+
+  .board-detail-overlay .clean-detail-header .board-detail-back,
+  .board-detail-overlay .clean-detail-chat-button {
+    flex: 0 0 auto !important;
+  }
+
+  .board-detail-overlay .clean-detail-order-name,
+  .detail-working-user {
+    flex: 1 1 180px !important;
+  }
+
+  .board-detail-overlay .clean-detail-header .detail-pipeline-strip {
+    flex: 1 0 100% !important;
   }
 }
 
