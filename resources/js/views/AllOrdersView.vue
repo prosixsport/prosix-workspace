@@ -20062,4 +20062,227 @@ body.board-column-resizing .column-resizer::before {
   }
 }
 
+
+
+/* =========================================================
+   FINAL STICKY ORDER + DETAIL Z-INDEX FIX
+   ========================================================= */
+
+/*
+  DESKTOP SCROLL ORDER:
+  1. Workflow / reminder toolbar
+  2. Active section heading
+  3. Black table columns
+  4. Order rows scroll underneath
+*/
+.factory-board-page .board-toolbar {
+  position: sticky !important;
+  top: 0 !important;
+  z-index: 12000 !important;
+
+  min-height: 62px !important;
+
+  background: #f4f5f8 !important;
+
+  padding-top: 6px !important;
+  padding-bottom: 6px !important;
+
+  border-bottom: 1px solid #e5e7eb !important;
+
+  box-shadow:
+    0 4px 12px rgba(15, 23, 42, .06) !important;
+}
+
+/* IN PRODUCTION / active section heading */
+.factory-board-page .factory-board
+.board-section-heading.collapsible-active-heading {
+  position: sticky !important;
+
+  top: 62px !important;
+
+  z-index: 11000 !important;
+
+  background: #ffffff !important;
+
+  box-shadow:
+    0 2px 8px rgba(15, 23, 42, .05) !important;
+}
+
+/* BLACK TABLE HEADER */
+.factory-board-page .factory-board .board-table-head {
+  position: sticky !important;
+
+  top: 120px !important;
+
+  z-index: 10000 !important;
+
+  background: #000000 !important;
+
+  box-shadow:
+    0 2px 8px rgba(0, 0, 0, .14) !important;
+}
+
+/* Rows always remain below sticky areas */
+.factory-board-page .board-table-row {
+  position: relative !important;
+  z-index: 1 !important;
+}
+
+/* Parents must not clip sticky elements */
+.factory-board-page .factory-board,
+.factory-board-page .board-table-shell {
+  overflow: visible !important;
+}
+
+/* =========================================================
+   ORDER DETAIL MUST ALWAYS BE ABOVE THE FACTORY LIST
+   ========================================================= */
+
+.factory-board-page .board-detail-overlay {
+  z-index: 50000 !important;
+}
+
+/* Detail panel itself */
+.factory-board-page .board-detail-panel,
+.factory-board-page .clean-detail-panel {
+  position: relative !important;
+  z-index: 50001 !important;
+
+  overflow: auto !important;
+}
+
+/*
+  Detail top black toolbar stays fixed inside the open order.
+  Everything in the order scrolls underneath it.
+*/
+.factory-board-page .board-detail-overlay .clean-detail-header,
+.factory-board-page .board-detail-overlay .detail-header {
+  position: sticky !important;
+
+  top: 0 !important;
+
+  z-index: 52000 !important;
+
+  background: #050505 !important;
+}
+
+/*
+  Info bar sits below detail toolbar.
+  Do NOT let it jump above toolbar.
+*/
+.factory-board-page .board-detail-overlay .detail-topbar-wrapper {
+  position: relative !important;
+
+  top: auto !important;
+
+  z-index: 51000 !important;
+
+  margin-top: 0 !important;
+
+  overflow: visible !important;
+
+  background: #f4f5f8 !important;
+}
+
+.factory-board-page .board-detail-overlay .detail-topbar {
+  position: relative !important;
+
+  top: auto !important;
+
+  z-index: 51001 !important;
+
+  overflow: visible !important;
+}
+
+/* =========================================================
+   ALL DETAIL DROPDOWNS OPEN ABOVE CONTENT
+   ========================================================= */
+
+.factory-board-page .date-dropdown,
+.factory-board-page .status-dropdown,
+.factory-board-page .tracking-dropdown,
+.factory-board-page .payment-dropdown,
+.factory-board-page .tracking-dropdown-wide,
+.factory-board-page .payment-dropdown-wide {
+  position: absolute !important;
+
+  z-index: 90000 !important;
+}
+
+/* Their parent cells must not clip dropdowns */
+.factory-board-page .detail-info-item,
+.factory-board-page .tracking-info-item,
+.factory-board-page .invoice-info-item {
+  overflow: visible !important;
+}
+
+/* Row Status dropdown always above sticky board headers */
+.factory-board-page .status-fixed-dropdown,
+.factory-board-page .monday-status-menu {
+  z-index: 95000 !important;
+}
+
+/* Notification/profile dropdowns still remain highest */
+.factory-board-page .chat-notification-dropdown,
+.factory-board-page .notification-center-dropdown {
+  z-index: 100000 !important;
+}
+
+/* =========================================================
+   WHEN DETAIL IS OPEN:
+   LIST STICKY HEADERS MUST NEVER APPEAR OVER IT
+   ========================================================= */
+
+/*
+  Modern Chrome supports :has().
+  This removes sticky stacking competition while detail is open.
+*/
+.factory-board-page:has(.board-detail-overlay)
+.board-toolbar,
+
+.factory-board-page:has(.board-detail-overlay)
+.factory-board
+.board-section-heading.collapsible-active-heading,
+
+.factory-board-page:has(.board-detail-overlay)
+.factory-board
+.board-table-head {
+  z-index: 10 !important;
+}
+
+/* Detail remains well above them */
+.factory-board-page:has(.board-detail-overlay)
+.board-detail-overlay {
+  z-index: 50000 !important;
+}
+
+/* =========================================================
+   MOBILE
+   ========================================================= */
+
+@media (max-width: 780px) {
+  .factory-board-page .board-toolbar {
+    top: 0 !important;
+    min-height: 56px !important;
+  }
+
+  .factory-board-page .factory-board
+  .board-section-heading.collapsible-active-heading {
+    top: 56px !important;
+  }
+
+  .factory-board-page .factory-board .board-table-head {
+    top: 108px !important;
+  }
+
+  .factory-board-page .board-detail-overlay {
+    z-index: 50000 !important;
+  }
+
+  .factory-board-page .board-detail-overlay .clean-detail-header,
+  .factory-board-page .board-detail-overlay .detail-header {
+    top: 0 !important;
+  }
+}
+
 </style>
