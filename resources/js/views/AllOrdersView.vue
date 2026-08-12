@@ -900,10 +900,15 @@
           </div>
         </div>
 
+
+
+
       </section>
 
-      <!-- COLLAPSED STATUS BARS -->
+
+      <!-- OTHER SECTIONS: KEEP THEIR OWN NATURAL POSITION -->
       <section class="collapsed-status-bars">
+
         <button
           v-for="group in boardGroups.filter(group => group.key !== activeGroup)"
           :key="group.key"
@@ -928,7 +933,9 @@
             <strong>{{ group.label }}</strong>
           </span>
         </button>
+
       </section>
+
     </main>
     <!-- ROW STATUS DROPDOWN -->
     <div
@@ -20282,6 +20289,602 @@ body.board-column-resizing .column-resizer::before {
   .factory-board-page .board-detail-overlay .clean-detail-header,
   .factory-board-page .board-detail-overlay .detail-header {
     top: 0 !important;
+  }
+}
+
+
+
+/* =========================================================
+   FINAL: ONLY ORDER ROWS SCROLL
+   HEADER / TOOLBAR / SECTION TITLE STAY IN PLACE
+   ========================================================= */
+
+/*
+ * Stop the whole Factory Orders page from scrolling.
+ * The order table shell gets its own internal vertical scroll.
+ */
+.factory-board-page {
+  height: 100vh !important;
+  max-height: 100vh !important;
+
+  display: flex !important;
+  flex-direction: column !important;
+
+  overflow: hidden !important;
+}
+
+/* Shared PageHeader stays in normal flow and NEVER scrolls away. */
+.factory-board-page > .page-header,
+.factory-board-page .page-header {
+  position: relative !important;
+  top: auto !important;
+
+  flex: 0 0 auto !important;
+
+  z-index: 30000 !important;
+
+  transform: none !important;
+}
+
+/* Top workflow / reminder toolbar stays exactly where it is. */
+.factory-board-page .board-toolbar {
+  position: relative !important;
+  top: auto !important;
+
+  flex: 0 0 auto !important;
+
+  z-index: 20000 !important;
+
+  margin: 0 !important;
+
+  background: #f4f5f8 !important;
+
+  box-shadow: none !important;
+}
+
+/*
+ * Factory board occupies the remaining screen height.
+ * It does NOT scroll as a whole.
+ */
+.factory-board-page .factory-board {
+  flex: 1 1 auto !important;
+  min-height: 0 !important;
+
+  display: flex !important;
+  flex-direction: column !important;
+
+  overflow: hidden !important;
+}
+
+/* IN PRODUCTION title remains fixed in the board flow. */
+.factory-board-page .factory-board
+.board-section-heading.collapsible-active-heading {
+  position: relative !important;
+  top: auto !important;
+
+  flex: 0 0 auto !important;
+
+  z-index: 15000 !important;
+
+  margin: 0 !important;
+
+  background: #ffffff !important;
+
+  box-shadow: none !important;
+}
+
+/* Bulk toolbar, when visible, also stays fixed. */
+.factory-board-page .board-bulk-toolbar {
+  position: relative !important;
+  top: auto !important;
+
+  flex: 0 0 auto !important;
+
+  z-index: 14500 !important;
+}
+
+/*
+ * THIS is the only vertically scrollable area.
+ * It contains the black header + order rows.
+ */
+.factory-board-page .board-table-shell {
+  flex: 1 1 auto !important;
+  min-height: 0 !important;
+
+  position: relative !important;
+
+  overflow-x: auto !important;
+  overflow-y: auto !important;
+
+  overscroll-behavior: contain !important;
+
+  scrollbar-gutter: stable;
+}
+
+/*
+ * Black column heading stays at the top INSIDE the order scroll area.
+ * Only rows pass underneath it.
+ */
+.factory-board-page .board-table-shell .board-table-head {
+  position: sticky !important;
+  top: 0 !important;
+
+  z-index: 14000 !important;
+
+  background: #000000 !important;
+
+  box-shadow:
+    0 2px 8px rgba(0, 0, 0, .12) !important;
+}
+
+/* Inline Add row stays below black table header. */
+.factory-board-page .board-inline-add-row {
+  position: relative !important;
+  z-index: 5 !important;
+}
+
+/* Only order rows move. */
+.factory-board-page .board-table-row {
+  position: relative !important;
+  z-index: 1 !important;
+}
+
+/* Collapsed status sections stay in their place, outside row scrolling. */
+.factory-board-page .collapsed-status-bars {
+  flex: 0 0 auto !important;
+
+  position: relative !important;
+
+  z-index: 12000 !important;
+
+  background: #f4f5f8 !important;
+}
+
+/* =========================================================
+   IMPORTANT: REMOVE OLD PAGE STICKY OFFSETS
+   ========================================================= */
+
+.factory-board-page .board-toolbar,
+.factory-board-page .factory-board
+.board-section-heading.collapsible-active-heading,
+.factory-board-page .factory-board .board-table-head {
+  transform: none !important;
+}
+
+/* =========================================================
+   ORDER DETAIL
+   ========================================================= */
+
+/*
+ * Detail remains above the board.
+ * Opening an order will not make the list headers jump over it.
+ */
+.factory-board-page .board-detail-overlay {
+  z-index: 60000 !important;
+}
+
+.factory-board-page .board-detail-overlay .board-detail-panel,
+.factory-board-page .board-detail-overlay .clean-detail-panel {
+  z-index: 60001 !important;
+}
+
+.factory-board-page .board-detail-overlay .clean-detail-header,
+.factory-board-page .board-detail-overlay .detail-header {
+  z-index: 62000 !important;
+}
+
+/* Detail dropdowns always above the detail content. */
+.factory-board-page .date-dropdown,
+.factory-board-page .status-dropdown,
+.factory-board-page .tracking-dropdown,
+.factory-board-page .payment-dropdown,
+.factory-board-page .tracking-dropdown-wide,
+.factory-board-page .payment-dropdown-wide {
+  z-index: 90000 !important;
+}
+
+/* Row status popup remains above table/header. */
+.factory-board-page .status-fixed-dropdown,
+.factory-board-page .monday-status-menu {
+  z-index: 95000 !important;
+}
+
+/* Notification dropdown remains highest. */
+.factory-board-page .chat-notification-dropdown,
+.factory-board-page .notification-center-dropdown {
+  z-index: 100000 !important;
+}
+
+/* =========================================================
+   MOBILE
+   ========================================================= */
+
+@media (max-width: 780px) {
+  .factory-board-page {
+    height: 100dvh !important;
+    max-height: 100dvh !important;
+  }
+
+  .factory-board-page .board-table-shell {
+    -webkit-overflow-scrolling: touch;
+  }
+}
+
+
+
+/* =========================================================
+   FULL HEIGHT ORDER LIST
+   Collapsed sections live INSIDE the scrolling order area.
+   ========================================================= */
+
+/* Board table takes all remaining vertical space. */
+.factory-board-page .board-table-shell {
+  flex: 1 1 0 !important;
+  min-height: 0 !important;
+  height: auto !important;
+  max-height: none !important;
+
+  overflow-y: auto !important;
+  overflow-x: auto !important;
+}
+
+/*
+ * Completed / Shipped / Delivered / custom collapsed bars
+ * now appear AFTER the order rows inside the same scroll area.
+ * They do NOT reduce the visible height of the orders.
+ */
+.factory-board-page .board-table-shell .collapsed-status-bars {
+  position: relative !important;
+
+  width: 100% !important;
+
+  display: flex !important;
+  flex-direction: column !important;
+
+  flex: none !important;
+
+  margin-top: 18px !important;
+  padding: 0 0 18px !important;
+
+  background: #f4f5f8 !important;
+
+  z-index: 2 !important;
+}
+
+/* Undo old rule that reserved fixed-page space for collapsed bars. */
+.factory-board-page > .factory-board > .collapsed-status-bars {
+  display: none !important;
+}
+
+/* Rows use full available viewport below the fixed headers. */
+.factory-board-page .factory-board {
+  flex: 1 1 0 !important;
+  min-height: 0 !important;
+}
+
+/* Black table heading stays at the top of the internal scroll area. */
+.factory-board-page .board-table-shell .board-table-head {
+  position: sticky !important;
+  top: 0 !important;
+  z-index: 14000 !important;
+}
+
+/* Keep scrollbar at full available height. */
+.factory-board-page .board-table-shell {
+  scrollbar-gutter: stable;
+}
+
+
+
+/* =========================================================
+   FINAL SECTION POSITION FIX
+   OPEN EACH SECTION WHERE IT BELONGS
+   ========================================================= */
+
+/*
+ * collapsed-status-bars is only a wrapper.
+ * display: contents means every collapsed section button becomes
+ * a direct flex-order participant inside .factory-board.
+ *
+ * Existing boardSectionOrder(group.key, ...) values then keep:
+ * In Production -> its place
+ * Completed     -> its place
+ * Shipped       -> its place
+ * Delivered     -> its place
+ * Custom groups -> their place
+ *
+ * So opening a section no longer forces it to the top.
+ */
+.factory-board-page .factory-board > .collapsed-status-bars {
+  display: contents !important;
+
+  height: auto !important;
+  min-height: 0 !important;
+  max-height: none !important;
+
+  margin: 0 !important;
+  padding: 0 !important;
+
+  overflow: visible !important;
+}
+
+/* Each closed section participates in the existing boardSectionOrder(). */
+.factory-board-page .factory-board > .collapsed-status-bars > .collapsed-status-bar {
+  display: flex !important;
+  width: 100% !important;
+  flex: 0 0 auto !important;
+}
+
+/*
+ * The active heading/table already use:
+ * boardSectionOrder(activeGroup, 0/1/2)
+ * so they now open exactly where that group belongs.
+ */
+.factory-board-page .board-section-heading.collapsible-active-heading,
+.factory-board-page .board-bulk-toolbar,
+.factory-board-page .board-table-shell {
+  position: relative !important;
+}
+
+/*
+ * IMPORTANT:
+ * Override previous rules that hid direct-child collapsed sections.
+ */
+.factory-board-page > .factory-board > .collapsed-status-bars,
+.factory-board-page .factory-board > .collapsed-status-bars {
+  display: contents !important;
+}
+
+
+
+/* =========================================================
+   FINAL: ORDERS FULL SCREEN HEIGHT + SECTIONS AFTER IT
+   ========================================================= */
+
+/*
+ * Do NOT let the collapsed sections squeeze the active order list.
+ * The active list gets a full viewport-height block.
+ * Other sections stay after it, in their own natural order.
+ */
+.factory-board-page .factory-board {
+  display: flex !important;
+  flex-direction: column !important;
+
+  overflow: visible !important;
+}
+
+/* Active section heading keeps its normal height. */
+.factory-board-page .board-section-heading.collapsible-active-heading {
+  flex: 0 0 auto !important;
+}
+
+/*
+ * Main active order table gets the whole remaining screen height.
+ * This is the important change.
+ */
+.factory-board-page .board-table-shell {
+  flex: 0 0 calc(100vh - 370px) !important;
+
+  min-height: calc(100vh - 370px) !important;
+  height: calc(100vh - 370px) !important;
+  max-height: calc(100vh - 370px) !important;
+
+  overflow-y: auto !important;
+  overflow-x: auto !important;
+
+  margin-bottom: 18px !important;
+
+  scrollbar-gutter: stable;
+}
+
+/* Black table header stays at top while rows scroll. */
+.factory-board-page .board-table-shell .board-table-head {
+  position: sticky !important;
+  top: 0 !important;
+
+  z-index: 14000 !important;
+
+  background: #000000 !important;
+}
+
+/*
+ * Other sections remain AFTER the full-height order area.
+ * They no longer reduce the visible order height.
+ */
+.factory-board-page .factory-board > .collapsed-status-bars {
+  display: contents !important;
+}
+
+.factory-board-page
+.factory-board
+> .collapsed-status-bars
+> .collapsed-status-bar {
+  flex: 0 0 auto !important;
+  width: 100% !important;
+}
+
+/*
+ * Preserve existing boardSectionOrder(...) positioning.
+ * Opening a lower section still opens where that section belongs.
+ */
+.factory-board-page .board-section-heading.collapsible-active-heading,
+.factory-board-page .board-bulk-toolbar,
+.factory-board-page .board-table-shell,
+.factory-board-page .collapsed-status-bar {
+  position: relative !important;
+}
+
+/* Laptop / smaller desktop */
+@media (max-height: 850px) and (min-width: 781px) {
+  .factory-board-page .board-table-shell {
+    flex-basis: calc(100vh - 350px) !important;
+    min-height: calc(100vh - 350px) !important;
+    height: calc(100vh - 350px) !important;
+    max-height: calc(100vh - 350px) !important;
+  }
+}
+
+/* Mobile */
+@media (max-width: 780px) {
+  .factory-board-page .board-table-shell {
+    flex-basis: calc(100dvh - 255px) !important;
+    min-height: calc(100dvh - 255px) !important;
+    height: calc(100dvh - 255px) !important;
+    max-height: calc(100dvh - 255px) !important;
+
+    -webkit-overflow-scrolling: touch;
+  }
+}
+
+
+
+/* =========================================================
+   TRUE FINAL LAYOUT
+   ORDERS FILL SCREEN; OTHER SECTIONS ONLY AFTER LAST ORDER
+   ========================================================= */
+
+/* Keep the application viewport fixed. */
+.factory-board-page {
+  height: 100vh !important;
+  max-height: 100vh !important;
+
+  display: flex !important;
+  flex-direction: column !important;
+
+  overflow: hidden !important;
+}
+
+/* Header and workflow tabs never participate in the board scroll. */
+.factory-board-page .page-header,
+.factory-board-page .board-toolbar {
+  flex: 0 0 auto !important;
+  position: relative !important;
+  top: auto !important;
+}
+
+/*
+ * The BOARD is the one scrolling region.
+ * It fills every pixel left below PageHeader + workflow toolbar.
+ */
+.factory-board-page .factory-board {
+  flex: 1 1 0 !important;
+  min-height: 0 !important;
+  height: auto !important;
+
+  display: flex !important;
+  flex-direction: column !important;
+
+  overflow-y: auto !important;
+  overflow-x: hidden !important;
+
+  overscroll-behavior: contain !important;
+  scrollbar-gutter: stable;
+}
+
+/* Active section title remains visible while its orders scroll. */
+.factory-board-page
+.factory-board
+.board-section-heading.collapsible-active-heading {
+  position: sticky !important;
+  top: 0 !important;
+
+  flex: 0 0 auto !important;
+
+  z-index: 16000 !important;
+  background: #ffffff !important;
+}
+
+/* Bulk actions sit below the active section title when present. */
+.factory-board-page .board-bulk-toolbar {
+  position: sticky !important;
+  top: 58px !important;
+  z-index: 15500 !important;
+  flex: 0 0 auto !important;
+}
+
+/*
+ * IMPORTANT:
+ * Do NOT give the order table its own short scroll box.
+ * It becomes normal content in .factory-board and is guaranteed
+ * to occupy at least the rest of the visible screen.
+ */
+.factory-board-page .board-table-shell {
+  flex: 0 0 auto !important;
+
+  width: 100% !important;
+
+  min-height: calc(100vh - 360px) !important;
+  height: auto !important;
+  max-height: none !important;
+
+  overflow: visible !important;
+
+  margin: 0 0 18px !important;
+  padding: 0 !important;
+}
+
+/* Black columns remain visible underneath the active section heading. */
+.factory-board-page .board-table-shell .board-table-head {
+  position: sticky !important;
+  top: 58px !important;
+
+  z-index: 15000 !important;
+
+  background: #000000 !important;
+}
+
+/* If bulk toolbar exists, black heading gets a little more offset. */
+.factory-board-page:has(.board-bulk-toolbar)
+.board-table-shell .board-table-head {
+  top: 108px !important;
+}
+
+/* Rows are normal document rows, so they continue right to screen bottom. */
+.factory-board-page .board-table-row {
+  position: relative !important;
+  z-index: 1 !important;
+}
+
+/*
+ * Closed sections remain direct children and keep boardSectionOrder().
+ * Because the active table is no longer height-limited by them,
+ * they appear ONLY after the final order when you scroll down.
+ */
+.factory-board-page .factory-board > .collapsed-status-bars {
+  display: contents !important;
+}
+
+.factory-board-page
+.factory-board
+> .collapsed-status-bars
+> .collapsed-status-bar {
+  flex: 0 0 auto !important;
+  width: 100% !important;
+}
+
+/* Remove all previous fixed heights from the order shell. */
+.factory-board-page .board-table-shell {
+  flex-basis: auto !important;
+}
+
+/* Keep detail view above board when an order is opened. */
+.factory-board-page .board-detail-overlay {
+  z-index: 60000 !important;
+}
+
+/* Mobile */
+@media (max-width: 780px) {
+  .factory-board-page {
+    height: 100dvh !important;
+    max-height: 100dvh !important;
+  }
+
+  .factory-board-page .board-table-shell {
+    min-height: calc(100dvh - 265px) !important;
+  }
+
+  .factory-board-page .board-table-shell .board-table-head {
+    top: 54px !important;
   }
 }
 
