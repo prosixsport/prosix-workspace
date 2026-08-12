@@ -1,11 +1,15 @@
 <template>
     <AppLayout>
         <div class="page">
-            <div class="head">
-                <div>
-                    <h2>Clients</h2>
-                    <p>Add and manage clients.</p>
-                </div>
+            <PageHeader
+                title="Clients"
+                subtitle="Add and manage clients."
+                :user="currentUser"
+                :photo="currentUser?.profile_photo_url"
+                @profile="openProfile"
+            />
+
+            <div class="clients-header-actions">
                 <button @click="openModal()" class="add-btn">
                     <i class="fa-solid fa-plus"></i> Add Client
                 </button>
@@ -93,11 +97,12 @@
 
 <script>
 import AppLayout from '../layouts/AppLayout.vue'
+import PageHeader from '../layouts/PageHeader.vue'
 import axios from 'axios'
 
 export default {
     name: 'ClientsView',
-    components: { AppLayout },
+    components: { AppLayout, PageHeader },
 
     data() {
         return {
@@ -118,11 +123,25 @@ export default {
         }
     },
 
+    computed: {
+        currentUser() {
+            try {
+                return JSON.parse(localStorage.getItem('user')) || {}
+            } catch (e) {
+                return {}
+            }
+        }
+    },
+
     mounted() {
         this.fetchClients()
     },
 
     methods: {
+        openProfile() {
+            this.$router.push('/profile')
+        },
+
         headers() {
             return {
                 Authorization: `Bearer ${localStorage.getItem('token')}`,
@@ -234,7 +253,8 @@ export default {
 </script>
 
 <style scoped>
-.page { padding: 24px; background: #f4f5f8; min-height: 100vh; }
+.page { padding: 0 24px 24px; background: #f4f5f8; min-height: 100vh; }
+.clients-header-actions { display: flex; justify-content: flex-end; align-items: center; margin: 14px 0 18px; }
 .head { display: flex; justify-content: space-between; gap: 15px; align-items: center; margin-bottom: 18px; }
 .head h2 { margin: 0; font-size: 28px; font-weight: 900; color: #111; }
 .head p { margin: 4px 0 0; color: #6b7280; }
@@ -257,12 +277,12 @@ textarea { min-height: 80px; resize: vertical; }
 .save-btn { width: 100%; margin-top: 18px; }
 .client-modal-box {display: block; background: #fff; width: 460px; max-width: 100%; border-radius: 20px; padding: 24px; position: relative; z-index: 100000;}
 @media (max-width: 600px) {
-    .page { padding: 16px; }
+    .page { padding: 0 16px 16px; }
     .head { flex-direction: column; align-items: stretch; }
     .add-btn { width: 100%; }
 }
 @media (max-width: 768px) {
-    .page { padding: 14px; }
+    .page { padding: 0 14px 14px; }
     .head { flex-direction: column; align-items: stretch; gap: 12px; }
     .head h2 { font-size: 24px; }
     .add-btn { width: 100%; display: flex; justify-content: center; align-items: center; gap: 8px; }

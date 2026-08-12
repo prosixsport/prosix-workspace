@@ -1,12 +1,15 @@
 <template>
     <AppLayout>
         <div class="page">
-            <div class="head">
-                <div>
-                    <h2>Invoices</h2>
-                    <p>Create, edit and manage invoices.</p>
-                </div>
+            <PageHeader
+                title="Invoices"
+                subtitle="Create, edit and manage invoices."
+                :user="currentUser"
+                :photo="currentUser?.profile_photo_url"
+                @profile="openProfile"
+            />
 
+            <div class="invoice-header-actions">
                 <button @click="openModal()" class="add-btn">
                     <i class="fa-solid fa-plus"></i> Create Invoice
                 </button>
@@ -358,11 +361,12 @@
 
 <script>
 import AppLayout from '../layouts/AppLayout.vue'
+import PageHeader from '../layouts/PageHeader.vue'
 import axios from 'axios'
 
 export default {
     name: 'InvoicesView',
-    components: { AppLayout },
+    components: { AppLayout, PageHeader },
 
     data() {
         return {
@@ -403,6 +407,14 @@ export default {
     },
 
     computed: {
+        currentUser() {
+            try {
+                return JSON.parse(localStorage.getItem('user')) || {}
+            } catch (e) {
+                return {}
+            }
+        },
+
         subtotal() {
             return this.form.items.reduce((sum, item) => {
                 return sum + Number(item.quantity || 0) * Number(item.price || 0)
@@ -448,6 +460,10 @@ export default {
     },
 
     methods: {
+        openProfile() {
+            this.$router.push('/profile')
+        },
+
         emptyFormData() {
             return {
                 client_id: '',
@@ -691,7 +707,8 @@ alert('Item description and quantity are required')
 </script>
 
 <style scoped>
-.page { padding:24px; background:#f4f5f8; min-height:100vh; }
+.page { padding:0 24px 24px; background:#f4f5f8; min-height:100vh; }
+.invoice-header-actions { display:flex; justify-content:flex-end; align-items:center; margin:14px 0 18px; }
 .head { display:flex; justify-content:space-between; gap:15px; align-items:center; margin-bottom:18px; }
 .head h2 { margin:0; font-size:28px; font-weight:900; color:#111; }
 .head p { margin:4px 0 0; color:#6b7280; }
@@ -856,7 +873,7 @@ textarea { min-height:80px; resize:vertical; }
 }
 
 @media (max-width:600px) {
-    .page { padding:16px; }
+    .page { padding:0 16px 16px; }
     .head { flex-direction:column; align-items:stretch; }
     .add-btn { width:100%; }
     .item-label-row { display:none; }
@@ -876,7 +893,7 @@ textarea { min-height:80px; resize:vertical; }
 
 /* MOBILE RESPONSIVE TABLE CARDS */
 @media (max-width: 768px) {
-    .page { padding: 14px; }
+    .page { padding: 0 14px 14px; }
     .head { flex-direction: column; align-items: stretch; gap: 12px; }
     .head h2 { font-size: 24px; }
     .add-btn { width: 100%; display: flex; justify-content: center; align-items: center; gap: 8px; }

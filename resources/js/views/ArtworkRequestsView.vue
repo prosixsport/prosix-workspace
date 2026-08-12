@@ -2,43 +2,43 @@
   <AppLayout>
     <div class="artwork-page">
       <!-- TOP -->
-      <div class="page-head">
-        <div>
-          <p class="eyebrow">PROSIX WEBSITE</p>
-          <h1>Artwork Requests</h1>
-          <span>Artwork requests received from Prosix.com</span>
-        </div>
+      <PageHeader
+        title="Artwork Requests"
+        subtitle="Artwork requests received from Prosix.com"
+        :user="currentUser"
+        :photo="currentUser?.profile_photo_url"
+        @profile="openProfile"
+      />
 
-        <div class="page-head-actions">
-          <button
-            type="button"
-            class="btn btn-dark"
-            :disabled="selectedIds.length === 0"
-            @click="downloadSelectedFiles"
-          >
-            <i class="fa-solid fa-download"></i>
-            Download Selected Files
-          </button>
+      <div class="page-head-actions header-actions">
+        <button
+          type="button"
+          class="btn btn-dark"
+          :disabled="selectedIds.length === 0"
+          @click="downloadSelectedFiles"
+        >
+          <i class="fa-solid fa-download"></i>
+          Download Selected Files
+        </button>
 
-          <button
-            type="button"
-            class="btn btn-outline"
-            :disabled="selectedIds.length === 0"
-            @click="printSelected"
-          >
-            <i class="fa-solid fa-print"></i>
-            Print Selected
-          </button>
+        <button
+          type="button"
+          class="btn btn-outline"
+          :disabled="selectedIds.length === 0"
+          @click="printSelected"
+        >
+          <i class="fa-solid fa-print"></i>
+          Print Selected
+        </button>
 
-          <button
-            type="button"
-            class="btn btn-outline"
-            @click="fetchOrders()"
-          >
-            <i class="fa-solid fa-rotate-right"></i>
-            Refresh
-          </button>
-        </div>
+        <button
+          type="button"
+          class="btn btn-outline"
+          @click="fetchOrders()"
+        >
+          <i class="fa-solid fa-rotate-right"></i>
+          Refresh
+        </button>
       </div>
 
       <!-- TOOLBAR -->
@@ -531,12 +531,14 @@
 <script>
 import axios from 'axios'
 import AppLayout from '../layouts/AppLayout.vue'
+import PageHeader from '../layouts/PageHeader.vue'
 
 export default {
   name: 'ArtworkRequestsView',
 
   components: {
-    AppLayout
+    AppLayout,
+    PageHeader
   },
 
   data() {
@@ -565,6 +567,14 @@ export default {
   },
 
   computed: {
+    currentUser() {
+      try {
+        return JSON.parse(localStorage.getItem('user')) || {}
+      } catch {
+        return {}
+      }
+    },
+
     filteredOrders() {
       const query = String(this.search || '')
         .trim()
@@ -661,6 +671,10 @@ export default {
   },
 
   methods: {
+    openProfile() {
+      this.$router.push('/profile')
+    },
+
     headers() {
       return {
         Authorization:
@@ -1390,6 +1404,10 @@ export default {
   font-size: 10px;
   font-weight: 900;
   letter-spacing: .14em;
+}
+
+.header-actions {
+  margin: 14px 0 18px;
 }
 
 .page-head-actions {

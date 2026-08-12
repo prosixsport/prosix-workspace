@@ -12,7 +12,121 @@
   :user="currentUser"
   :photo="currentUser?.profile_photo_url"
   @profile="openProfile"
-/>
+>
+  <template #notifications>
+      <div
+        v-if="showChatNotificationMenu"
+        class="chat-notification-dropdown notification-center-dropdown"
+        @click.stop
+      >
+        <div class="chat-notification-head notification-center-head">
+          <div>
+            <strong>Notifications</strong>
+            <small>{{ totalBellNotificationCount }} unread</small>
+          </div>
+        </div>
+
+        <div class="notification-tabs">
+          <button
+            type="button"
+            :class="{ active: notificationTab === 'chats' }"
+            @click.stop="notificationTab = 'chats'"
+          >
+            <i class="fa-solid fa-comments"></i>
+            Chats
+            <span v-if="totalUnreadChatCount > 0">
+              {{ totalUnreadChatCount }}
+            </span>
+          </button>
+
+          <button
+            type="button"
+            :class="{ active: notificationTab === 'orders' }"
+            @click.stop="notificationTab = 'orders'"
+          >
+            <i class="fa-solid fa-folder-plus"></i>
+            Orders
+            <span v-if="unreadOrderNotificationCount > 0">
+              {{ unreadOrderNotificationCount }}
+            </span>
+          </button>
+        </div>
+
+        <div v-if="notificationTab === 'chats'" class="notification-list">
+          <button
+            v-for="order in unreadChatOrders"
+            :key="'chat-notification-' + order.id"
+            type="button"
+            class="chat-notification-item"
+            @click="openChatFromNotification(order)"
+          >
+            <span class="chat-notification-icon">
+              <i class="fa-solid fa-comments"></i>
+            </span>
+
+            <span class="chat-notification-content">
+              <strong>{{ order.name }}</strong>
+              <small>
+                {{ order.last_message_sender || 'New message' }}
+                <template v-if="order.last_message_text">
+                  · {{ shortLastMessage(order.last_message_text) }}
+                </template>
+              </small>
+            </span>
+
+            <span class="chat-notification-badge">
+              {{ order.unread_chat_count }}
+            </span>
+          </button>
+
+          <div
+            v-if="unreadChatOrders.length === 0"
+            class="chat-notification-empty"
+          >
+            <i class="fa-regular fa-comment-dots"></i>
+            No unread chats
+          </div>
+        </div>
+
+        <div v-else class="notification-list">
+          <button
+            v-for="order in unreadOrderNotifications"
+            :key="'order-notification-' + order.id"
+            type="button"
+            class="chat-notification-item order-notification-item"
+            @click="openOrderFromNotification(order)"
+          >
+            <span class="chat-notification-icon order-notification-icon">
+              <i class="fa-solid fa-folder-plus"></i>
+            </span>
+
+            <span class="chat-notification-content">
+              <strong>{{ order.name }}</strong>
+              <small>
+                New order
+                <template v-if="order.po">
+                  · {{ order.po }}
+                </template>
+                <template v-if="order.created_at">
+                  · {{ notificationTime(order.created_at) }}
+                </template>
+              </small>
+            </span>
+
+            <span class="order-notification-new-dot"></span>
+          </button>
+
+          <div
+            v-if="unreadOrderNotifications.length === 0"
+            class="chat-notification-empty"
+          >
+            <i class="fa-regular fa-folder-open"></i>
+            No new order notifications
+          </div>
+        </div>
+      </div>
+  </template>
+</PageHeader>
 
     <!-- STATUS NAVIGATION -->
     <section class="board-toolbar">
@@ -120,138 +234,6 @@
       </div>
 
       <div class="board-toolbar-actions">
-        <!-- CHAT + NEW ORDER NOTIFICATIONS -->
-        <div v-show="!detailOpen" class="chat-notification-wrap" @click.stop>
-          <button
-            type="button"
-            class="chat-notification-button"
-            title="Notifications"
-            @click="toggleNotificationMenu"
-          >
-            <i class="fa-solid fa-bell"></i>
-
-            <span
-              v-if="totalBellNotificationCount > 0"
-              class="chat-notification-count"
-            >
-              {{ totalBellNotificationCount > 99 ? '99+' : totalBellNotificationCount }}
-            </span>
-          </button>
-
-          <div
-            v-if="showChatNotificationMenu"
-            class="chat-notification-dropdown notification-center-dropdown"
-          >
-            <div class="chat-notification-head notification-center-head">
-              <div>
-                <strong>Notifications</strong>
-                <small>{{ totalBellNotificationCount }} unread</small>
-              </div>
-            </div>
-
-            <div class="notification-tabs">
-              <button
-                type="button"
-                :class="{ active: notificationTab === 'chats' }"
-                @click.stop="notificationTab = 'chats'"
-              >
-                <i class="fa-solid fa-comments"></i>
-                Chats
-                <span v-if="totalUnreadChatCount > 0">
-                  {{ totalUnreadChatCount }}
-                </span>
-              </button>
-
-              <button
-                type="button"
-                :class="{ active: notificationTab === 'orders' }"
-                @click.stop="notificationTab = 'orders'"
-              >
-                <i class="fa-solid fa-folder-plus"></i>
-                Orders
-                <span v-if="unreadOrderNotificationCount > 0">
-                  {{ unreadOrderNotificationCount }}
-                </span>
-              </button>
-            </div>
-
-            <!-- CHAT NOTIFICATIONS -->
-            <div v-if="notificationTab === 'chats'" class="notification-list">
-              <button
-                v-for="order in unreadChatOrders"
-                :key="'chat-notification-' + order.id"
-                type="button"
-                class="chat-notification-item"
-                @click="openChatFromNotification(order)"
-              >
-                <span class="chat-notification-icon">
-                  <i class="fa-solid fa-comments"></i>
-                </span>
-
-                <span class="chat-notification-content">
-                  <strong>{{ order.name }}</strong>
-                  <small>
-                    {{ order.last_message_sender || 'New message' }}
-                    <template v-if="order.last_message_text">
-                      · {{ shortLastMessage(order.last_message_text) }}
-                    </template>
-                  </small>
-                </span>
-
-                <span class="chat-notification-badge">
-                  {{ order.unread_chat_count }}
-                </span>
-              </button>
-
-              <div
-                v-if="unreadChatOrders.length === 0"
-                class="chat-notification-empty"
-              >
-                <i class="fa-regular fa-comment-dots"></i>
-                No unread chats
-              </div>
-            </div>
-
-            <!-- NEW / UNOPENED ORDER NOTIFICATIONS -->
-            <div v-else class="notification-list">
-              <button
-                v-for="order in unreadOrderNotifications"
-                :key="'order-notification-' + order.id"
-                type="button"
-                class="chat-notification-item order-notification-item"
-                @click="openOrderFromNotification(order)"
-              >
-                <span class="chat-notification-icon order-notification-icon">
-                  <i class="fa-solid fa-folder-plus"></i>
-                </span>
-
-                <span class="chat-notification-content">
-                  <strong>{{ order.name }}</strong>
-                  <small>
-                    New order
-                    <template v-if="order.po">
-                      · {{ order.po }}
-                    </template>
-                    <template v-if="order.created_at">
-                      · {{ notificationTime(order.created_at) }}
-                    </template>
-                  </small>
-                </span>
-
-                <span class="order-notification-new-dot"></span>
-              </button>
-
-              <div
-                v-if="unreadOrderNotifications.length === 0"
-                class="chat-notification-empty"
-              >
-                <i class="fa-regular fa-folder-open"></i>
-                No new order notifications
-              </div>
-            </div>
-          </div>
-        </div>
-
         <button
           type="button"
           class="theme-toggle-button"
@@ -610,55 +592,39 @@
               </button>
 
               <div class="order-working-actions">
+                <!-- START WORK: ONLY FOR "IN PRODUCTION" STATUS -->
                 <button
-                  v-if="!workingDesigner(order)"
+                  v-if="isInProductionOrder(order) && !workingDesigner(order)"
                   type="button"
                   class="start-working-btn"
-                  title="Start Order"
-                  aria-label="Start Order"
+                  title="Start Work"
+                  aria-label="Start Work"
                   @click.stop="startWorking(order)"
                 >
                   <i class="fa-solid fa-play"></i>
                 </button>
 
-                <div
-                  v-else
-                  class="row-working-control"
+                <!-- AFTER START: ONLY USER IMAGE / AVATAR -->
+                <button
+                  v-else-if="isInProductionOrder(order) && workingDesigner(order)"
+                  type="button"
+                  class="working-user-avatar-only"
+                  :title="workingDesigner(order).name + ' is working'"
+                  @click.stop
                 >
-                  <div
-                    class="row-working-user"
-                    :title="workingDesigner(order).name + ' is working'"
+                  <img
+                    v-if="workingDesigner(order).profile_photo_url"
+                    :src="workingDesigner(order).profile_photo_url"
+                    :alt="workingDesigner(order).name"
+                  />
+
+                  <span
+                    v-else
+                    class="row-working-avatar-fallback"
                   >
-                    <span class="row-working-live-dot"></span>
-
-                    <img
-                      v-if="workingDesigner(order).profile_photo_url"
-                      :src="workingDesigner(order).profile_photo_url"
-                      :alt="workingDesigner(order).name"
-                    />
-
-                    <span
-                      v-else
-                      class="row-working-avatar-fallback"
-                    >
-                      {{ initial(workingDesigner(order).name) }}
-                    </span>
-
-                    <strong>{{ workingDesigner(order).name }}</strong>
-                    <small>working</small>
-                  </div>
-
-                  <button
-                    v-if="isSuperAdmin"
-                    type="button"
-                    class="superadmin-stop-working-btn"
-                    title="Stop Work - Super Admin Only"
-                    aria-label="Stop Work"
-                    @click.stop="stopWorking(order)"
-                  >
-                    <i class="fa-solid fa-stop"></i>
-                  </button>
-                </div>
+                    {{ initial(workingDesigner(order).name) }}
+                  </span>
+                </button>
               </div>
             </div>
           </div>
@@ -3003,6 +2969,9 @@ beforeUnmount()  {
     async startWorking(order) {
       if (!order?.id) return
 
+      // Start button should work ONLY while this order is In Production.
+      if (!this.isInProductionOrder(order)) return
+
       try {
         const response = await axios.post(
           `/api/orders/${order.id}/claim`,
@@ -3012,6 +2981,10 @@ beforeUnmount()  {
           }
         )
 
+        // Mark ONLY this exact order as started on this browser/user.
+        this.markOrderWorkStarted(order.id)
+
+        order.work_started = true
         order.working_by =
           response.data?.working_by ||
           response.data?.user ||
@@ -3054,6 +3027,8 @@ beforeUnmount()  {
           }
         )
 
+        this.clearOrderWorkStarted(order.id)
+        order.work_started = false
         order.working_by = null
         await this.fetchOrders()
       } catch (error) {
@@ -3066,8 +3041,69 @@ beforeUnmount()  {
       }
     },
 
+    isInProductionOrder(order) {
+      const status = String(order?.status || '')
+        .trim()
+        .toLowerCase()
+        .replace(/[_-]+/g, ' ')
+        .replace(/\s+/g, ' ')
+
+      return status === 'in production'
+    },
+
+    getStartedWorkOrderIds() {
+      try {
+        const raw = localStorage.getItem('factory_started_work_order_ids')
+        const ids = raw ? JSON.parse(raw) : []
+        return Array.isArray(ids) ? ids.map(Number) : []
+      } catch (error) {
+        return []
+      }
+    },
+
+    markOrderWorkStarted(orderId) {
+      const id = Number(orderId)
+      if (!id) return
+
+      const ids = this.getStartedWorkOrderIds()
+      if (!ids.includes(id)) ids.push(id)
+
+      localStorage.setItem(
+        'factory_started_work_order_ids',
+        JSON.stringify(ids)
+      )
+    },
+
+    clearOrderWorkStarted(orderId) {
+      const id = Number(orderId)
+      const ids = this.getStartedWorkOrderIds().filter(item => item !== id)
+
+      localStorage.setItem(
+        'factory_started_work_order_ids',
+        JSON.stringify(ids)
+      )
+    },
+
+    hasOrderWorkStarted(order) {
+      if (!order?.id) return false
+
+      // Explicit backend flags are supported when available.
+      const backendStarted =
+        order.work_started === true ||
+        order.is_working === true ||
+        order.work_session_active === true ||
+        Boolean(order.working_started_at)
+
+      if (backendStarted) return true
+
+      // IMPORTANT: working_by alone is NOT enough, because some API responses
+      // may populate it when status changes to In Production.
+      return this.getStartedWorkOrderIds().includes(Number(order.id))
+    },
+
     workingDesigner(order) {
-      return order?.working_by || null
+      if (!this.hasOrderWorkStarted(order)) return null
+      return order?.working_by || this.currentUser || null
     },
 
     async claimOrder(order) {
@@ -3082,6 +3118,8 @@ beforeUnmount()  {
           }
         )
 
+        this.markOrderWorkStarted(order.id)
+        order.work_started = true
         order.working_by =
           response.data?.working_by ||
           response.data?.user ||
@@ -3108,6 +3146,8 @@ beforeUnmount()  {
           }
         )
 
+        this.clearOrderWorkStarted(order.id)
+        order.work_started = false
         order.working_by = null
       } catch (error) {
         console.error('Release order error:', error)
@@ -7300,6 +7340,15 @@ async fetchClients() {
          * order_work_sessions table se aata hai.
          */
         working_by: order.working_by || null,
+        work_started:
+          order.work_started === true ||
+          order.is_working === true ||
+          order.work_session_active === true ||
+          Boolean(order.working_started_at) ||
+          this.getStartedWorkOrderIds().includes(Number(order.id)),
+        is_working: order.is_working === true,
+        work_session_active: order.work_session_active === true,
+        working_started_at: order.working_started_at || null,
 
         /*
          * Order creator backend se creator relation ke naam se aaye.
@@ -16049,7 +16098,7 @@ body.board-column-resizing .column-resizer::before {
 .factory-board-page .board-col-name {
   position: relative !important;
 
-  padding: 5px 145px 5px 14px !important;
+  padding: 5px 48px 5px 14px !important;
 
   display: flex !important;
   align-items: center !important;
@@ -16164,22 +16213,23 @@ body.board-column-resizing .column-resizer::before {
 .factory-board-page .board-col-name .order-working-actions {
   position: absolute !important;
 
-  right: 8px !important;
+  right: 7px !important;
   top: 50% !important;
 
   transform: translateY(-50%) !important;
 
-  width: 128px !important;
-  height: 30px !important;
+  width: 34px !important;
+  min-width: 34px !important;
+  height: 34px !important;
 
   display: flex !important;
   align-items: center !important;
-  justify-content: flex-end !important;
+  justify-content: center !important;
 
   margin: 0 !important;
   padding: 0 !important;
 
-  overflow: hidden !important;
+  overflow: visible !important;
 
   z-index: 6 !important;
 }
@@ -18744,6 +18794,136 @@ body.board-column-resizing .column-resizer::before {
 .superadmin-stop-working-btn:hover {
   background: #ffffff !important;
   color: #111827 !important;
+}
+
+
+
+/* In Production: after Start Work show only working user's avatar */
+.working-user-avatar-only {
+  width: 34px;
+  height: 34px;
+  min-width: 34px;
+  padding: 0;
+  border: 0;
+  border-radius: 50%;
+  overflow: hidden;
+  background: #f3f4f6;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: default;
+  box-shadow: 0 0 0 2px #fff, 0 0 0 3px rgba(0, 0, 0, 0.08);
+}
+
+.working-user-avatar-only img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+
+.working-user-avatar-only .row-working-avatar-fallback {
+  width: 100%;
+  height: 100%;
+  border-radius: 50%;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 12px;
+  font-weight: 800;
+  line-height: 1;
+}
+
+
+
+/* =========================================================
+   FINAL ORDER NAME + WORKER AVATAR FIX
+   Keep order name visible right up to the worker avatar.
+   No large empty/white reserved area.
+   ========================================================= */
+.factory-board-page .board-table-row > .board-col-name {
+  padding-left: 14px !important;
+  padding-right: 48px !important;
+}
+
+.factory-board-page .board-col-name .inline-cell-wrap,
+.factory-board-page .board-col-name .name-value {
+  width: 100% !important;
+  max-width: 100% !important;
+  min-width: 0 !important;
+}
+
+.factory-board-page .board-col-name .name-value > strong,
+.factory-board-page .board-col-name .name-value > small {
+  width: 100% !important;
+  max-width: 100% !important;
+  min-width: 0 !important;
+}
+
+.factory-board-page .board-col-name .order-working-actions {
+  right: 7px !important;
+  width: 34px !important;
+  min-width: 34px !important;
+  max-width: 34px !important;
+  height: 34px !important;
+  overflow: visible !important;
+}
+
+.factory-board-page .board-col-name .working-user-avatar-only {
+  width: 30px !important;
+  height: 30px !important;
+  min-width: 30px !important;
+  max-width: 30px !important;
+  padding: 0 !important;
+  margin: 0 !important;
+  border-radius: 50% !important;
+  overflow: hidden !important;
+  flex: 0 0 30px !important;
+}
+
+.factory-board-page .board-col-name .working-user-avatar-only img {
+  width: 30px !important;
+  height: 30px !important;
+  min-width: 30px !important;
+  object-fit: cover !important;
+  border-radius: 50% !important;
+}
+
+.factory-board-page .board-col-name .working-user-avatar-only .row-working-avatar-fallback {
+  width: 30px !important;
+  height: 30px !important;
+  min-width: 30px !important;
+  border-radius: 50% !important;
+}
+
+.factory-board-page .board-col-name .start-working-btn {
+  width: 28px !important;
+  height: 28px !important;
+  min-width: 28px !important;
+  max-width: 28px !important;
+  margin: 0 !important;
+}
+
+
+
+/* =========================================================
+   PAGE HEADER NOTIFICATION DROPDOWN
+   ========================================================= */
+.factory-board-page .page-header-notification-slot .chat-notification-dropdown {
+  position: absolute !important;
+  top: calc(100% + 10px) !important;
+  right: 0 !important;
+  left: auto !important;
+  width: min(390px, calc(100vw - 32px)) !important;
+  z-index: 99999 !important;
+  margin: 0 !important;
+}
+
+@media (max-width: 780px) {
+  .factory-board-page .page-header-notification-slot .chat-notification-dropdown {
+    right: -58px !important;
+    width: min(360px, calc(100vw - 24px)) !important;
+  }
 }
 
 </style>

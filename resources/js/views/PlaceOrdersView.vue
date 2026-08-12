@@ -1,37 +1,14 @@
 <template>
   <AppLayout>
     <div class="place-orders-page">
-    <header class="page-head">
-      <div>
-        <p class="eyebrow">Prosix CRM</p>
-        <h1>Place Orders</h1>
-        <span>Manage customer orders and production files.</span>
-      </div>
+      <PageHeader
+        title="Place Orders"
+        subtitle="Manage customer orders and production files."
+        :user="currentUser"
+        :photo="currentUser?.profile_photo_url"
+        @profile="openProfile"
+      />
 
-      <div class="top-actions">
-        <div class="search-box">
-          <i class="fa-solid fa-magnifying-glass"></i>
-          <input
-            v-model="search"
-            type="text"
-            placeholder="Search orders..."
-          />
-        </div>
-
-        <button
-          type="button"
-          class="print-selected-btn"
-          :disabled="selectedIds.length === 0"
-          @click="printSelected"
-        >
-          <i class="fa-solid fa-print"></i>
-          Print Selected
-          <span v-if="selectedIds.length">
-            {{ selectedIds.length }}
-          </span>
-        </button>
-      </div>
-    </header>
 
     <section class="filters-bar">
       <div class="tabs">
@@ -736,12 +713,14 @@
 <script>
 import axios from 'axios'
 import AppLayout from '../layouts/AppLayout.vue'
+import PageHeader from '../layouts/PageHeader.vue'
 
 export default {
   name: 'PlaceOrdersView',
 
   components: {
-    AppLayout
+    AppLayout,
+    PageHeader
   },
 
   data() {
@@ -906,6 +885,11 @@ export default {
   },
 
   methods: {
+    openProfile() {
+      if (this.$route?.path === '/profile') return
+      this.$router.push('/profile')
+    },
+
     headers() {
       return {
         Authorization: `Bearer ${localStorage.getItem('token')}`,

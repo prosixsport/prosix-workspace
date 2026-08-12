@@ -2,51 +2,13 @@
   <AppLayout>
     <div class="teamstore-page">
     <main class="main-content">
-      <!-- Top header -->
-      <header class="topbar">
-        <div class="topbar-left">
-          <button
-            type="button"
-            class="back-button"
-            @click="$router.push('/dashboard')"
-          >
-            <i class="fa-solid fa-arrow-left"></i>
-          </button>
-
-          <div>
-            <p class="eyebrow">PROSIX TEAMSTORE</p>
-            <h1>TeamStore Orders</h1>
-            <span class="page-subtitle">
-              Category-wise orders received from TeamStore
-            </span>
-          </div>
-        </div>
-
-        <div class="topbar-actions">
-          <button
-            type="button"
-            class="manage-status-button"
-            @click="statusManagerOpen = true"
-          >
-            <i class="fa-solid fa-sliders"></i>
-            Manage Statuses
-          </button>
-
-          <label class="search-box">
-            <i class="fa-solid fa-magnifying-glass"></i>
-
-            <input
-              v-model="search"
-              type="search"
-              placeholder="Search order, customer, category..."
-            />
-          </label>
-
-          <span v-if="unreadCount > 0" class="new-count">
-            {{ unreadCount }} new
-          </span>
-        </div>
-      </header>
+      <PageHeader
+        title="TeamStore Orders"
+        subtitle="Category-wise orders received from TeamStore"
+        :user="currentUser"
+        :photo="currentUser?.profile_photo_url"
+        @profile="openProfile"
+      />
 
       <section class="workspace">
         <!-- =========================
@@ -971,12 +933,14 @@
 <script>
 import axios from 'axios'
 import AppLayout from '../layouts/AppLayout.vue'
+import PageHeader from '../layouts/PageHeader.vue'
 
 export default {
   name: 'TeamStoreOrdersView',
 
   components: {
-    AppLayout
+    AppLayout,
+    PageHeader
   },
 
   data() {
@@ -1281,6 +1245,10 @@ export default {
   },
 
   methods: {
+    openProfile() {
+      this.$router.push('/profile')
+    },
+
     headers() {
       return {
         Authorization:

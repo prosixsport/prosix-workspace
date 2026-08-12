@@ -8,13 +8,16 @@
                 {{ toast.text }}
             </div>
 
-            <!-- Header -->
-            <div class="members-header">
-                <div>
-                    <h4>Members</h4>
-                    <p>Manage Prosix team members and roles</p>
-                </div>
+            <!-- Shared Global Header -->
+            <PageHeader
+                title="Members"
+                subtitle="Manage Prosix team members and roles"
+                :user="currentUser"
+                :photo="currentUser?.profile_photo_url"
+                @profile="openProfile"
+            />
 
+            <div class="members-header-actions">
                 <button @click="openInviteModal" class="primary-btn">
                     <i class="fa-solid fa-user-plus"></i>
                     Invite Member
@@ -174,12 +177,13 @@
 
 <script>
 import AppLayout from '../layouts/AppLayout.vue'
+import PageHeader from '../layouts/PageHeader.vue'
 import axios from 'axios'
 
 export default {
     name: 'Members',
 
-    components: { AppLayout },
+    components: { AppLayout, PageHeader },
 
     data() {
         return {
@@ -200,11 +204,25 @@ export default {
         }
     },
 
+    computed: {
+        currentUser() {
+            try {
+                return JSON.parse(localStorage.getItem('user')) || {}
+            } catch (e) {
+                return {}
+            }
+        }
+    },
+
     mounted() {
         this.fetchMembers()
     },
 
     methods: {
+        openProfile() {
+            this.$router.push('/profile')
+        },
+
         headers() {
             return {
                 Authorization: `Bearer ${localStorage.getItem('token')}`
@@ -356,9 +374,16 @@ async deleteMember(id) {
 
 <style scoped>
 .members-page {
-    padding: 28px;
+    padding: 0 28px 28px;
     background: #f6f7fb;
     min-height: 100vh;
+}
+
+.members-header-actions {
+    display: flex;
+    justify-content: flex-end;
+    align-items: center;
+    margin: 14px 0 18px;
 }
 
 /* Header */
@@ -674,7 +699,9 @@ async deleteMember(id) {
    MOBILE RESPONSIVE
    =========================== */
 @media (max-width: 768px) {
-    .members-page { padding: 16px; }
+    .members-page { padding: 0 16px 16px; }
+    .members-header-actions { margin: 12px 0 16px; }
+    .members-header-actions .primary-btn { width: 100%; }
 
     .members-header {
         flex-direction: column;
