@@ -932,7 +932,7 @@
             </button>
 
             <div
-              v-if="status.custom"
+              v-if="canManageStatusOption(status)"
               class="monday-status-actions"
             >
               <button
@@ -2572,7 +2572,7 @@ watch: {
 },
 
 async mounted() {
-  this.loadCustomStatuses()
+  this.loadSavedStatusOptions()
   this.loadBoardGroups()
   this.loadDefaultBoardGroupOverrides()
   await Promise.all([
@@ -6164,7 +6164,7 @@ body.board-column-resizing .column-resizer::before {
     },
 
     startRowStatusEdit(status) {
-      if (!status?.custom) return
+      if (!status?.label) return
 
       this.rowStatusEditingLabel = status.label
       this.rowStatusEditName = status.label
@@ -6178,7 +6178,7 @@ body.board-column-resizing .column-resizer::before {
     },
 
     async saveRowStatusEdit(status) {
-      if (!status?.custom) return
+      if (!status?.label) return
 
       const oldLabel = String(status.label || '').trim()
       const newLabel = String(this.rowStatusEditName || '').trim()
@@ -6206,22 +6206,9 @@ body.board-column-resizing .column-resizer::before {
 
       status.label = newLabel
       status.color = newColor
-      status.custom = true
 
-      const customOnly = this.statusOptions
-        .filter(item => item.custom)
-        .map(item => ({
-          label: item.label,
-          color: item.color,
-          group: item.group || 'in_production',
-          groupLabel: item.groupLabel || 'In Production',
-          custom: true
-        }))
-
-      localStorage.setItem(
-        'custom_order_statuses',
-        JSON.stringify(customOnly)
-      )
+      // Save ALL statuses, including the built-in/default ones.
+      this.saveAllStatusOptions()
 
       // Keep already-loaded orders in sync and persist them.
       affectedOrders.forEach(order => {
@@ -6264,7 +6251,7 @@ body.board-column-resizing .column-resizer::before {
     },
 
     async deleteRowCustomStatus(status) {
-      if (!status?.custom) return
+      if (!status?.label) return
 
       const label = String(status.label || '').trim()
 
@@ -6280,20 +6267,8 @@ body.board-column-resizing .column-resizer::before {
         item => item !== status
       )
 
-      const customOnly = this.statusOptions
-        .filter(item => item.custom)
-        .map(item => ({
-          label: item.label,
-          color: item.color,
-          group: item.group || 'in_production',
-          groupLabel: item.groupLabel || 'In Production',
-          custom: true
-        }))
-
-      localStorage.setItem(
-        'custom_order_statuses',
-        JSON.stringify(customOnly)
-      )
+      // Persist deletion for built-in and custom statuses.
+      this.saveAllStatusOptions()
 
       if (this.rowStatusEditingLabel === label) {
         this.cancelRowStatusEdit()
@@ -6819,31 +6794,188 @@ alert(e.response?.data?.message || 'Orders were not deleted')
       this.mobileLeftOpen = false
     },
 
-    loadCustomStatuses() {
+    canManageStatusOption(status) {
+      return Boolean(status?.label)
+    },
+
+    loadSavedStatusOptions() {
       try {
-        const saved = JSON.parse(localStorage.getItem('custom_order_statuses') || '[]')
-        saved.forEach(item => {
-          if (item?.label && !this.statusOptions.some(s => s.label === item.label)) {
-            this.statusOptions.push({ label: item.label, color: item.color || '#6161ff', group: item.group || 'in_production', groupLabel: item.groupLabel || 'In Production', custom: true })
-          }
-        })
-      } catch (e) { console.error('loadCustomStatuses error:', e) }
+        /*
+         * New storage contains the complete status list:
+         * built-in/default + custom statuses.
+         */
+        const savedAll = JSON.parse(
+          localStorage.getItem('factory_order_status_options') || '[]'
+        )
+
+        if (Array.isArray(savedAll) && savedAll.length) {
+          this.statusOptions = savedAll
+            .filter(item => item?.label)
+            .map(item => ({
+              label: String(item.label || '').trim(),
+              color: item.color || '#6161ff',
+              group: item.group || 'in_production',
+              groupLabel: item.groupLabel || 'In Production',
+              custom: item.custom === true
+            }))
+
+          return
+        }
+
+        /*
+         * Backward compatibility:
+         * old custom statuses are merged into the current default list.
+         */
+        const legacyCustom = JSON.parse(
+          localStorage.getItem('custom_order_statuses') || '[]'
+        )
+
+        if (Array.isArray(legacyCustom)) {
+          legacyCustom.forEach(item => {
+            if (
+              item?.label &&
+              !this.statusOptions.some(
+                status =>
+                  String(status.label || '').trim().toLowerCase() ===
+                  String(item.label || '').trim().toLowerCase()
+              )
+            ) {
+              this.statusOptions.push({
+                label: item.label,
+                color: item.color || '#6161ff',
+                group: item.group || 'in_production',
+                groupLabel: item.groupLabel || 'In Production',
+                custom: true
+              })
+            }
+          })
+        }
+
+        this.saveAllStatusOptions()
+      } catch (error) {
+        console.error('loadSavedStatusOptions error:', error)
+      }
+    },
+
+    saveAllStatusOptions() {
+      const clean = (this.statusOptions || [])
+        .filter(item => item?.label)
+        .map(item => ({
+          label: String(item.label || '').trim(),
+          color: item.color || '#6161ff',
+          group: item.group || 'in_production',
+          groupLabel: item.groupLabel || 'In Production',
+          custom: item.custom === true
+        }))
+
+      localStorage.setItem(
+        'factory_order_status_options',
+        JSON.stringify(clean)
+      )
+
+      /*
+       * Keep old custom storage too so any older code still works.
+       */
+      localStorage.setItem(
+        'custom_order_statuses',
+        JSON.stringify(
+          clean
+            .filter(item => item.custom)
+            .map(item => ({
+              ...item,
+              custom: true
+            }))
+        )
+      )
     },
 
     saveCustomStatusOption(status) {
       if (!status?.label) return
-      const existsIndex = this.statusOptions.findIndex(s => s.label === status.label)
-      if (existsIndex === -1) this.statusOptions.push(status)
-      else this.statusOptions.splice(existsIndex, 1, { ...this.statusOptions[existsIndex], ...status })
-      const customOnly = this.statusOptions.filter(s => s.custom).map(s => ({ label: s.label, color: s.color, group: s.group || 'in_production', groupLabel: s.groupLabel || 'In Production', custom: true }))
-      localStorage.setItem('custom_order_statuses', JSON.stringify(customOnly))
+
+      const existsIndex = this.statusOptions.findIndex(
+        item =>
+          String(item.label || '').trim().toLowerCase() ===
+          String(status.label || '').trim().toLowerCase()
+      )
+
+      const normalized = {
+        label: String(status.label || '').trim(),
+        color: status.color || '#6161ff',
+        group: status.group || 'in_production',
+        groupLabel: status.groupLabel || 'In Production',
+        custom: true
+      }
+
+      if (existsIndex === -1) {
+        this.statusOptions.push(normalized)
+      } else {
+        this.statusOptions.splice(
+          existsIndex,
+          1,
+          {
+            ...this.statusOptions[existsIndex],
+            ...normalized
+          }
+        )
+      }
+
+      this.saveAllStatusOptions()
     },
 
     async changeStatusOptionColor(status, color) {
-      if (!status) return
+      if (!status || !color) return
+
       status.color = color
-      if (status.custom) this.saveCustomStatusOption(status)
-      if (this.selectedOrder && this.selectedOrder.status === status.label) await this.changeStatus(status)
+
+      /*
+       * Save color even for built-in statuses such as:
+       * Pending, Designing, In Production, Completed, Shipped, Delivered.
+       */
+      this.saveAllStatusOptions()
+
+      const affectedOrders = this.orders.filter(
+        order =>
+          String(order.status || '').trim().toLowerCase() ===
+          String(status.label || '').trim().toLowerCase()
+      )
+
+      affectedOrders.forEach(order => {
+        order.statusColor = color
+      })
+
+      if (
+        this.rowStatusMenuOrder &&
+        String(this.rowStatusMenuOrder.status || '').trim().toLowerCase() ===
+          String(status.label || '').trim().toLowerCase()
+      ) {
+        this.rowStatusMenuOrder.statusColor = color
+      }
+
+      if (
+        this.selectedOrder &&
+        String(this.selectedOrder.status || '').trim().toLowerCase() ===
+          String(status.label || '').trim().toLowerCase()
+      ) {
+        this.selectedOrder.statusColor = color
+      }
+
+      /*
+       * Persist the new color to orders already using this status.
+       */
+      await Promise.allSettled(
+        affectedOrders.map(order =>
+          axios.put(
+            `/api/orders/${order.id}`,
+            {
+              status: order.status,
+              status_color: color
+            },
+            {
+              headers: this.headers()
+            }
+          )
+        )
+      )
     },
 
     selectAllMembers() { this.newOrder.selectedMembers = [...this.availableMembers] },
@@ -9618,7 +9750,7 @@ grid-template-columns: 32px 1fr 118px 38px;
   white-space: nowrap;
 }
 
-.payment-chip-paid { background: #e9f3ff; color: #0073ea; }
+.payment-chip-paid { background: #dcfce7; color: #15803d; }
 .payment-chip-received { background: #e8fff3; color: #00a86b; }
 .payment-chip-balance { background: #fff4e5; color: #d97706; }
 
@@ -10990,8 +11122,11 @@ grid-template-columns: 32px 1fr 118px 38px;
 .payment-input-inline {
   min-width: 90px;
   border-radius: 999px;
-  background: #ffeb58;
+  background: #dcfce7;
+  color: #15803d;
+  border-color: #86efac;
   text-align: center;
+  font-weight: 800;
 }
 
 .board-avatar-add {
@@ -18924,6 +19059,40 @@ body.board-column-resizing .column-resizer::before {
     right: -58px !important;
     width: min(360px, calc(100vw - 24px)) !important;
   }
+}
+
+
+
+/* =========================================================
+   FINAL STATUS MANAGER + GREEN PAYMENT UPDATE
+   ========================================================= */
+
+/* Edit/Delete controls are available for default and custom statuses. */
+.monday-status-actions {
+  display: flex !important;
+  align-items: center !important;
+  gap: 4px !important;
+  flex: 0 0 auto !important;
+}
+
+/* Payment labels/pills are green instead of yellow. */
+.factory-board-page .payment-input-inline {
+  background: #dcfce7 !important;
+  color: #15803d !important;
+  border-color: #86efac !important;
+}
+
+.factory-board-page .payment-input-inline:hover,
+.factory-board-page .payment-input-inline:focus {
+  background: #ecfdf5 !important;
+  color: #166534 !important;
+  border-color: #4ade80 !important;
+  box-shadow: 0 0 0 3px rgba(34, 197, 94, .12) !important;
+}
+
+.factory-board-page .payment-chip-paid {
+  background: #dcfce7 !important;
+  color: #15803d !important;
 }
 
 </style>
