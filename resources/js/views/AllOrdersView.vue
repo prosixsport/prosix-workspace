@@ -1136,6 +1136,68 @@
           </div>
         </div>
 
+        <!-- SEARCH ANY ORDER FROM INSIDE DETAIL PAGE -->
+        <div class="detail-order-search" @click.stop>
+          <i class="fa-solid fa-magnifying-glass detail-order-search-icon"></i>
+
+          <input
+            v-model="detailSearchOrder"
+            type="text"
+            placeholder="Search another order..."
+            autocomplete="off"
+            @focus="detailSearchOpen = true"
+            @input="detailSearchOpen = true"
+            @keydown.enter.prevent="openFirstDetailSearchResult"
+            @keydown.esc.prevent="detailSearchOpen = false"
+          />
+
+          <button
+            v-if="detailSearchOrder"
+            type="button"
+            class="detail-order-search-clear"
+            title="Clear search"
+            @click.stop="clearDetailOrderSearch"
+          >
+            <i class="fa-solid fa-xmark"></i>
+          </button>
+
+          <div
+            v-if="detailSearchOpen && detailSearchOrder.trim()"
+            class="detail-order-search-dropdown"
+          >
+            <button
+              v-for="order in detailSearchResults"
+              :key="'detail-search-' + order.id"
+              type="button"
+              class="detail-order-search-item"
+              :class="{ active: Number(order.id) === Number(selectedOrder?.id) }"
+              @click.stop="openDetailSearchOrder(order)"
+            >
+              <span class="detail-search-folder">
+                <i class="fa-solid fa-folder"></i>
+              </span>
+
+              <span class="detail-search-copy">
+                <strong>{{ order.name }}</strong>
+                <small>
+                  {{ order.po || 'No PO' }}
+                  <template v-if="order.status"> · {{ order.status }}</template>
+                </small>
+              </span>
+
+              <i class="fa-solid fa-arrow-right detail-search-arrow"></i>
+            </button>
+
+            <div
+              v-if="detailSearchResults.length === 0"
+              class="detail-order-search-empty"
+            >
+              <i class="fa-regular fa-folder-open"></i>
+              No matching order found
+            </div>
+          </div>
+        </div>
+
         <!-- WHO STARTED THIS ORDER -->
         <div
           v-if="workingDesigner(selectedOrder)"
@@ -2227,6 +2289,8 @@ export default {
       notificationCount: 0,
       lastNotificationId: null,
       searchOrder: '',
+      detailSearchOrder: '',
+      detailSearchOpen: false,
       selectedClient: '',
       selectedOrders: [],
       selectAll: false,
@@ -2395,6 +2459,38 @@ canEditWorkflowFields() {
       try { const user = JSON.parse(raw); return user?.name ? user.name.charAt(0).toUpperCase() : 'A' } catch { return 'A' }
     },
     userPhoto() { return this.currentUser?.profile_photo_url || null },
+
+    detailSearchResults() {
+      const query = String(this.detailSearchOrder || '')
+        .trim()
+        .toLowerCase()
+
+      if (!query) return []
+
+      return this.orders
+        .filter(order => {
+          const searchable = [
+            order.name,
+            order.po,
+            order.status,
+            order.shippingAddress,
+            order.trk
+          ]
+            .filter(Boolean)
+            .join(' ')
+            .toLowerCase()
+
+          return searchable.includes(query)
+        })
+        .sort((a, b) =>
+          String(a.name || '').localeCompare(String(b.name || ''), 'en', {
+            sensitivity: 'base',
+            numeric: true
+          })
+        )
+        .slice(0, 8)
+    },
+
 filteredOrders() {
   return this.orders
     .filter(o => {
@@ -2652,7 +2748,7 @@ async mounted() {
 
   if (foundOrder) {
     this.activeGroup = foundOrder.group
-    await this.selectOrder(foundOrder)
+    await this.openBoardOrder(foundOrder)
 
     if (openChat == 1) {
       this.showChat = true
@@ -6107,6 +6203,40 @@ body.board-column-resizing .column-resizer::before {
       }
     },
 
+    clearDetailOrderSearch() {
+      this.detailSearchOrder = ''
+      this.detailSearchOpen = false
+    },
+
+    async openFirstDetailSearchResult() {
+      const first = this.detailSearchResults[0]
+      if (!first) return
+      await this.openDetailSearchOrder(first)
+    },
+
+    async openDetailSearchOrder(order) {
+      if (!order) return
+
+      this.detailSearchOpen = false
+      this.detailSearchOrder = ''
+      this.activeGroup = order.group || this.activeGroup
+      this.activeSectionCollapsed = false
+
+      // Keep the selected order in the URL without leaving this page.
+      if (Number(this.$route.query.order_id) !== Number(order.id)) {
+        this.$router.replace({
+          path: this.$route.path,
+          query: {
+            ...this.$route.query,
+            order_id: order.id,
+            open_chat: undefined
+          }
+        }).catch(() => {})
+      }
+
+      await this.openBoardOrder(order)
+    },
+
     async openBoardOrder(order) {
       if (!order) return
 
@@ -8427,6 +8557,7 @@ async onFileChange(event, card) {
       this.packingEditOrderId = null
       this.packingEditValue = ''
       this.openOrderMenuId = null
+      this.detailSearchOpen = false
     },
 
     startResize() {
@@ -20885,6 +21016,191 @@ body.board-column-resizing .column-resizer::before {
 
   .factory-board-page .board-table-shell .board-table-head {
     top: 54px !important;
+  }
+}
+
+
+
+/* =========================================================
+   DETAIL HEADER ORDER SEARCH
+   Search any order while the order detail page is open.
+========================================================= */
+.detail-order-search {
+  position: relative;
+  width: clamp(220px, 24vw, 360px);
+  min-width: 220px;
+  flex: 0 1 360px;
+  z-index: 70020;
+}
+
+.detail-order-search > input {
+  width: 100%;
+  height: 40px;
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  background: rgba(255, 255, 255, 0.09);
+  color: #fff;
+  border-radius: 8px;
+  padding: 0 38px 0 38px;
+  outline: none;
+  font-size: 13px;
+  font-weight: 600;
+  transition: border-color .18s ease, background .18s ease, box-shadow .18s ease;
+}
+
+.detail-order-search > input::placeholder {
+  color: rgba(255, 255, 255, 0.62);
+}
+
+.detail-order-search > input:focus {
+  background: #fff;
+  color: #111827;
+  border-color: #fff;
+  box-shadow: 0 0 0 3px rgba(255, 255, 255, 0.12);
+}
+
+.detail-order-search > input:focus::placeholder {
+  color: #94a3b8;
+}
+
+.detail-order-search-icon {
+  position: absolute;
+  left: 13px;
+  top: 50%;
+  transform: translateY(-50%);
+  color: rgba(255, 255, 255, 0.72);
+  font-size: 13px;
+  pointer-events: none;
+  z-index: 2;
+}
+
+.detail-order-search:focus-within .detail-order-search-icon {
+  color: #64748b;
+}
+
+.detail-order-search-clear {
+  position: absolute;
+  right: 8px;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 27px;
+  height: 27px;
+  border: 0;
+  border-radius: 6px;
+  background: rgba(255, 255, 255, 0.12);
+  color: #fff;
+  display: grid;
+  place-items: center;
+  cursor: pointer;
+  z-index: 3;
+}
+
+.detail-order-search:focus-within .detail-order-search-clear {
+  background: #eef2f7;
+  color: #475569;
+}
+
+.detail-order-search-dropdown {
+  position: absolute;
+  top: calc(100% + 8px);
+  left: 0;
+  width: min(430px, 86vw);
+  max-height: 390px;
+  overflow-y: auto;
+  background: #fff;
+  border: 1px solid #e5e7eb;
+  border-radius: 10px;
+  box-shadow: 0 18px 45px rgba(15, 23, 42, 0.22);
+  padding: 6px;
+  z-index: 70030;
+}
+
+.detail-order-search-item {
+  width: 100%;
+  border: 0;
+  background: transparent;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  text-align: left;
+  padding: 10px;
+  border-radius: 8px;
+  cursor: pointer;
+  color: #0f172a;
+}
+
+.detail-order-search-item:hover,
+.detail-order-search-item.active {
+  background: #f1f5f9;
+}
+
+.detail-search-folder {
+  width: 34px;
+  height: 34px;
+  flex: 0 0 34px;
+  border-radius: 7px;
+  background: #111827;
+  color: #fff;
+  display: grid;
+  place-items: center;
+}
+
+.detail-search-copy {
+  min-width: 0;
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.detail-search-copy strong {
+  color: #0f172a;
+  font-size: 13px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.detail-search-copy small {
+  color: #64748b;
+  font-size: 11px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.detail-search-arrow {
+  color: #94a3b8;
+  font-size: 11px;
+}
+
+.detail-order-search-empty {
+  min-height: 90px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-direction: column;
+  gap: 8px;
+  color: #94a3b8;
+  font-size: 12px;
+}
+
+@media (max-width: 980px) {
+  .detail-order-search {
+    width: min(100%, 330px);
+    min-width: 190px;
+  }
+}
+
+@media (max-width: 700px) {
+  .detail-order-search {
+    order: 10;
+    flex: 1 0 100%;
+    width: 100%;
+    max-width: none;
+  }
+
+  .detail-order-search-dropdown {
+    width: 100%;
   }
 }
 
