@@ -99,6 +99,7 @@
                   <th>Products</th>
                   <th class="qty-col">Qty</th>
                   <th>Images</th>
+                  <th class="status-col">Status</th>
                   <th>Date</th>
                   <th class="actions-col">Actions</th>
                 </tr>
@@ -176,6 +177,22 @@
                         @error="hideBrokenImage"
                       />
                     </div>
+                  </td>
+
+                  <td class="status-col">
+                    <select
+                      class="status-select"
+                      :class="statusClass(order.status)"
+                      :value="String(order.status || 'pending').toLowerCase()"
+                      :disabled="statusSavingId === Number(order.id)"
+                      @click.stop
+                      @change="updateArtworkStatus(order, $event.target.value)"
+                    >
+                      <option value="pending">Pending</option>
+                      <option value="processing">Processing</option>
+                      <option value="completed">Completed</option>
+                      <option value="cancelled">Cancelled</option>
+                    </select>
                   </td>
 
                   <td>
@@ -276,12 +293,18 @@
                 <p>{{ selectedOrder.email || '—' }}</p>
               </div>
 
-              <span
-                class="status-pill"
+              <select
+                class="detail-status-select status-pill"
                 :class="statusClass(selectedOrder.status)"
+                :value="String(selectedOrder.status || 'pending').toLowerCase()"
+                :disabled="statusSavingId === Number(selectedOrder.id)"
+                @change="updateArtworkStatus(selectedOrder, $event.target.value)"
               >
-                {{ capitalize(selectedOrder.status || 'pending') }}
-              </span>
+                <option value="pending">Pending</option>
+                <option value="processing">Processing</option>
+                <option value="completed">Completed</option>
+                <option value="cancelled">Cancelled</option>
+              </select>
             </div>
 
             <div class="detail-table">
@@ -551,6 +574,7 @@ export default {
       previewFile: null,
       search: '',
       activeStatus: 'all',
+      statusSavingId: null,
       syncTimer: null,
       prosixBaseUrl:
         import.meta.env.VITE_PROSIX_URL ||
@@ -798,6 +822,119 @@ export default {
         this.selectedIds.filter(
           id => !visibleSet.has(id)
         )
+    },
+
+    async updateArtworkStatus(order, newStatus) {
+      if (!order?.id || !newStatus) return
+
+      const orderId = Number(order.id)
+      const oldStatus = String(order.status || 'pending').toLowerCase()
+      const nextStatus = String(newStatus).toLowerCase()
+
+      if (oldStatus === nextStatus) return
+
+      this.statusSavingId = orderId
+
+      // Optimistic UI update
+      order.status = nextStatus
+
+      if (
+        this.selectedOrder &&
+        Number(this.selectedOrder.id) === orderId
+      ) {
+        this.selectedOrder.status = nextStatus
+      }
+
+      try {
+        /*
+         * IMPORTANT:
+         * This CRM endpoint should update the local record AND sync the same
+         * status to Prosix.com on the Laravel backend.
+         *
+         * Recommended backend route:
+         * PATCH /api/artwork-requests/{id}/status
+         */
+        const response = await axios.patch(
+          `/api/artwork-requests/${orderId}/status`,
+          {
+            status: nextStatus
+          },
+          {
+            headers: this.headers()
+          }
+        )
+
+        const updated =
+          response.data?.data ??
+          response.data?.artwork_request ??
+          response.data
+
+        if (updated && typeof updated === 'object') {
+          const index = this.orders.findIndex(
+            item => Number(item.id) === orderId
+          )
+
+          if (index !== -1) {
+            this.orders[index] = {
+              ...this.orders[index],
+              ...updated,
+              status: String(
+                updated.status || nextStatus
+              ).toLowerCase()
+            }
+          }
+
+          if (
+            this.selectedOrder &&
+            Number(this.selectedOrder.id) === orderId
+          ) {
+            this.selectedOrder = {
+              ...this.selectedOrder,
+              ...updated,
+              status: String(
+                updated.status || nextStatus
+              ).toLowerCase()
+            }
+          }
+        }
+
+        window.dispatchEvent(
+          new CustomEvent('artwork-request-status-updated', {
+            detail: {
+              id: orderId,
+              status: nextStatus
+            }
+          })
+        )
+      } catch (error) {
+        console.error(
+          'Artwork request status update error:',
+          error
+        )
+
+        // Roll back UI if backend/prosix sync failed
+        const index = this.orders.findIndex(
+          item => Number(item.id) === orderId
+        )
+
+        if (index !== -1) {
+          this.orders[index].status = oldStatus
+        }
+
+        if (
+          this.selectedOrder &&
+          Number(this.selectedOrder.id) === orderId
+        ) {
+          this.selectedOrder.status = oldStatus
+        }
+
+        alert(
+          error.response?.data?.message ||
+          'Status could not be updated on Prosix.'
+        )
+      } finally {
+        this.statusSavingId = null
+      }
     },
 
     statusCount(status) {
@@ -1600,6 +1737,66 @@ export default {
 .qty-col {
   width: 65px;
   text-align: center !important;
+}
+
+.status-col {
+  width: 145px;
+  min-width: 145px;
+}
+
+.status-select,
+.detail-status-select {
+  min-width: 120px;
+  height: 32px;
+  padding: 0 28px 0 10px;
+  border: 1px solid transparent;
+  border-radius: 999px;
+  outline: none;
+  font-size: 10px;
+  font-weight: 900;
+  cursor: pointer;
+  appearance: auto;
+}
+
+.status-select:disabled,
+.detail-status-select:disabled {
+  opacity: .6;
+  cursor: wait;
+}
+
+.detail-status-select {
+  min-width: 132px;
+  height: 34px;
+}
+
+.status-select.status-pending,
+.detail-status-select.status-pending {
+  background: #fef3c7;
+  color: #92400e;
+  border-color: #fde68a;
+}
+
+.status-select.status-processing,
+.detail-status-select.status-processing {
+  background: #dbeafe;
+  color: #1d4ed8;
+  border-color: #bfdbfe;
+}
+
+.status-select.status-completed,
+.detail-status-select.status-completed {
+  background: #dcfce7;
+  color: #166534;
+  border-color: #bbf7d0;
+}
+
+.status-select.status-cancelled,
+.status-select.status-canceled,
+.detail-status-select.status-cancelled,
+.detail-status-select.status-canceled {
+  background: #fee2e2;
+  color: #991b1b;
+  border-color: #fecaca;
 }
 
 .actions-col {

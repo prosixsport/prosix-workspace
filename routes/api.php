@@ -200,6 +200,11 @@ Route::middleware('auth:sanctum')->group(function () {
             'markRead'
         ]);
 
+        Route::patch('/{id}/status', [
+            ArtworkRequestController::class,
+            'updateStatus'
+        ]);
+
     });
 
     /*
