@@ -23,13 +23,26 @@ class Order extends Model
         'created_by',
         'shipping_address',
         'packing_detail',
+
+        // NEW
+        'custom_fields',
     ];
 
     protected $casts = [
         'ship_date' => 'date',
+
         'payment_received' => 'decimal:2',
         'payment_balance' => 'decimal:2',
+
+        // NEW
+        'custom_fields' => 'array',
     ];
+
+    /*
+    |--------------------------------------------------------------------------
+    | Members / Owners
+    |--------------------------------------------------------------------------
+    */
 
     public function members()
     {
@@ -41,20 +54,50 @@ class Order extends Model
             ->withTimestamps();
     }
 
+    /*
+    |--------------------------------------------------------------------------
+    | Order Members
+    |--------------------------------------------------------------------------
+    */
+
     public function orderMembers()
     {
-        return $this->hasMany(OrderMember::class);
+        return $this->hasMany(
+            OrderMember::class
+        );
     }
+
+    /*
+    |--------------------------------------------------------------------------
+    | Messages
+    |--------------------------------------------------------------------------
+    */
 
     public function messages()
     {
-        return $this->hasMany(OrderMessage::class);
+        return $this->hasMany(
+            OrderMessage::class
+        );
     }
+
+    /*
+    |--------------------------------------------------------------------------
+    | Files
+    |--------------------------------------------------------------------------
+    */
 
     public function files()
     {
-        return $this->hasMany(OrderFile::class);
+        return $this->hasMany(
+            OrderFile::class
+        );
     }
+
+    /*
+    |--------------------------------------------------------------------------
+    | Creator
+    |--------------------------------------------------------------------------
+    */
 
     public function creator()
     {
@@ -64,10 +107,24 @@ class Order extends Model
         );
     }
 
+    /*
+    |--------------------------------------------------------------------------
+    | Reads
+    |--------------------------------------------------------------------------
+    */
+
     public function reads()
     {
-        return $this->hasMany(OrderRead::class);
+        return $this->hasMany(
+            OrderRead::class
+        );
     }
+
+    /*
+    |--------------------------------------------------------------------------
+    | Clients
+    |--------------------------------------------------------------------------
+    */
 
     public function clients()
     {
@@ -77,11 +134,24 @@ class Order extends Model
         );
     }
 
+    /*
+    |--------------------------------------------------------------------------
+    | Activities
+    |--------------------------------------------------------------------------
+    */
+
     public function activities()
     {
-        return $this->hasMany(OrderActivity::class)
-            ->latest();
+        return $this->hasMany(
+            OrderActivity::class
+        )->latest();
     }
+
+    /*
+    |--------------------------------------------------------------------------
+    | Work Sessions
+    |--------------------------------------------------------------------------
+    */
 
     public function workSessions()
     {
@@ -89,6 +159,12 @@ class Order extends Model
             OrderWorkSession::class
         );
     }
+
+    /*
+    |--------------------------------------------------------------------------
+    | Active Work Session
+    |--------------------------------------------------------------------------
+    */
 
     public function activeWorkSession()
     {

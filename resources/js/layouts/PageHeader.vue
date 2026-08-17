@@ -18,6 +18,11 @@
 
     <!-- RIGHT SIDE -->
     <div class="page-header__right">
+      <!-- PAGE-SPECIFIC HEADER TOOLS (e.g. SELECT OWNER for Super Admin) -->
+      <div v-if="$slots.notifications" class="page-header__custom-tools" @click.stop>
+        <slot name="notifications"></slot>
+      </div>
+
       <!-- GLOBAL NOTIFICATION BELL -->
       <div class="page-header-notification-slot" @click.stop>
         <button
@@ -596,6 +601,16 @@ export default {
   gap: 12px;
 
   flex: 0 0 auto;
+}
+
+.page-header__custom-tools {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 10px;
+  flex: 0 0 auto;
+  position: relative;
+  z-index: 99993;
 }
 
 .page-header-notification-slot {

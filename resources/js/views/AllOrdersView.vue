@@ -15,6 +15,32 @@
 >
   <template #notifications>
       <div
+        v-if="isSuperAdmin"
+        class="header-board-admin-tools"
+        @click.stop
+      >
+        <span class="header-owner-toggle-label">SELECT OWNER</span>
+        <button
+          type="button"
+          class="header-owner-toggle"
+          :class="{ active: boardSettings.auto_assign_all_owners }"
+          :title="boardSettings.auto_assign_all_owners ? 'Automatic owner assignment is ON' : 'Automatic owner assignment is OFF'"
+          @click.stop="toggleAutoAssignAllOwners"
+        >
+          <span></span>
+        </button>
+
+        <button
+          type="button"
+          class="header-column-settings-btn"
+          title="Manage board columns"
+          @click.stop="boardSettingsModal = true"
+        >
+          <i class="fa-solid fa-sliders"></i>
+        </button>
+      </div>
+
+      <div
         v-if="showChatNotificationMenu"
         class="chat-notification-dropdown notification-center-dropdown"
         @click.stop
@@ -411,7 +437,7 @@
             ></span>
           </div>
 
-          <div class="board-col board-col-status resizable-head-cell">
+          <div v-if="isBoardColumnVisible('status')" class="board-col board-col-status resizable-head-cell">
             STATUS
             <span
               class="column-resizer"
@@ -420,7 +446,15 @@
             ></span>
           </div>
 
-          <div class="board-col board-col-owner resizable-head-cell">
+          <div
+            v-for="column in activeCustomColumns"
+            :key="'custom-head-' + column.id"
+            class="board-col board-col-custom resizable-head-cell"
+          >
+            {{ column.name }}
+          </div>
+
+          <div v-if="isBoardColumnVisible('owner')" class="board-col board-col-owner resizable-head-cell">
             OWNER
             <span
               class="column-resizer"
@@ -429,7 +463,7 @@
             ></span>
           </div>
 
-          <div class="board-col board-col-files resizable-head-cell">
+          <div v-if="isBoardColumnVisible('files')" class="board-col board-col-files resizable-head-cell">
             FILES
             <span
               class="column-resizer"
@@ -438,7 +472,7 @@
             ></span>
           </div>
 
-          <div class="board-col board-col-packing resizable-head-cell">
+          <div v-if="isBoardColumnVisible('packing')" class="board-col board-col-packing resizable-head-cell">
             PACKING DETAIL
             <span
               class="column-resizer"
@@ -447,7 +481,7 @@
             ></span>
           </div>
 
-          <div class="board-col board-col-notes resizable-head-cell">
+          <div v-if="isBoardColumnVisible('notes')" class="board-col board-col-notes resizable-head-cell">
             NOTES
             <span
               class="column-resizer"
@@ -456,7 +490,7 @@
             ></span>
           </div>
 
-          <div class="board-col board-col-chat resizable-head-cell">
+          <div v-if="isBoardColumnVisible('chat')" class="board-col board-col-chat resizable-head-cell">
             CHAT
             <span
               class="column-resizer"
@@ -465,7 +499,7 @@
             ></span>
           </div>
 
-          <div class="board-col board-col-payment resizable-head-cell">
+          <div v-if="isBoardColumnVisible('payment')" class="board-col board-col-payment resizable-head-cell">
             PAYMENT
             <span
               class="column-resizer"
@@ -474,7 +508,7 @@
             ></span>
           </div>
 
-          <div class="board-col board-col-address resizable-head-cell">
+          <div v-if="isBoardColumnVisible('address')" class="board-col board-col-address resizable-head-cell">
             ADDRESS
             <span
               class="column-resizer"
@@ -483,7 +517,7 @@
             ></span>
           </div>
 
-          <div class="board-col board-col-track resizable-head-cell">
+          <div v-if="isBoardColumnVisible('track')" class="board-col board-col-track resizable-head-cell">
             TRK#
             <span
               class="column-resizer"
@@ -668,7 +702,7 @@
             </div>
           </div>
 
-          <div class="board-col board-col-status row-status-cell" @click.stop>
+          <div v-if="isBoardColumnVisible('status')" class="board-col board-col-status row-status-cell" @click.stop>
             <div class="status-ref-wrap">
               <button
                 type="button"
@@ -692,7 +726,54 @@
             </div>
           </div>
 
-          <div class="board-col board-col-owner">
+          <div
+            v-for="column in activeCustomColumns"
+            :key="'custom-cell-' + order.id + '-' + column.id"
+            class="board-col board-col-custom row-custom-cell"
+            @click.stop
+          >
+            <!-- DROPDOWN: full colored label like STATUS -->
+            <button
+              v-if="(column.type || 'dropdown') === 'dropdown'"
+              type="button"
+              class="custom-field-trigger custom-field-trigger-filled"
+              :class="{ empty: !getOrderCustomOption(order, column) }"
+              :style="customFieldButtonStyle(order, column)"
+              @click.stop="openCustomFieldMenu(order, column, $event)"
+            >
+              <span>{{ getOrderCustomOption(order, column)?.label || 'Select' }}</span>
+              <i class="fa-solid fa-chevron-down"></i>
+            </button>
+
+            <!-- TEXT -->
+            <input
+              v-else-if="column.type === 'text'"
+              class="custom-field-text-input"
+              type="text"
+              :value="getOrderCustomText(order, column)"
+              placeholder="Write..."
+              :readonly="!canEditWorkflowFields"
+              @click.stop
+              @keydown.enter.prevent="$event.target.blur()"
+              @blur="saveOrderCustomText(order, column, $event.target.value)"
+            />
+
+            <!-- NOTES -->
+            <textarea
+              v-else
+              class="custom-field-notes-input"
+              rows="1"
+              :value="getOrderCustomText(order, column)"
+              placeholder="Write notes..."
+              :readonly="!canEditWorkflowFields"
+              @click.stop
+              @keydown.enter.exact.prevent="$event.target.blur()"
+              @keydown.shift.enter.stop
+              @blur="saveOrderCustomText(order, column, $event.target.value)"
+            ></textarea>
+          </div>
+
+          <div v-if="isBoardColumnVisible('owner')" class="board-col board-col-owner">
             <div class="board-avatar-stack owner-compact-stack">
               <button
                 v-if="loggedInOrderOwner(order)"
@@ -737,6 +818,7 @@
           </div>
 
           <div
+            v-if="isBoardColumnVisible('files')"
             class="board-col board-col-files board-files-drop-zone"
             :class="{
               'row-file-drag-active':
@@ -812,7 +894,7 @@
             </div>
           </div>
 
-          <div class="board-col board-col-packing">
+          <div v-if="isBoardColumnVisible('packing')" class="board-col board-col-packing">
             <input
               class="packing-clean-input"
               :value="packingDetailText(order)"
@@ -826,21 +908,22 @@
           </div>
 
           <!-- NOTES: EDIT DIRECTLY FROM OUTER ORDER ROW -->
-          <div class="board-col board-col-notes">
-            <input
+          <div v-if="isBoardColumnVisible('notes')" class="board-col board-col-notes">
+            <textarea
               class="board-notes-inline-input"
               :value="orderNotesText(order)"
-              type="text"
+              rows="1"
               placeholder="Write notes..."
               :title="orderNotesText(order) || 'Write notes'"
               :readonly="!canEditOrderNotes"
               @click.stop
-              @keydown.enter.prevent="saveNotesInline(order, $event)"
+              @keydown.enter.exact.prevent="saveNotesInline(order, $event)"
+              @keydown.shift.enter.stop
               @blur="saveNotesInline(order, $event, true)"
-            />
+            ></textarea>
           </div>
 
-          <div class="board-col board-col-chat">
+          <div v-if="isBoardColumnVisible('chat')" class="board-col board-col-chat">
             <button
               type="button"
               class="board-chat-button"
@@ -854,7 +937,7 @@
             </button>
           </div>
 
-          <div class="board-col board-col-payment">
+          <div v-if="isBoardColumnVisible('payment')" class="board-col board-col-payment">
             <input
               class="board-inline-cell-input payment-input-inline"
               :value="order.payment || '0 % Paid'"
@@ -865,7 +948,7 @@
             />
           </div>
 
-          <div class="board-col board-col-address">
+          <div v-if="isBoardColumnVisible('address')" class="board-col board-col-address">
             <input
               class="board-inline-cell-input"
               :value="order.shippingAddress || ''"
@@ -877,7 +960,7 @@
             />
           </div>
 
-          <div class="board-col board-col-track">
+          <div v-if="isBoardColumnVisible('track')" class="board-col board-col-track">
             <input
               class="board-inline-cell-input"
               :value="trackingSummary(order.trk)"
@@ -937,6 +1020,393 @@
       </section>
 
     </main>
+    <!-- SUPER ADMIN BOARD SETTINGS -->
+    <div
+      v-if="boardSettingsModal && isSuperAdmin"
+      class="board-settings-overlay"
+      @click.self="boardSettingsModal = false"
+    >
+      <div class="board-settings-modal" @click.stop>
+        <div class="board-settings-head">
+          <div>
+            <h3>Board Settings</h3>
+            <p>Hide/show columns and create Dropdown, Text or Notes columns.</p>
+          </div>
+          <button type="button" @click="boardSettingsModal = false">
+            <i class="fa-solid fa-xmark"></i>
+          </button>
+        </div>
+
+        <div class="board-settings-section">
+          <h4>Standard Columns</h4>
+          <div class="board-column-toggle-grid">
+            <label v-for="column in manageableStandardColumns" :key="column.key">
+              <input
+                type="checkbox"
+                :checked="isBoardColumnVisible(column.key)"
+                @change="toggleBoardColumnVisibility(column.key)"
+              />
+              <span>{{ column.label }}</span>
+            </label>
+          </div>
+        </div>
+
+        <div class="board-settings-section">
+          <div class="board-settings-section-title">
+            <h4>Custom Columns</h4>
+          </div>
+
+          <div class="custom-column-create custom-column-create-with-type">
+            <input
+              v-model="newCustomColumnName"
+              type="text"
+              placeholder="Column name e.g. PRIORITY / DESIGN NOTE"
+              @keydown.enter.prevent="createCustomColumn"
+            />
+
+            <select
+              v-model="newCustomColumnType"
+              class="custom-column-type-select"
+              title="Choose field type"
+            >
+              <option value="dropdown">Dropdown Labels</option>
+              <option value="text">Single Line Text</option>
+              <option value="notes">Multi Line Notes</option>
+            </select>
+
+            <button type="button" :disabled="!newCustomColumnName.trim()" @click="createCustomColumn">
+              <i class="fa-solid fa-plus"></i> Add Column
+            </button>
+          </div>
+
+          <div class="custom-field-type-help">
+            <span><strong>Dropdown:</strong> Status/Priority type colored labels</span>
+            <span><strong>Text:</strong> PO type short manual text</span>
+            <span><strong>Notes:</strong> Multi-line written notes</span>
+          </div>
+
+          <div v-if="!customColumns.length" class="custom-column-empty">
+            No custom columns yet.
+          </div>
+
+          <div
+            v-for="column in customColumns"
+            :key="'manage-column-' + column.id"
+            class="custom-column-manager"
+            :data-custom-column-id="column.id"
+          >
+            <div class="custom-column-manager-head">
+              <div class="custom-column-title-block">
+                <strong>{{ column.name }}</strong>
+
+                <select
+                  :value="column.type || 'dropdown'"
+                  class="custom-column-inline-type"
+                  @change="changeCustomColumnType(column, $event.target.value)"
+                >
+                  <option value="dropdown">Dropdown</option>
+                  <option value="text">Text</option>
+                  <option value="notes">Notes</option>
+                </select>
+              </div>
+
+              <div>
+                <button type="button" title="Rename" @click="renameCustomColumn(column)">
+                  <i class="fa-solid fa-pen"></i>
+                </button>
+                <button type="button" class="danger" title="Delete" @click="deleteCustomColumn(column)">
+                  <i class="fa-solid fa-trash"></i>
+                </button>
+              </div>
+            </div>
+
+            <template v-if="(column.type || 'dropdown') === 'dropdown'">
+            <div class="custom-option-list">
+              <div
+                v-for="option in column.options || []"
+                :key="'manage-option-' + option.id"
+                class="custom-option-manage-row"
+              >
+                <span class="custom-option-color" :style="{ background: option.color || '#6161ff' }"></span>
+                <span>{{ option.label }}</span>
+                <button type="button" title="Edit" @click="editCustomColumnOption(column, option)">
+                  <i class="fa-solid fa-pen"></i>
+                </button>
+                <button type="button" class="danger" title="Delete" @click="deleteCustomColumnOption(column, option)">
+                  <i class="fa-solid fa-trash"></i>
+                </button>
+              </div>
+            </div>
+
+            <div class="custom-option-inline-create">
+              <input
+                :value="customOptionDraft(column.id).label"
+                type="text"
+                placeholder="Write label e.g. Urgent"
+                @input="setCustomOptionDraft(column.id, 'label', $event.target.value)"
+                @keydown.enter.prevent="createCustomColumnOptionInline(column)"
+              />
+
+              <label class="custom-option-inline-color" title="Choose label color">
+                <span
+                  :style="{ background: customOptionDraft(column.id).color }"
+                ></span>
+                <input
+                  :value="customOptionDraft(column.id).color"
+                  type="color"
+                  @input="setCustomOptionDraft(column.id, 'color', $event.target.value)"
+                />
+              </label>
+
+              <button
+                type="button"
+                class="custom-option-add-btn"
+                :disabled="!customOptionDraft(column.id).label.trim()"
+                @click="createCustomColumnOptionInline(column)"
+              >
+                <i class="fa-solid fa-plus"></i>
+                Add Label
+              </button>
+            </div>
+            </template>
+
+            <div
+              v-else
+              class="custom-non-dropdown-help"
+            >
+              <i :class="(column.type || 'text') === 'notes' ? 'fa-regular fa-note-sticky' : 'fa-solid fa-font'"></i>
+              <span>
+                {{ (column.type || 'text') === 'notes'
+                  ? 'This column accepts multi-line written notes.'
+                  : 'This column accepts short manual text.' }}
+              </span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- CUSTOM FIELD DROPDOWN -->
+    <div
+      v-if="customFieldMenu.order && customFieldMenu.column"
+      class="custom-field-fixed-dropdown"
+      :style="customFieldMenuStyle"
+      @click.stop
+    >
+      <div class="custom-field-dropdown-head">
+        <strong>{{ customFieldMenu.column.name }}</strong>
+
+        <button
+          type="button"
+          @click="closeCustomFieldMenu"
+        >
+          <i class="fa-solid fa-xmark"></i>
+        </button>
+      </div>
+
+      <!-- NOT SET -->
+      <button
+        type="button"
+        class="custom-field-option-row custom-field-clear-row"
+        @click="saveOrderCustomValue(
+          customFieldMenu.order,
+          customFieldMenu.column,
+          null
+        )"
+      >
+        <span class="custom-option-color clear"></span>
+        <span>Not Set</span>
+        <span></span>
+      </button>
+
+      <!-- OPTIONS -->
+      <div
+        v-for="option in customFieldMenu.column.options || []"
+        :key="'custom-select-' + option.id"
+        class="custom-field-option-manage-select-row"
+      >
+        <!--
+          Click the small color dot:
+          native color picker opens immediately.
+        -->
+        <label
+          v-if="isSuperAdmin"
+          class="custom-field-color-picker"
+          title="Change label color"
+          @click.stop
+        >
+          <span
+            class="custom-option-color"
+            :style="{
+              background: option.color || '#fdab3d'
+            }"
+          ></span>
+
+          <input
+            type="color"
+            :value="option.color || '#fdab3d'"
+            @input.stop
+            @change.stop="
+              changeCustomOptionColor(
+                customFieldMenu.column,
+                option,
+                $event.target.value
+              )
+            "
+          />
+        </label>
+
+        <span
+          v-else
+          class="custom-option-color"
+          :style="{
+            background: option.color || '#fdab3d'
+          }"
+        ></span>
+
+        <!-- NORMAL LABEL -->
+        <button
+          v-if="Number(customFieldEditingOptionId) !== Number(option.id)"
+          type="button"
+          class="custom-field-option-main"
+          @click="
+            saveOrderCustomValue(
+              customFieldMenu.order,
+              customFieldMenu.column,
+              option
+            )
+          "
+        >
+          <span>{{ option.label }}</span>
+
+          <i
+            v-if="
+              Number(
+                getOrderCustomOption(
+                  customFieldMenu.order,
+                  customFieldMenu.column
+                )?.id
+              ) === Number(option.id)
+            "
+            class="fa-solid fa-check"
+          ></i>
+        </button>
+
+        <!-- INLINE EDIT -->
+        <div
+          v-else
+          class="custom-field-inline-edit"
+        >
+          <input
+            v-model="customFieldEditingLabel"
+            type="text"
+            maxlength="120"
+            autofocus
+            @keydown.enter.prevent="
+              saveCustomOptionInlineEdit(
+                customFieldMenu.column,
+                option
+              )
+            "
+            @keydown.esc.prevent="
+              cancelCustomOptionInlineEdit
+            "
+          />
+
+          <button
+            type="button"
+            class="save"
+            title="Save"
+            @click="
+              saveCustomOptionInlineEdit(
+                customFieldMenu.column,
+                option
+              )
+            "
+          >
+            <i class="fa-solid fa-check"></i>
+          </button>
+
+          <button
+            type="button"
+            title="Cancel"
+            @click="cancelCustomOptionInlineEdit"
+          >
+            <i class="fa-solid fa-xmark"></i>
+          </button>
+        </div>
+
+        <!-- SUPER ADMIN ACTIONS -->
+        <div
+          v-if="isSuperAdmin"
+          class="custom-field-option-actions"
+        >
+          <button
+            type="button"
+            title="Edit label"
+            @click.stop="
+              startCustomOptionInlineEdit(option)
+            "
+          >
+            <i class="fa-solid fa-pen"></i>
+          </button>
+
+          <button
+            type="button"
+            class="danger"
+            title="Delete label"
+            @click.stop="
+              deleteCustomColumnOption(
+                customFieldMenu.column,
+                option
+              )
+            "
+          >
+            <i class="fa-solid fa-trash"></i>
+          </button>
+        </div>
+      </div>
+
+      <!-- QUICK ADD DIRECTLY IN DROPDOWN -->
+      <div
+        v-if="isSuperAdmin"
+        class="custom-field-quick-create"
+      >
+        <input
+          v-model="customFieldQuickLabel"
+          type="text"
+          maxlength="120"
+          placeholder="Add new label..."
+          @keydown.enter.prevent="
+            addCustomOptionFromDropdown(
+              customFieldMenu.column
+            )
+          "
+        />
+
+        <button
+          type="button"
+          :disabled="!customFieldQuickLabel.trim()"
+          @click="
+            addCustomOptionFromDropdown(
+              customFieldMenu.column
+            )
+          "
+        >
+          <i class="fa-solid fa-plus"></i>
+          Add
+        </button>
+      </div>
+
+      <div
+        v-if="isSuperAdmin"
+        class="custom-field-quick-hint"
+      >
+        <i class="fa-solid fa-circle-info"></i>
+        New label gets a default color. Click its color dot to change it.
+      </div>
+    </div>
+
     <!-- ROW STATUS DROPDOWN -->
     <div
       v-if="rowStatusMenuId && rowStatusMenuOrder"
@@ -2189,6 +2659,30 @@ export default {
   data() {
       return {
       showShippingAddressMenu: false,
+      boardSettingsModal: false,
+      boardSettingsSaving: false,
+      boardSettings: {
+        auto_assign_all_owners: false,
+        hidden_columns: []
+      },
+      customColumns: [],
+      boardCustomValuesByOrder: {},
+      newCustomColumnName: '',
+      newCustomColumnType: 'dropdown',
+      customOptionDrafts: {},
+      customFieldMenu: {
+        order: null,
+        column: null,
+        top: 0,
+        left: 0,
+        width: 260
+      },
+
+      // Inline management inside custom dropdown
+      customFieldQuickLabel: '',
+      customFieldEditingOptionId: null,
+      customFieldEditingLabel: '',
+
       dragActiveCardType: null,
       dragCounter: 0,
       detailOpen: false,
@@ -2638,10 +3132,41 @@ filteredOrders() {
       }
     },
 
+    manageableStandardColumns() {
+      return [
+        { key: 'status', label: 'Status' },
+        { key: 'owner', label: 'Owner' },
+        { key: 'files', label: 'Files' },
+        { key: 'packing', label: 'Packing Detail' },
+        { key: 'notes', label: 'Notes' },
+        { key: 'chat', label: 'Chat' },
+        { key: 'payment', label: 'Payment' },
+        { key: 'address', label: 'Address' },
+        { key: 'track', label: 'Tracking' }
+      ]
+    },
+
+    activeCustomColumns() {
+      return (this.customColumns || [])
+        .filter(column => column && column.is_active !== false)
+        .sort((a, b) => Number(a.position || 0) - Number(b.position || 0))
+    },
+
+    customFieldMenuStyle() {
+      const menu = this.customFieldMenu || {}
+      return {
+        position: 'fixed',
+        top: `${Number(menu.top || 0)}px`,
+        left: `${Number(menu.left || 0)}px`,
+        width: `${Number(menu.width || 220)}px`,
+        zIndex: 2147483647
+      }
+    },
+
     boardGridStyle() {
       const w = this.columnWidths
 
-      const keys = [
+      const staticKeys = [
         'check',
         'name',
         'status',
@@ -2655,6 +3180,17 @@ filteredOrders() {
         'track',
         'info'
       ]
+
+      const alwaysVisible = ['check', 'name', 'info']
+      const keys = staticKeys.filter(key =>
+        alwaysVisible.includes(key) || this.isBoardColumnVisible(key)
+      )
+
+      this.activeCustomColumns.forEach(column => {
+        const key = `custom_${column.id}`
+        keys.splice(Math.min(3, keys.length - 1), 0, key)
+        if (!w[key]) w[key] = 145
+      })
 
       const total = keys.reduce(
         (sum, key) => sum + Number(w[key] || 0),
@@ -2728,6 +3264,8 @@ async mounted() {
   this.loadSavedStatusOptions()
   this.loadBoardGroups()
   this.loadDefaultBoardGroupOverrides()
+  await this.fetchBoardConfiguration()
+
   await Promise.all([
     this.fetchOrders(),
     this.fetchMembers(),
@@ -2755,8 +3293,13 @@ async mounted() {
       await this.markChatRead()
     }
   }
-} else if (this.filteredOrders.length) {
-  this.selectedOrder = this.filteredOrders[0]
+} else {
+  /*
+   * Do NOT silently select the first order.
+   * This prevents the detail form from jumping back to row #1.
+   */
+  this.selectedOrder = null
+  this.detailOpen = false
 }
   },
 
@@ -2789,6 +3332,734 @@ beforeUnmount()  {
 
 
  methods: {
+    isBoardColumnVisible(key) {
+      return !(this.boardSettings.hidden_columns || []).includes(key)
+    },
+
+    async fetchBoardConfiguration() {
+      try {
+        const res = await axios.get('/api/factory-board/config', {
+          headers: this.headers()
+        })
+
+        const data = res.data?.data || res.data || {}
+        this.boardSettings = {
+          auto_assign_all_owners: Boolean(data.settings?.auto_assign_all_owners),
+          hidden_columns: Array.isArray(data.settings?.hidden_columns)
+            ? data.settings.hidden_columns
+            : []
+        }
+        this.customColumns = Array.isArray(data.custom_columns)
+          ? data.custom_columns
+          : []
+
+        const rawValues = data.custom_values || {}
+        this.boardCustomValuesByOrder = Object.keys(rawValues).reduce((map, orderId) => {
+          map[Number(orderId)] = Array.isArray(rawValues[orderId])
+            ? rawValues[orderId]
+            : []
+          return map
+        }, {})
+      } catch (error) {
+        console.error('fetchBoardConfiguration error:', error)
+      }
+    },
+
+    async toggleAutoAssignAllOwners() {
+      if (!this.isSuperAdmin || this.boardSettingsSaving) return
+      this.boardSettingsSaving = true
+      const next = !this.boardSettings.auto_assign_all_owners
+
+      try {
+        const res = await axios.put(
+          '/api/factory-board/settings',
+          {
+            auto_assign_all_owners: next,
+            hidden_columns: this.boardSettings.hidden_columns || []
+          },
+          { headers: this.headers() }
+        )
+        this.boardSettings.auto_assign_all_owners = Boolean(
+          res.data?.settings?.auto_assign_all_owners ??
+          res.data?.data?.auto_assign_all_owners ??
+          next
+        )
+      } catch (error) {
+        console.error('toggleAutoAssignAllOwners error:', error)
+        alert(error.response?.data?.message || 'Owner auto-select setting could not be saved.')
+      } finally {
+        this.boardSettingsSaving = false
+      }
+    },
+
+    async toggleBoardColumnVisibility(key) {
+      if (!this.isSuperAdmin) return
+
+      const hidden = new Set(this.boardSettings.hidden_columns || [])
+      if (hidden.has(key)) hidden.delete(key)
+      else hidden.add(key)
+
+      try {
+        const res = await axios.put(
+          '/api/factory-board/settings',
+          {
+            auto_assign_all_owners: Boolean(
+              this.boardSettings.auto_assign_all_owners
+            ),
+            hidden_columns: [...hidden]
+          },
+          { headers: this.headers() }
+        )
+        const savedHidden =
+          res.data?.settings?.hidden_columns ??
+          res.data?.data?.hidden_columns
+
+        this.boardSettings.hidden_columns = Array.isArray(savedHidden)
+          ? savedHidden
+          : [...hidden]
+      } catch (error) {
+        console.error('toggleBoardColumnVisibility error:', error)
+        alert(error.response?.data?.message || 'Column setting could not be saved.')
+      }
+    },
+
+    async createCustomColumn() {
+      if (!this.isSuperAdmin) return
+
+      const name = String(this.newCustomColumnName || '').trim().toUpperCase()
+      const type = String(this.newCustomColumnType || 'dropdown')
+
+      if (!name) return
+
+      try {
+        await axios.post(
+          '/api/factory-board/custom-columns',
+          { name, type },
+          { headers: this.headers() }
+        )
+
+        this.newCustomColumnName = ''
+        this.newCustomColumnType = 'dropdown'
+
+        await this.fetchBoardConfiguration()
+      } catch (error) {
+        console.error('createCustomColumn error:', error)
+        alert(error.response?.data?.message || 'Custom column could not be created.')
+      }
+    },
+
+    async changeCustomColumnType(column, type) {
+      if (!this.isSuperAdmin || !column) return
+
+      if (
+        !confirm(
+          `Change "${column.name}" to ${String(type).toUpperCase()} field?`
+        )
+      ) {
+        return
+      }
+
+      try {
+        await axios.put(
+          `/api/factory-board/custom-columns/${column.id}`,
+          {
+            name: column.name,
+            type
+          },
+          {
+            headers: this.headers()
+          }
+        )
+
+        await this.fetchBoardConfiguration()
+      } catch (error) {
+        alert(
+          error.response?.data?.message ||
+          'Column type could not be changed.'
+        )
+      }
+    },
+
+    openCustomColumnSettings(column) {
+      this.closeCustomFieldMenu()
+      this.boardSettingsModal = true
+
+      this.$nextTick(() => {
+        const target = document.querySelector(
+          `[data-custom-column-id="${column?.id}"]`
+        )
+
+        target?.scrollIntoView({
+          block: 'center',
+          behavior: 'smooth'
+        })
+      })
+    },
+
+    async renameCustomColumn(column) {
+      if (!this.isSuperAdmin || !column) return
+      const name = window.prompt('New column name', column.name)
+      if (!name || !name.trim()) return
+
+      try {
+        await axios.put(`/api/factory-board/custom-columns/${column.id}`, {
+          name: name.trim().toUpperCase()
+        }, { headers: this.headers() })
+        await this.fetchBoardConfiguration()
+      } catch (error) {
+        alert(error.response?.data?.message || 'Column could not be renamed.')
+      }
+    },
+
+    async deleteCustomColumn(column) {
+      if (!this.isSuperAdmin || !column) return
+      if (!confirm(`Delete "${column.name}" column?`)) return
+
+      try {
+        await axios.delete(`/api/factory-board/custom-columns/${column.id}`, { headers: this.headers() })
+        await this.fetchBoardConfiguration()
+      } catch (error) {
+        alert(error.response?.data?.message || 'Column could not be deleted.')
+      }
+    },
+
+    customDefaultOptionColor(column) {
+      const palette = [
+        '#fdab3d',
+        '#00c875',
+        '#579bfc',
+        '#e2445c',
+        '#a25ddc',
+        '#00c2ff',
+        '#ff642e',
+        '#037f4c'
+      ]
+
+      const count =
+        Array.isArray(column?.options)
+          ? column.options.length
+          : 0
+
+      return palette[count % palette.length]
+    },
+
+    customOptionDraft(columnId) {
+      const id = Number(columnId)
+
+      if (!this.customOptionDrafts[id]) {
+        const column =
+          this.customColumns.find(
+            item => Number(item.id) === id
+          )
+
+        this.customOptionDrafts[id] = {
+          label: '',
+          color: this.customDefaultOptionColor(column)
+        }
+      }
+
+      return this.customOptionDrafts[id]
+    },
+
+    setCustomOptionDraft(columnId, key, value) {
+      const id = Number(columnId)
+      const current = this.customOptionDraft(id)
+
+      this.customOptionDrafts[id] = {
+        ...current,
+        [key]: value
+      }
+    },
+
+    async createCustomColumnOptionInline(column) {
+      if (!this.isSuperAdmin || !column) return
+
+      const draft = this.customOptionDraft(column.id)
+      const label = String(draft.label || '').trim()
+      const color = String(draft.color || '#fdab3d').trim() || '#fdab3d'
+
+      if (!label) return
+
+      try {
+        await axios.post(
+          `/api/factory-board/custom-columns/${column.id}/options`,
+          {
+            label,
+            color
+          },
+          {
+            headers: this.headers()
+          }
+        )
+
+        await this.fetchBoardConfiguration()
+
+        const refreshedColumn =
+          this.customColumns.find(
+            item => Number(item.id) === Number(column.id)
+          )
+
+        this.customOptionDrafts[Number(column.id)] = {
+          label: '',
+          color: this.customDefaultOptionColor(refreshedColumn)
+        }
+
+        if (this.customFieldMenu.column?.id === column.id) {
+          this.customFieldMenu.column =
+            this.customColumns.find(
+              item => Number(item.id) === Number(column.id)
+            ) || column
+        }
+      } catch (error) {
+        console.error('createCustomColumnOptionInline error:', error)
+        alert(
+          error.response?.data?.message ||
+          'Dropdown label could not be added.'
+        )
+      }
+    },
+
+    async addCustomColumnOption(column) {
+      if (!this.isSuperAdmin || !column) return
+      const label = window.prompt(`Add option in ${column.name}`)
+      if (!label || !label.trim()) return
+      const color = window.prompt('Color hex (example #ff3b30)', '#fdab3d') || '#fdab3d'
+
+      try {
+        await axios.post(`/api/factory-board/custom-columns/${column.id}/options`, {
+          label: label.trim(),
+          color
+        }, { headers: this.headers() })
+        await this.fetchBoardConfiguration()
+        if (this.customFieldMenu.column?.id === column.id) {
+          this.customFieldMenu.column = this.customColumns.find(c => Number(c.id) === Number(column.id)) || column
+        }
+      } catch (error) {
+        alert(error.response?.data?.message || 'Option could not be added.')
+      }
+    },
+
+    startCustomOptionInlineEdit(option) {
+      if (!this.isSuperAdmin || !option) return
+
+      this.customFieldEditingOptionId =
+        Number(option.id)
+
+      this.customFieldEditingLabel =
+        String(option.label || '')
+    },
+
+    cancelCustomOptionInlineEdit() {
+      this.customFieldEditingOptionId = null
+      this.customFieldEditingLabel = ''
+    },
+
+    async saveCustomOptionInlineEdit(column, option) {
+      if (
+        !this.isSuperAdmin ||
+        !column ||
+        !option
+      ) {
+        return
+      }
+
+      const label =
+        String(
+          this.customFieldEditingLabel || ''
+        ).trim()
+
+      if (!label) {
+        return
+      }
+
+      try {
+        await axios.put(
+          `/api/factory-board/custom-options/${option.id}`,
+          {
+            label,
+            color:
+              option.color ||
+              '#fdab3d'
+          },
+          {
+            headers:
+              this.headers()
+          }
+        )
+
+        this.cancelCustomOptionInlineEdit()
+
+        await this.fetchBoardConfiguration()
+
+        this.refreshOpenCustomFieldColumn(
+          column.id
+        )
+      } catch (error) {
+        alert(
+          error.response?.data?.message ||
+          'Label could not be edited.'
+        )
+      }
+    },
+
+    async changeCustomOptionColor(
+      column,
+      option,
+      color
+    ) {
+      if (
+        !this.isSuperAdmin ||
+        !column ||
+        !option ||
+        !color
+      ) {
+        return
+      }
+
+      /*
+       * Change UI immediately so picker feels instant.
+       */
+      option.color = color
+
+      try {
+        await axios.put(
+          `/api/factory-board/custom-options/${option.id}`,
+          {
+            label:
+              option.label,
+
+            color
+          },
+          {
+            headers:
+              this.headers()
+          }
+        )
+
+        await this.fetchBoardConfiguration()
+
+        this.refreshOpenCustomFieldColumn(
+          column.id
+        )
+      } catch (error) {
+        alert(
+          error.response?.data?.message ||
+          'Color could not be changed.'
+        )
+
+        await this.fetchBoardConfiguration()
+
+        this.refreshOpenCustomFieldColumn(
+          column.id
+        )
+      }
+    },
+
+    refreshOpenCustomFieldColumn(columnId) {
+      if (
+        !this.customFieldMenu.column ||
+        Number(this.customFieldMenu.column.id) !==
+          Number(columnId)
+      ) {
+        return
+      }
+
+      const fresh =
+        this.customColumns.find(
+          column =>
+            Number(column.id) ===
+            Number(columnId)
+        )
+
+      if (fresh) {
+        this.customFieldMenu.column =
+          fresh
+      }
+    },
+
+    async addCustomOptionFromDropdown(column) {
+      if (
+        !this.isSuperAdmin ||
+        !column
+      ) {
+        return
+      }
+
+      const label =
+        String(
+          this.customFieldQuickLabel || ''
+        ).trim()
+
+      if (!label) {
+        return
+      }
+
+      const color =
+        this.customDefaultOptionColor(
+          column
+        )
+
+      try {
+        await axios.post(
+          `/api/factory-board/custom-columns/${column.id}/options`,
+          {
+            label,
+            color
+          },
+          {
+            headers:
+              this.headers()
+          }
+        )
+
+        this.customFieldQuickLabel = ''
+
+        await this.fetchBoardConfiguration()
+
+        this.refreshOpenCustomFieldColumn(
+          column.id
+        )
+      } catch (error) {
+        alert(
+          error.response?.data?.message ||
+          'Label could not be added.'
+        )
+      }
+    },
+
+    async deleteCustomColumnOption(column, option) {
+      if (!this.isSuperAdmin || !option) return
+      if (!confirm(`Delete "${option.label}" option?`)) return
+
+      try {
+        await axios.delete(`/api/factory-board/custom-options/${option.id}`, { headers: this.headers() })
+        await this.fetchBoardConfiguration()
+        this.refreshOpenCustomFieldColumn(column?.id)
+      } catch (error) {
+        alert(error.response?.data?.message || 'Option could not be deleted.')
+      }
+    },
+
+    getOrderCustomValue(order, column) {
+      if (!order || !column) return null
+
+      const values =
+        Array.isArray(order.custom_values)
+          ? order.custom_values
+          : []
+
+      return values.find(
+        item =>
+          Number(item.column_id) ===
+          Number(column.id)
+      ) || null
+    },
+
+    getOrderCustomText(order, column) {
+      const item =
+        this.getOrderCustomValue(
+          order,
+          column
+        )
+
+      return String(
+        item?.value ?? ''
+      )
+    },
+
+    async saveOrderCustomText(order, column, rawValue) {
+      if (
+        !this.canEditWorkflowFields ||
+        !order ||
+        !column
+      ) {
+        return
+      }
+
+      const value =
+        String(rawValue ?? '')
+
+      const oldValue =
+        this.getOrderCustomText(
+          order,
+          column
+        )
+
+      if (value === oldValue) {
+        return
+      }
+
+      try {
+        const res =
+          await axios.put(
+            `/api/orders/${order.id}/custom-values/${column.id}`,
+            {
+              value
+            },
+            {
+              headers:
+                this.headers()
+            }
+          )
+
+        const saved =
+          res.data?.value || null
+
+        const values =
+          Array.isArray(order.custom_values)
+            ? [...order.custom_values]
+            : []
+
+        const index =
+          values.findIndex(
+            item =>
+              Number(item.column_id) ===
+              Number(column.id)
+          )
+
+        if (!saved) {
+          if (index !== -1) {
+            values.splice(index, 1)
+          }
+        } else if (index === -1) {
+          values.push(saved)
+        } else {
+          values.splice(
+            index,
+            1,
+            saved
+          )
+        }
+
+        order.custom_values =
+          values
+
+        if (
+          this.selectedOrder &&
+          Number(this.selectedOrder.id) ===
+          Number(order.id)
+        ) {
+          this.selectedOrder.custom_values =
+            values
+        }
+      } catch (error) {
+        console.error(
+          'saveOrderCustomText error:',
+          error
+        )
+
+        alert(
+          error.response?.data?.message ||
+          'Custom value could not be saved.'
+        )
+      }
+    },
+
+    getOrderCustomOption(order, column) {
+      if (!order || !column) return null
+      const values = Array.isArray(order.custom_values) ? order.custom_values : []
+      const value = values.find(item => Number(item.column_id) === Number(column.id))
+      if (!value) return null
+
+      if (value.option) return value.option
+      const optionId = value.option_id || value.value_option_id
+      return (column.options || []).find(option => Number(option.id) === Number(optionId)) || null
+    },
+
+    customFieldButtonStyle(order, column) {
+      const option =
+        this.getOrderCustomOption(
+          order,
+          column
+        )
+
+      if (!option) {
+        return {}
+      }
+
+      const color =
+        option.color ||
+        '#6161ff'
+
+      return {
+        background: color,
+        color: this.readableTextColor(color),
+        borderColor: color
+      }
+    },
+
+    openCustomFieldMenu(order, column, event) {
+      const rect = event.currentTarget.getBoundingClientRect()
+      const width = Math.max(270, rect.width)
+      const left = Math.min(rect.left, window.innerWidth - width - 12)
+      const estimatedHeight = Math.min(
+        430,
+        120 + ((column.options || []).length * 46)
+      )
+
+      const top =
+        rect.bottom + estimatedHeight > window.innerHeight
+          ? Math.max(12, rect.top - estimatedHeight - 6)
+          : rect.bottom + 6
+
+      this.customFieldQuickLabel = ''
+      this.cancelCustomOptionInlineEdit()
+
+      this.customFieldMenu = {
+        order,
+        column,
+        top,
+        left,
+        width
+      }
+    },
+
+    closeCustomFieldMenu() {
+      this.customFieldQuickLabel = ''
+      this.cancelCustomOptionInlineEdit()
+
+      this.customFieldMenu = {
+        order: null,
+        column: null,
+        top: 0,
+        left: 0,
+        width: 260
+      }
+    },
+
+    async saveOrderCustomValue(order, column, option) {
+      if (!this.canEditWorkflowFields || !order || !column) return
+
+      try {
+        const res = await axios.put(
+          `/api/orders/${order.id}/custom-values/${column.id}`,
+          { option_id: option?.id || null },
+          { headers: this.headers() }
+        )
+
+        const saved = res.data?.value || null
+        const values = Array.isArray(order.custom_values) ? [...order.custom_values] : []
+        const index = values.findIndex(item => Number(item.column_id) === Number(column.id))
+
+        if (!saved) {
+          if (index !== -1) values.splice(index, 1)
+        } else if (index === -1) {
+          values.push(saved)
+        } else {
+          values.splice(index, 1, saved)
+        }
+
+        order.custom_values = values
+        if (this.selectedOrder && Number(this.selectedOrder.id) === Number(order.id)) {
+          this.selectedOrder.custom_values = values
+        }
+        this.closeCustomFieldMenu()
+      } catch (error) {
+        console.error('saveOrderCustomValue error:', error)
+        alert(error.response?.data?.message || 'Custom value could not be saved.')
+      }
+    },
+
     normalizeOwnerRole(role) {
       return String(role || 'member')
         .trim()
@@ -6240,6 +7511,26 @@ body.board-column-resizing .column-resizer::before {
     async openBoardOrder(order) {
       if (!order) return
 
+      /*
+       * Keep the currently opened order in the URL.
+       * If this page re-renders/remounts because of notifications,
+       * route updates, HMR, etc., the SAME order is restored instead
+       * of falling back to the first order.
+       */
+      if (
+        Number(this.$route.query.order_id || 0) !==
+        Number(order.id)
+      ) {
+        this.$router.replace({
+          path: this.$route.path,
+          query: {
+            ...this.$route.query,
+            order_id: order.id,
+            open_chat: undefined
+          }
+        }).catch(() => {})
+      }
+
       // Show detail immediately, then fetch heavier data in background.
       this.selectedOrder = order
       this.detailOpen = true
@@ -6286,6 +7577,23 @@ body.board-column-resizing .column-resizer::before {
       this.detailOpen = false
       this.showChat = false
       this.closeAllMenus()
+
+      /*
+       * User intentionally closed the form, so remove persisted order ID.
+       */
+      if (this.$route.query.order_id) {
+        const query = {
+          ...this.$route.query
+        }
+
+        delete query.order_id
+        delete query.open_chat
+
+        this.$router.replace({
+          path: this.$route.path,
+          query
+        }).catch(() => {})
+      }
     },
 
     async openBoardChat(order) {
@@ -6874,7 +8182,9 @@ body.board-column-resizing .column-resizer::before {
             trk: 'N/A',
             notes: '',
             shipping_address: '',
-            member_ids: [],
+            member_ids: this.boardSettings.auto_assign_all_owners
+              ? this.availableMembers.map(member => member.id)
+              : [],
             client_ids: []
           },
           {
@@ -7701,9 +9011,25 @@ openPreviewFile(file) {
         // This keeps the 3 thumbnail previews visible after a full page refresh.
         await this.loadBoardOrderFiles()
 
-        if (this.selectedOrder) {
-          const fresh = this.orders.find(o => Number(o.id) === Number(this.selectedOrder.id))
-          if (fresh) this.selectedOrder = fresh
+        /*
+         * Preserve the SAME selected order after any refresh.
+         * Never replace it with this.orders[0].
+         */
+        const selectedId =
+          Number(
+            this.selectedOrder?.id ||
+            this.$route.query.order_id ||
+            0
+          )
+
+        if (selectedId) {
+          const fresh = this.orders.find(
+            order => Number(order.id) === selectedId
+          )
+
+          if (fresh) {
+            this.selectedOrder = fresh
+          }
         }
       } catch (e) { console.error('fetchOrders error:', e) } finally { this.loadingOrders = false }
     },
@@ -7799,6 +9125,7 @@ async fetchClients() {
         paymentBalance: order.payment_balance || 0,
         members,
         clients: order.clients || [],
+        custom_values: order.custom_values || this.boardCustomValuesByOrder[Number(order.id)] || [],
         shippingAddress: order.shipping_address || '',
         packing_detail: order.packing_detail || '',
         packingDetail: order.packing_detail || '',
@@ -8097,7 +9424,9 @@ if (!this.hasFullOrderAccess && this.currentUser?.can_create_orders !== true) re
       const status = this.statusOptions.find(s => s.label === this.newOrder.status)
       const payload = {
         name: this.newOrder.name, po: this.newOrder.po,
-        member_ids: this.newOrder.selectedMembers.map(m => m.id),
+        member_ids: (!this.editingOrderId && this.boardSettings.auto_assign_all_owners)
+          ? this.availableMembers.map(m => m.id)
+          : this.newOrder.selectedMembers.map(m => m.id),
         client_ids: this.newOrder.selectedClients.map(c => c.id),
 shipping_address: this.newOrder.shippingAddress,
         ship_date: this.newOrder.shipDate || null, status: this.newOrder.status,
@@ -19467,9 +20796,10 @@ body.board-column-resizing .column-resizer::before {
   font-size: 10px;
   font-weight: 600;
 
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
+  white-space: pre-wrap;
+  overflow: auto;
+  resize: none;
+  font-family: inherit;
 
   transition:
     background .15s ease,
@@ -21204,4 +22534,520 @@ body.board-column-resizing .column-resizer::before {
   }
 }
 
+/* =========================================================
+   FINAL SECTION BAR BORDER COLOR
+   Black lines -> soft gray
+   KEEP THIS AT VERY END OF <style>
+   ========================================================= */
+
+/* CLOSED / COLLAPSED STATUS BARS */
+.factory-board-page .factory-board .collapsed-status-bar {
+  background: #ffffff !important;
+
+  border-top: 1px solid #d1d5db !important;
+  border-bottom: 1px solid #d1d5db !important;
+  border-right: 0 !important;
+
+  /* status color wali left line same rahe */
+  border-left: 5px solid var(--group-color) !important;
+
+  border-radius: 0 !important;
+  box-shadow: none !important;
+
+  min-height: 58px !important;
+  width: 100% !important;
+
+  padding-left: 38px !important;
+
+  display: flex !important;
+  align-items: center !important;
+  justify-content: flex-start !important;
+}
+
+
+/* CLOSED BAR HOVER */
+.factory-board-page .factory-board .collapsed-status-bar:hover {
+  background: #fafafa !important;
+}
+
+
+/* ACTIVE / OPEN SECTION */
+.factory-board-page
+.factory-board
+.board-section-heading.collapsible-active-heading {
+  background: #ffffff !important;
+
+  border-top: 1px solid #d1d5db !important;
+  border-bottom: 1px solid #d1d5db !important;
+  border-right: 0 !important;
+
+  border-left: 5px solid var(--active-section-color) !important;
+
+  border-radius: 0 !important;
+  box-shadow: none !important;
+
+  min-height: 58px !important;
+}
+
+
+/* ACTIVE SECTION HOVER */
+.factory-board-page
+.factory-board
+.board-section-heading.collapsible-active-heading:hover {
+  background: #fafafa !important;
+}
+
+
+/* REMOVE ANY OLD BLACK BORDER OVERRIDES */
+.factory-board-page .collapsed-status-bars {
+  border-top: 0 !important;
+}
+
+
+/* Keep title colors */
+.factory-board-page .collapsed-status-bar strong {
+  color: var(--group-color) !important;
+}
+
+
+/* Chevron same group color */
+.factory-board-page .collapsed-status-bar .collapsed-status-icon {
+  color: var(--group-color) !important;
+}
+
+
+/* Active section title / arrow same active color */
+.factory-board-page
+.collapsible-active-heading h1,
+.factory-board-page
+.collapsible-active-heading .section-collapse-icon {
+  color: var(--active-section-color) !important;
+}
+
+
+/* OPTIONAL:
+   If lines should be slightly lighter, use #e5e7eb instead of #d1d5db
+*/
+
+
+
+
+
+
+/* =========================================================
+   BOARD SUPER ADMIN SETTINGS + CUSTOM DROPDOWN COLUMNS
+   ========================================================= */
+.header-board-admin-tools {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  margin-right: 10px;
+  white-space: nowrap;
+}
+.header-owner-toggle-label {
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: .6px;
+  color: #6b7280;
+}
+.header-owner-toggle {
+  width: 38px;
+  height: 20px;
+  padding: 2px;
+  border: 0;
+  border-radius: 999px;
+  background: #d1d5db;
+  cursor: pointer;
+  transition: .2s ease;
+}
+.header-owner-toggle span {
+  display: block;
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  background: #fff;
+  box-shadow: 0 1px 4px rgba(0,0,0,.22);
+  transition: transform .2s ease;
+}
+.header-owner-toggle.active { background: #00c875; }
+.header-owner-toggle.active span { transform: translateX(18px); }
+.header-column-settings-btn {
+  width: 30px;
+  height: 30px;
+  display: inline-grid;
+  place-items: center;
+  border: 1px solid #e5e7eb;
+  border-radius: 8px;
+  background: #fff;
+  color: #111827;
+  cursor: pointer;
+}
+.board-settings-overlay {
+  position: fixed; inset: 0; z-index: 2100000000;
+  background: rgba(15,23,42,.45);
+  display: flex; align-items: center; justify-content: center;
+  padding: 24px;
+}
+.board-settings-modal {
+  width: min(760px, 96vw); max-height: 88vh; overflow: auto;
+  background: #fff; border-radius: 16px; box-shadow: 0 25px 70px rgba(0,0,0,.28);
+}
+.board-settings-head {
+  display:flex; align-items:flex-start; justify-content:space-between; gap:16px;
+  padding:20px 22px; border-bottom:1px solid #e5e7eb;
+}
+.board-settings-head h3 { margin:0; font-size:20px; color:#111827; }
+.board-settings-head p { margin:5px 0 0; font-size:12px; color:#6b7280; }
+.board-settings-head > button, .custom-column-manager-head button, .custom-option-manage-row button {
+  border:0; background:#f3f4f6; border-radius:7px; width:30px; height:30px; cursor:pointer;
+}
+.board-settings-section { padding:20px 22px; border-bottom:1px solid #eef0f3; }
+.board-settings-section h4 { margin:0 0 12px; font-size:13px; color:#111827; text-transform:uppercase; letter-spacing:.5px; }
+.board-column-toggle-grid { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:10px; }
+.board-column-toggle-grid label { display:flex; align-items:center; gap:8px; padding:10px; border:1px solid #e5e7eb; border-radius:9px; font-size:12px; font-weight:700; color:#374151; }
+.custom-column-create { display:flex; gap:8px; margin-bottom:14px; }
+.custom-column-create-with-type {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 190px auto;
+}
+.custom-column-type-select,
+.custom-column-inline-type {
+  border: 1px solid #d1d5db;
+  border-radius: 9px;
+  background: #fff;
+  color: #111827;
+  font-weight: 700;
+  outline: none;
+}
+.custom-column-type-select {
+  min-height: 40px;
+  padding: 0 10px;
+}
+.custom-field-type-help {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 8px;
+  margin: -4px 0 14px;
+  font-size: 11px;
+  color: #64748b;
+}
+.custom-field-type-help span {
+  padding: 8px 10px;
+  background: #f8fafc;
+  border-radius: 8px;
+}
+.custom-column-title-block {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+.custom-column-inline-type {
+  padding: 5px 8px;
+  font-size: 10px;
+}
+.custom-non-dropdown-help {
+  margin-top: 10px;
+  padding: 11px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  border: 1px dashed #cbd5e1;
+  border-radius: 9px;
+  color: #64748b;
+  font-size: 11px;
+}
+.custom-column-create input { flex:1; min-width:0; border:1px solid #d1d5db; border-radius:9px; padding:10px 12px; }
+.custom-column-create button, .custom-option-add-btn, .custom-field-quick-add button { border:0; border-radius:9px; background:#111827; color:#fff; padding:9px 12px; font-weight:700; cursor:pointer; }
+.custom-column-manager { border:1px solid #e5e7eb; border-radius:12px; padding:12px; margin-top:10px; }
+.custom-column-manager-head { display:flex; justify-content:space-between; align-items:center; gap:10px; }
+.custom-column-manager-head > div { display:flex; gap:6px; }
+.custom-column-manager-head .danger, .custom-option-manage-row .danger { color:#dc2626; }
+.custom-option-list { margin-top:10px; display:grid; gap:6px; }
+.custom-option-manage-row { display:grid; grid-template-columns:16px 1fr 30px 30px; gap:7px; align-items:center; background:#f8fafc; padding:7px 8px; border-radius:8px; font-size:12px; }
+.custom-option-color { width:12px; height:12px; border-radius:50%; display:inline-block; }
+.custom-option-color.clear { border:1px dashed #9ca3af; background:transparent; }
+.custom-option-add-btn { margin-top:10px; background:#f3f4f6; color:#111827; }
+.custom-option-inline-create {
+  margin-top: 10px;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 42px auto;
+  gap: 8px;
+  align-items: center;
+}
+.custom-option-inline-create > input[type="text"] {
+  min-width: 0;
+  height: 38px;
+  padding: 0 11px;
+  border: 1px solid #d1d5db;
+  border-radius: 9px;
+  outline: none;
+}
+.custom-option-inline-create > input[type="text"]:focus {
+  border-color: #94a3b8;
+  box-shadow: 0 0 0 3px rgba(148,163,184,.12);
+}
+.custom-option-inline-color {
+  width: 42px;
+  height: 38px;
+  position: relative;
+  display: grid;
+  place-items: center;
+  border: 1px solid #d1d5db;
+  border-radius: 9px;
+  cursor: pointer;
+  overflow: hidden;
+}
+.custom-option-inline-color span {
+  width: 22px;
+  height: 22px;
+  border-radius: 6px;
+}
+.custom-option-inline-color input[type="color"] {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  opacity: 0;
+  cursor: pointer;
+}
+.custom-option-inline-create .custom-option-add-btn {
+  margin-top: 0;
+  height: 38px;
+  white-space: nowrap;
+}
+.custom-option-inline-create .custom-option-add-btn:disabled {
+  opacity: .45;
+  cursor: not-allowed;
+}
+.custom-column-empty { padding:18px; text-align:center; color:#9ca3af; font-size:12px; }
+.board-col-custom { min-width:0; }
+.custom-field-trigger { width:100%; min-width:0; height:100%; min-height:46px; border:0; border-radius:0; padding:0 10px; background:#fff; color:#374151; display:flex; align-items:center; justify-content:space-between; gap:6px; font-size:11px; font-weight:800; cursor:pointer; transition:.15s ease; }
+.custom-field-trigger span { overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.custom-field-trigger-filled:not(.empty) { box-shadow: inset 0 0 0 1px rgba(0,0,0,.05); }
+.custom-field-trigger.empty { color:#9ca3af; font-weight:600; background:#fff; border:1px solid #e5e7eb; margin:5px; width:calc(100% - 10px); min-height:34px; height:34px; border-radius:7px; }
+.custom-field-text-input,
+.custom-field-notes-input {
+  width: 100%;
+  min-width: 0;
+  min-height: 46px;
+  border: 0;
+  outline: 0;
+  background: transparent;
+  color: #111827;
+  padding: 8px 9px;
+  font: inherit;
+  font-size: 11px;
+}
+.custom-field-notes-input {
+  resize: none;
+  white-space: pre-wrap;
+  line-height: 1.35;
+}
+.custom-field-text-input:focus,
+.custom-field-notes-input:focus {
+  background: #fff;
+  box-shadow: inset 0 0 0 2px #cbd5e1;
+}
+.custom-field-fixed-dropdown { background:#fff; border:1px solid #e5e7eb; border-radius:12px; box-shadow:0 18px 50px rgba(0,0,0,.2); overflow:hidden; max-height:360px; overflow-y:auto; }
+.custom-field-dropdown-head { position:sticky; top:0; z-index:2; display:flex; align-items:center; justify-content:space-between; padding:11px 12px; background:#f8fafc; border-bottom:1px solid #e5e7eb; }
+.custom-field-dropdown-head button { border:0; background:transparent; cursor:pointer; }
+.custom-field-option-row { width:100%; border:0; border-bottom:1px solid #f3f4f6; background:#fff; padding:10px 12px; display:grid; grid-template-columns:16px 1fr 18px; gap:8px; align-items:center; text-align:left; cursor:pointer; font-size:12px; }
+.custom-field-option-row:hover { background:#f8fafc; }
+
+.custom-field-option-manage-select-row {
+  min-height: 44px;
+  display: grid;
+  grid-template-columns: 26px minmax(0, 1fr) auto;
+  gap: 6px;
+  align-items: center;
+  padding: 5px 7px;
+  background: #fff;
+  border-bottom: 1px solid #f1f5f9;
+}
+
+.custom-field-option-manage-select-row:hover {
+  background: #f8fafc;
+}
+
+.custom-field-color-picker {
+  width: 26px;
+  height: 30px;
+  display: grid;
+  place-items: center;
+  position: relative;
+  cursor: pointer;
+  border-radius: 6px;
+}
+
+.custom-field-color-picker:hover {
+  background: #eef2f7;
+}
+
+.custom-field-color-picker .custom-option-color {
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  box-shadow:
+    0 0 0 2px #fff,
+    0 0 0 3px #d1d5db;
+}
+
+.custom-field-color-picker input[type="color"] {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  opacity: 0;
+  cursor: pointer;
+}
+
+.custom-field-option-main {
+  min-width: 0;
+  min-height: 34px;
+  border: 0;
+  background: transparent;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  text-align: left;
+  padding: 0 5px;
+  color: #111827;
+  font-size: 12px;
+  cursor: pointer;
+}
+
+.custom-field-option-main > span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.custom-field-option-actions {
+  display: flex;
+  align-items: center;
+  gap: 3px;
+}
+
+.custom-field-option-actions button {
+  width: 29px;
+  height: 29px;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  color: #475569;
+  cursor: pointer;
+}
+
+.custom-field-option-actions button:hover {
+  background: #e2e8f0;
+  color: #111827;
+}
+
+.custom-field-option-actions button.danger {
+  color: #dc2626;
+}
+
+.custom-field-option-actions button.danger:hover {
+  background: #fee2e2;
+}
+
+.custom-field-inline-edit {
+  min-width: 0;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 30px 30px;
+  gap: 4px;
+  align-items: center;
+}
+
+.custom-field-inline-edit input {
+  min-width: 0;
+  height: 32px;
+  border: 1px solid #94a3b8;
+  border-radius: 6px;
+  padding: 0 8px;
+  outline: none;
+  font-size: 12px;
+}
+
+.custom-field-inline-edit input:focus {
+  border-color: #111827;
+}
+
+.custom-field-inline-edit button {
+  width: 30px;
+  height: 30px;
+  border: 0;
+  border-radius: 6px;
+  cursor: pointer;
+  background: #e2e8f0;
+}
+
+.custom-field-inline-edit button.save {
+  background: #111827;
+  color: #fff;
+}
+
+.custom-field-quick-create {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 7px;
+  padding: 9px;
+  background: #f8fafc;
+  border-top: 1px solid #e5e7eb;
+}
+
+.custom-field-quick-create input {
+  min-width: 0;
+  height: 34px;
+  border: 1px solid #cbd5e1;
+  border-radius: 7px;
+  padding: 0 9px;
+  outline: none;
+  font-size: 12px;
+}
+
+.custom-field-quick-create input:focus {
+  border-color: #111827;
+}
+
+.custom-field-quick-create button {
+  height: 34px;
+  border: 0;
+  border-radius: 7px;
+  padding: 0 11px;
+  background: #111827;
+  color: #fff;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.custom-field-quick-create button:disabled {
+  opacity: .45;
+  cursor: not-allowed;
+}
+
+.custom-field-quick-hint {
+  display: flex;
+  align-items: flex-start;
+  gap: 6px;
+  padding: 7px 9px 9px;
+  background: #f8fafc;
+  color: #64748b;
+  font-size: 10px;
+  line-height: 1.35;
+}
+.custom-field-quick-add { padding:10px; background:#f8fafc; }
+.custom-field-quick-add button { width:100%; }
+@media (max-width: 780px) {
+  .board-column-toggle-grid { grid-template-columns:1fr 1fr; }
+  .header-owner-toggle-label { display:none; }
+  .custom-column-create-with-type {
+    grid-template-columns: 1fr;
+  }
+  .custom-field-type-help {
+    grid-template-columns: 1fr;
+  }
+}
 </style>
