@@ -4121,16 +4121,31 @@ export default {
    MODAL
 ========================= */
 .modal-overlay {
-  padding: 30px;
-  position: fixed;
-  inset: 0;
-  z-index: 3000;
-  overflow-y: auto;
+  position: fixed !important;
+  inset: 0 !important;
+
+  /*
+   * IMPORTANT:
+   * PageHeader.vue uses z-index ~99990.
+   * The old modal was only 3000, so the PageHeader was sitting
+   * on top of the order modal and hiding its dark modal header.
+   */
+  z-index: 2147483500 !important;
+
+  width: 100vw;
+  height: 100dvh;
+
+  padding: 18px;
+
   display: flex;
-  align-items: flex-start;
+  align-items: center;
   justify-content: center;
-  background: rgba(15, 23, 42, .55);
-  backdrop-filter: blur(3px);
+
+  overflow: hidden;
+
+  background: rgba(15, 23, 42, .62);
+  backdrop-filter: blur(4px);
+  -webkit-backdrop-filter: blur(4px);
 }
 
 .order-modal {
@@ -4146,12 +4161,20 @@ export default {
 .modal-header {
   min-height: 88px;
   padding: 18px 20px;
+
+  flex: 0 0 auto;
+
   border-radius: 16px 16px 0 0;
+
   display: flex;
   align-items: center;
   justify-content: space-between;
+
   background: #111827;
   color: #fff;
+
+  position: relative;
+  z-index: 5;
 }
 
 .modal-header p {
@@ -4201,7 +4224,16 @@ export default {
 }
 
 .modal-body {
+  flex: 1 1 auto;
+  min-height: 0;
+
   padding: 18px;
+
+  overflow-y: auto;
+  overflow-x: hidden;
+
+  overscroll-behavior: contain;
+  scrollbar-gutter: stable;
 }
 
 .detail-grid {
@@ -4295,6 +4327,7 @@ export default {
 
 .modal-status-menu {
   width: 260px;
+  z-index: 50 !important;
 }
 
 .always-open {
@@ -4537,7 +4570,23 @@ export default {
   }
 
   .modal-overlay {
-    padding: 10px;
+    padding: 8px;
+  }
+
+  .order-modal {
+    width: calc(100vw - 16px);
+    max-height: calc(100dvh - 16px);
+    border-radius: 12px;
+  }
+
+  .modal-header {
+    min-height: 72px;
+    padding: 14px;
+    border-radius: 12px 12px 0 0;
+  }
+
+  .modal-body {
+    padding: 12px;
   }
 }
 </style>
