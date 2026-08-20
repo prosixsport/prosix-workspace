@@ -14,6 +14,7 @@ class User extends Authenticatable
     protected $fillable = [
         'name',
         'email',
+        'phone',
         'password',
         'role',
         'avatar',
@@ -44,12 +45,26 @@ class User extends Authenticatable
         'profile_photo_url',
     ];
 
-    public function getProfilePhotoUrlAttribute()
+    /*
+    |--------------------------------------------------------------------------
+    | Profile Photo URL
+    |--------------------------------------------------------------------------
+    */
+
+    public function getProfilePhotoUrlAttribute(): ?string
     {
-        return $this->profile_photo
-            ? asset('storage/' . $this->profile_photo)
-            : null;
+        if (!$this->profile_photo) {
+            return null;
+        }
+
+        return asset('storage/' . ltrim($this->profile_photo, '/'));
     }
+
+    /*
+    |--------------------------------------------------------------------------
+    | Role Helpers
+    |--------------------------------------------------------------------------
+    */
 
     public function isSuperAdmin(): bool
     {
@@ -66,8 +81,15 @@ class User extends Authenticatable
         return $this->role === 'member';
     }
 
+    /*
+    |--------------------------------------------------------------------------
+    | Order Permission
+    |--------------------------------------------------------------------------
+    */
+
     public function canCreateOrders(): bool
     {
-        return $this->role === 'super_admin' || $this->can_create_orders;
+        return $this->role === 'super_admin'
+            || (bool) $this->can_create_orders;
     }
 }

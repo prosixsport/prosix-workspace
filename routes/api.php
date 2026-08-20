@@ -258,16 +258,17 @@ Route::middleware('auth:sanctum')->group(function () {
     |--------------------------------------------------------------------------
     */
 
-    Route::get('/users/{user}/profile', [
-        MemberController::class,
-        'profile'
-    ]);
 
 
-    Route::post('/me/profile', [
-        MemberController::class,
-        'updateProfile'
-    ]);
+Route::get('/user/profile', [
+    MemberController::class,
+    'profile'
+]);
+
+Route::post('/user/profile', [
+    MemberController::class,
+    'updateProfile'
+]);
 
 
     /*

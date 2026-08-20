@@ -645,15 +645,10 @@ tbody tr:last-child td {
 
 .po-text {
   display: inline-flex;
-
   padding: 5px 9px;
-
   background: #f4f5f8;
-
   border-radius: 7px;
-
   color: #475467;
-
   font-size: 10px;
   font-weight: 800;
 }
