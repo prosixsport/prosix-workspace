@@ -414,7 +414,7 @@
         :style="{ order: boardSectionOrder(activeGroup, 2) }"
       >
         <div class="board-table-head" :style="boardGridStyle">
-          <div class="board-col board-col-check resizable-head-cell">
+          <div class="board-col board-col-check resizable-head-cell" style="order:-1">
             <input
               type="checkbox"
               v-model="selectAll"
@@ -428,7 +428,7 @@
             ></span>
           </div>
 
-          <div class="board-col board-col-name resizable-head-cell">
+          <div class="board-col board-col-name resizable-head-cell" :style="boardColumnOrderStyle('name')">
             ORDER NAME
             <span
               class="column-resizer"
@@ -437,7 +437,7 @@
             ></span>
           </div>
 
-          <div v-if="isBoardColumnVisible('status')" class="board-col board-col-status resizable-head-cell">
+          <div v-if="isBoardColumnVisible('status')" class="board-col board-col-status resizable-head-cell" :style="boardColumnOrderStyle('status')">
             STATUS
             <span
               class="column-resizer"
@@ -450,11 +450,12 @@
             v-for="column in activeCustomColumns"
             :key="'custom-head-' + column.id"
             class="board-col board-col-custom resizable-head-cell"
+            :style="boardColumnOrderStyle(`custom_${column.id}`)"
           >
             {{ column.name }}
           </div>
 
-          <div v-if="isBoardColumnVisible('owner')" class="board-col board-col-owner resizable-head-cell">
+          <div v-if="isBoardColumnVisible('owner')" class="board-col board-col-owner resizable-head-cell" :style="boardColumnOrderStyle('owner')">
             OWNER
             <span
               class="column-resizer"
@@ -463,7 +464,7 @@
             ></span>
           </div>
 
-          <div v-if="isBoardColumnVisible('files')" class="board-col board-col-files resizable-head-cell">
+          <div v-if="isBoardColumnVisible('files')" class="board-col board-col-files resizable-head-cell" :style="boardColumnOrderStyle('files')">
             FILES
             <span
               class="column-resizer"
@@ -472,7 +473,7 @@
             ></span>
           </div>
 
-          <div v-if="isBoardColumnVisible('packing')" class="board-col board-col-packing resizable-head-cell">
+          <div v-if="isBoardColumnVisible('packing')" class="board-col board-col-packing resizable-head-cell" :style="boardColumnOrderStyle('packing')">
             PACKING DETAIL
             <span
               class="column-resizer"
@@ -481,7 +482,7 @@
             ></span>
           </div>
 
-          <div v-if="isBoardColumnVisible('notes')" class="board-col board-col-notes resizable-head-cell">
+          <div v-if="isBoardColumnVisible('notes')" class="board-col board-col-notes resizable-head-cell" :style="boardColumnOrderStyle('notes')">
             NOTES
             <span
               class="column-resizer"
@@ -490,7 +491,7 @@
             ></span>
           </div>
 
-          <div v-if="isBoardColumnVisible('chat')" class="board-col board-col-chat resizable-head-cell">
+          <div v-if="isBoardColumnVisible('chat')" class="board-col board-col-chat resizable-head-cell" :style="boardColumnOrderStyle('chat')">
             CHAT
             <span
               class="column-resizer"
@@ -499,7 +500,7 @@
             ></span>
           </div>
 
-          <div v-if="isBoardColumnVisible('payment')" class="board-col board-col-payment resizable-head-cell">
+          <div v-if="isBoardColumnVisible('payment')" class="board-col board-col-payment resizable-head-cell" :style="boardColumnOrderStyle('payment')">
             PAYMENT
             <span
               class="column-resizer"
@@ -508,7 +509,7 @@
             ></span>
           </div>
 
-          <div v-if="isBoardColumnVisible('address')" class="board-col board-col-address resizable-head-cell">
+          <div v-if="isBoardColumnVisible('address')" class="board-col board-col-address resizable-head-cell" :style="boardColumnOrderStyle('address')">
             ADDRESS
             <span
               class="column-resizer"
@@ -517,7 +518,7 @@
             ></span>
           </div>
 
-          <div v-if="isBoardColumnVisible('track')" class="board-col board-col-track resizable-head-cell">
+          <div v-if="isBoardColumnVisible('track')" class="board-col board-col-track resizable-head-cell" :style="boardColumnOrderStyle('track')">
             TRK#
             <span
               class="column-resizer"
@@ -526,7 +527,7 @@
             ></span>
           </div>
 
-          <div class="board-col board-col-info">
+          <div class="board-col board-col-info" style="order:9999">
             <i class="fa-regular fa-circle-question"></i>
           </div>
         </div>
@@ -598,7 +599,7 @@
           :style="boardGridStyle"
           @click="openBoardOrder(order)"
         >
-          <div class="board-col board-col-check">
+          <div class="board-col board-col-check" style="order:-1">
             <input
               type="checkbox"
               :value="order.id"
@@ -607,7 +608,7 @@
             />
           </div>
 
-          <div class="board-col board-col-name">
+          <div class="board-col board-col-name" :style="boardColumnOrderStyle('name')">
             <span v-if="!order.user_has_seen" class="board-new-dot"></span>
 
             <div class="inline-cell-wrap">
@@ -635,9 +636,9 @@
               </button>
 
               <div class="order-working-actions">
-                <!-- START WORK: ONLY FOR "IN PRODUCTION" STATUS -->
+                <!-- START WORK: SHOW FOR EVERY ORDER STATUS -->
                 <button
-                  v-if="isInProductionOrder(order) && !workingDesigner(order)"
+                  v-if="!workingDesigner(order)"
                   type="button"
                   class="start-working-btn"
                   title="Start Work"
@@ -650,7 +651,6 @@
                 <!-- AFTER START: ONLY SUPER ADMIN CAN STOP -->
                 <button
                   v-else-if="
-                    isInProductionOrder(order) &&
                     workingDesigner(order) &&
                     isSuperAdmin
                   "
@@ -680,7 +680,7 @@
 
                 <!-- OTHER USERS: IMAGE ONLY -->
                 <div
-                  v-else-if="isInProductionOrder(order) && workingDesigner(order)"
+                  v-else-if="workingDesigner(order)"
                   class="working-user-avatar-only working-user-avatar-readonly"
                   :title="workingDesigner(order).name + ' is working'"
                   @click.stop
@@ -702,7 +702,7 @@
             </div>
           </div>
 
-          <div v-if="isBoardColumnVisible('status')" class="board-col board-col-status row-status-cell" @click.stop>
+          <div v-if="isBoardColumnVisible('status')" class="board-col board-col-status row-status-cell" :style="boardColumnOrderStyle('status')" @click.stop>
             <div class="status-ref-wrap">
               <button
                 type="button"
@@ -730,6 +730,7 @@
             v-for="column in activeCustomColumns"
             :key="'custom-cell-' + order.id + '-' + column.id"
             class="board-col board-col-custom row-custom-cell"
+            :style="boardColumnOrderStyle(`custom_${column.id}`)"
             @click.stop
           >
             <!-- DROPDOWN: full colored label like STATUS -->
@@ -773,7 +774,7 @@
             ></textarea>
           </div>
 
-          <div v-if="isBoardColumnVisible('owner')" class="board-col board-col-owner">
+          <div v-if="isBoardColumnVisible('owner')" class="board-col board-col-owner" :style="boardColumnOrderStyle('owner')">
             <div class="board-avatar-stack owner-compact-stack">
               <button
                 v-if="loggedInOrderOwner(order)"
@@ -820,6 +821,7 @@
           <div
             v-if="isBoardColumnVisible('files')"
             class="board-col board-col-files board-files-drop-zone"
+            :style="boardColumnOrderStyle('files')"
             :class="{
               'row-file-drag-active':
                 rowFileDragOrderId === Number(order.id)
@@ -894,7 +896,7 @@
             </div>
           </div>
 
-          <div v-if="isBoardColumnVisible('packing')" class="board-col board-col-packing">
+          <div v-if="isBoardColumnVisible('packing')" class="board-col board-col-packing" :style="boardColumnOrderStyle('packing')">
             <input
               class="packing-clean-input"
               :value="packingDetailText(order)"
@@ -908,7 +910,7 @@
           </div>
 
           <!-- NOTES: EDIT DIRECTLY FROM OUTER ORDER ROW -->
-          <div v-if="isBoardColumnVisible('notes')" class="board-col board-col-notes">
+          <div v-if="isBoardColumnVisible('notes')" class="board-col board-col-notes" :style="boardColumnOrderStyle('notes')">
             <textarea
               class="board-notes-inline-input"
               :value="orderNotesText(order)"
@@ -923,7 +925,7 @@
             ></textarea>
           </div>
 
-          <div v-if="isBoardColumnVisible('chat')" class="board-col board-col-chat">
+          <div v-if="isBoardColumnVisible('chat')" class="board-col board-col-chat" :style="boardColumnOrderStyle('chat')">
             <button
               type="button"
               class="board-chat-button"
@@ -937,7 +939,7 @@
             </button>
           </div>
 
-          <div v-if="isBoardColumnVisible('payment')" class="board-col board-col-payment">
+          <div v-if="isBoardColumnVisible('payment')" class="board-col board-col-payment" :style="boardColumnOrderStyle('payment')">
             <input
               class="board-inline-cell-input payment-input-inline"
               :value="order.payment || '0 % Paid'"
@@ -948,7 +950,7 @@
             />
           </div>
 
-          <div v-if="isBoardColumnVisible('address')" class="board-col board-col-address">
+          <div v-if="isBoardColumnVisible('address')" class="board-col board-col-address" :style="boardColumnOrderStyle('address')">
             <input
               class="board-inline-cell-input"
               :value="order.shippingAddress || ''"
@@ -960,7 +962,7 @@
             />
           </div>
 
-          <div v-if="isBoardColumnVisible('track')" class="board-col board-col-track">
+          <div v-if="isBoardColumnVisible('track')" class="board-col board-col-track" :style="boardColumnOrderStyle('track')">
             <input
               class="board-inline-cell-input"
               :value="trackingSummary(order.trk)"
@@ -972,7 +974,7 @@
             />
           </div>
 
-          <div class="board-col board-col-info">
+          <div class="board-col board-col-info" style="order:9999">
             <button
               type="button"
               title="Order details"
@@ -1038,6 +1040,38 @@
         </div>
 
         <div class="board-settings-section">
+          <h4>Column Positions</h4>
+          <p class="column-position-help">Use arrows to place any standard or custom column wherever you want.</p>
+          <div class="board-column-position-list">
+            <div
+              v-for="(column, index) in orderedBoardColumnItems"
+              :key="'position-' + column.key"
+              class="board-column-position-row"
+            >
+              <span class="board-column-position-number">{{ index + 1 }}</span>
+              <strong>{{ column.label }}</strong>
+              <small>{{ column.custom ? 'Custom' : 'Standard' }}</small>
+              <button
+                type="button"
+                title="Move left"
+                :disabled="index === 0 || boardSettingsSaving"
+                @click="moveBoardColumn(column.key, -1)"
+              >
+                <i class="fa-solid fa-arrow-left"></i>
+              </button>
+              <button
+                type="button"
+                title="Move right"
+                :disabled="index === orderedBoardColumnItems.length - 1 || boardSettingsSaving"
+                @click="moveBoardColumn(column.key, 1)"
+              >
+                <i class="fa-solid fa-arrow-right"></i>
+              </button>
+            </div>
+          </div>
+        </div>
+
+        <div class="board-settings-section">
           <h4>Standard Columns</h4>
           <div class="board-column-toggle-grid">
             <label v-for="column in manageableStandardColumns" :key="column.key">
@@ -1090,7 +1124,7 @@
           </div>
 
           <div
-            v-for="column in customColumns"
+            v-for="column in orderedCustomColumns"
             :key="'manage-column-' + column.id"
             class="custom-column-manager"
             :data-custom-column-id="column.id"
@@ -2663,7 +2697,8 @@ export default {
       boardSettingsSaving: false,
       boardSettings: {
         auto_assign_all_owners: false,
-        hidden_columns: []
+        hidden_columns: [],
+        column_order: []
       },
       customColumns: [],
       boardCustomValuesByOrder: {},
@@ -3147,9 +3182,47 @@ filteredOrders() {
     },
 
     activeCustomColumns() {
-      return (this.customColumns || [])
+      return this.orderedCustomColumns
         .filter(column => column && column.is_active !== false)
-        .sort((a, b) => Number(a.position || 0) - Number(b.position || 0))
+    },
+
+    orderedCustomColumns() {
+      return [...(this.customColumns || [])]
+        .filter(Boolean)
+        .sort((a, b) => {
+          const positionDifference = Number(a.position || 0) - Number(b.position || 0)
+          return positionDifference || Number(a.id || 0) - Number(b.id || 0)
+        })
+    },
+
+    allBoardColumnItems() {
+      return [
+        { key: 'name', label: 'Order Name', custom: false },
+        ...this.manageableStandardColumns.map(item => ({ ...item, custom: false })),
+        ...this.orderedCustomColumns.map(column => ({
+          key: `custom_${column.id}`,
+          label: column.name,
+          custom: true
+        }))
+      ]
+    },
+
+    orderedBoardColumnItems() {
+      const items = this.allBoardColumnItems
+      const itemMap = new Map(items.map(item => [item.key, item]))
+      const savedOrder = Array.isArray(this.boardSettings.column_order)
+        ? this.boardSettings.column_order
+        : []
+
+      const ordered = savedOrder
+        .filter(key => itemMap.has(key))
+        .map(key => itemMap.get(key))
+
+      items.forEach(item => {
+        if (!ordered.some(existing => existing.key === item.key)) ordered.push(item)
+      })
+
+      return ordered
     },
 
     customFieldMenuStyle() {
@@ -3166,29 +3239,21 @@ filteredOrders() {
     boardGridStyle() {
       const w = this.columnWidths
 
-      const staticKeys = [
-        'check',
-        'name',
-        'status',
-        'owner',
-        'files',
-        'packing',
-        'notes',
-        'chat',
-        'payment',
-        'address',
-        'track',
-        'info'
-      ]
-
-      const alwaysVisible = ['check', 'name', 'info']
-      const keys = staticKeys.filter(key =>
-        alwaysVisible.includes(key) || this.isBoardColumnVisible(key)
+      const activeCustomKeys = new Set(
+        this.activeCustomColumns.map(column => `custom_${column.id}`)
       )
 
-      this.activeCustomColumns.forEach(column => {
-        const key = `custom_${column.id}`
-        keys.splice(Math.min(3, keys.length - 1), 0, key)
+      const orderedDataKeys = this.orderedBoardColumnItems
+        .map(item => item.key)
+        .filter(key => {
+          if (key === 'name') return true
+          if (key.startsWith('custom_')) return activeCustomKeys.has(key)
+          return this.isBoardColumnVisible(key)
+        })
+
+      const keys = ['check', ...orderedDataKeys, 'info']
+
+      activeCustomKeys.forEach(key => {
         if (!w[key]) w[key] = 145
       })
 
@@ -3343,11 +3408,17 @@ beforeUnmount()  {
         })
 
         const data = res.data?.data || res.data || {}
+        const localColumnOrder = JSON.parse(
+          localStorage.getItem('factory_board_column_order') || '[]'
+        )
         this.boardSettings = {
           auto_assign_all_owners: Boolean(data.settings?.auto_assign_all_owners),
           hidden_columns: Array.isArray(data.settings?.hidden_columns)
             ? data.settings.hidden_columns
-            : []
+            : [],
+          column_order: Array.isArray(data.settings?.column_order) && data.settings.column_order.length
+            ? data.settings.column_order
+            : (Array.isArray(localColumnOrder) ? localColumnOrder : [])
         }
         this.customColumns = Array.isArray(data.custom_columns)
           ? data.custom_columns
@@ -3375,7 +3446,8 @@ beforeUnmount()  {
           '/api/factory-board/settings',
           {
             auto_assign_all_owners: next,
-            hidden_columns: this.boardSettings.hidden_columns || []
+            hidden_columns: this.boardSettings.hidden_columns || [],
+            column_order: this.boardSettings.column_order || []
           },
           { headers: this.headers() }
         )
@@ -3406,7 +3478,8 @@ beforeUnmount()  {
             auto_assign_all_owners: Boolean(
               this.boardSettings.auto_assign_all_owners
             ),
-            hidden_columns: [...hidden]
+            hidden_columns: [...hidden],
+            column_order: this.boardSettings.column_order || []
           },
           { headers: this.headers() }
         )
@@ -3420,6 +3493,57 @@ beforeUnmount()  {
       } catch (error) {
         console.error('toggleBoardColumnVisibility error:', error)
         alert(error.response?.data?.message || 'Column setting could not be saved.')
+      }
+    },
+
+    boardColumnOrderStyle(key) {
+      const index = this.orderedBoardColumnItems.findIndex(item => item.key === key)
+      return { order: index < 0 ? 0 : index + 1 }
+    },
+
+    async moveBoardColumn(key, direction) {
+      if (!this.isSuperAdmin || this.boardSettingsSaving) return
+
+      const order = this.orderedBoardColumnItems.map(item => item.key)
+      const currentIndex = order.indexOf(key)
+      const targetIndex = currentIndex + Number(direction)
+
+      if (currentIndex < 0 || targetIndex < 0 || targetIndex >= order.length) return
+
+      const previousOrder = [...(this.boardSettings.column_order || [])]
+      const [movedKey] = order.splice(currentIndex, 1)
+      order.splice(targetIndex, 0, movedKey)
+
+      this.boardSettings.column_order = order
+      localStorage.setItem('factory_board_column_order', JSON.stringify(order))
+      this.boardSettingsSaving = true
+
+      try {
+        const res = await axios.put(
+          '/api/factory-board/settings',
+          {
+            auto_assign_all_owners: Boolean(this.boardSettings.auto_assign_all_owners),
+            hidden_columns: this.boardSettings.hidden_columns || [],
+            column_order: order
+          },
+          { headers: this.headers() }
+        )
+
+        const savedOrder =
+          res.data?.settings?.column_order ??
+          res.data?.data?.column_order
+
+        if (Array.isArray(savedOrder) && savedOrder.length) {
+          this.boardSettings.column_order = savedOrder
+          localStorage.setItem('factory_board_column_order', JSON.stringify(savedOrder))
+        }
+      } catch (error) {
+        this.boardSettings.column_order = previousOrder
+        localStorage.setItem('factory_board_column_order', JSON.stringify(previousOrder))
+        console.error('moveBoardColumn error:', error)
+        alert(error.response?.data?.message || 'Column position could not be saved.')
+      } finally {
+        this.boardSettingsSaving = false
       }
     },
 
@@ -3477,6 +3601,57 @@ beforeUnmount()  {
           error.response?.data?.message ||
           'Column type could not be changed.'
         )
+      }
+    },
+
+    customColumnIndex(column) {
+      return this.orderedCustomColumns.findIndex(
+        item => Number(item.id) === Number(column?.id)
+      )
+    },
+
+    async moveCustomColumn(column, direction) {
+      if (!this.isSuperAdmin || !column || this.boardSettingsSaving) return
+
+      const columns = this.orderedCustomColumns
+      const currentIndex = this.customColumnIndex(column)
+      const targetIndex = currentIndex + Number(direction)
+
+      if (currentIndex < 0 || targetIndex < 0 || targetIndex >= columns.length) return
+
+      const reordered = [...columns]
+      const [movedColumn] = reordered.splice(currentIndex, 1)
+      reordered.splice(targetIndex, 0, movedColumn)
+
+      const previousColumns = [...this.customColumns]
+      this.customColumns = reordered.map((item, index) => ({
+        ...item,
+        position: index + 1
+      }))
+      this.boardSettingsSaving = true
+
+      try {
+        await Promise.all(
+          this.customColumns.map(item =>
+            axios.put(
+              `/api/factory-board/custom-columns/${item.id}`,
+              {
+                name: item.name,
+                type: item.type || 'dropdown',
+                position: item.position
+              },
+              { headers: this.headers() }
+            )
+          )
+        )
+
+        await this.fetchBoardConfiguration()
+      } catch (error) {
+        this.customColumns = previousColumns
+        console.error('moveCustomColumn error:', error)
+        alert(error.response?.data?.message || 'Column position could not be saved.')
+      } finally {
+        this.boardSettingsSaving = false
       }
     },
 
@@ -22705,6 +22880,14 @@ body.board-column-resizing .column-resizer::before {
 .board-settings-section h4 { margin:0 0 12px; font-size:13px; color:#111827; text-transform:uppercase; letter-spacing:.5px; }
 .board-column-toggle-grid { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:10px; }
 .board-column-toggle-grid label { display:flex; align-items:center; gap:8px; padding:10px; border:1px solid #e5e7eb; border-radius:9px; font-size:12px; font-weight:700; color:#374151; }
+.column-position-help { margin:-6px 0 12px; color:#64748b; font-size:11px; }
+.board-column-position-list { display:grid; gap:7px; }
+.board-column-position-row { display:grid; grid-template-columns:28px minmax(0,1fr) 68px 32px 32px; gap:7px; align-items:center; padding:8px 9px; border:1px solid #e5e7eb; border-radius:9px; background:#f8fafc; }
+.board-column-position-number { width:24px; height:24px; display:grid; place-items:center; border-radius:7px; background:#111827; color:#fff; font-size:10px; font-weight:800; }
+.board-column-position-row strong { min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; font-size:12px; color:#111827; }
+.board-column-position-row small { color:#94a3b8; font-size:9px; text-transform:uppercase; font-weight:800; }
+.board-column-position-row button { width:30px; height:30px; border:0; border-radius:7px; background:#e5e7eb; color:#111827; cursor:pointer; }
+.board-column-position-row button:disabled { opacity:.35; cursor:not-allowed; }
 .custom-column-create { display:flex; gap:8px; margin-bottom:14px; }
 .custom-column-create-with-type {
   display: grid;
@@ -22762,6 +22945,7 @@ body.board-column-resizing .column-resizer::before {
 .custom-column-manager { border:1px solid #e5e7eb; border-radius:12px; padding:12px; margin-top:10px; }
 .custom-column-manager-head { display:flex; justify-content:space-between; align-items:center; gap:10px; }
 .custom-column-manager-head > div { display:flex; gap:6px; }
+.custom-column-manager-head button:disabled { opacity:.35; cursor:not-allowed; }
 .custom-column-manager-head .danger, .custom-option-manage-row .danger { color:#dc2626; }
 .custom-option-list { margin-top:10px; display:grid; gap:6px; }
 .custom-option-manage-row { display:grid; grid-template-columns:16px 1fr 30px 30px; gap:7px; align-items:center; background:#f8fafc; padding:7px 8px; border-radius:8px; font-size:12px; }
