@@ -751,6 +751,8 @@
             :key="'custom-cell-' + order.id + '-' + column.id"
             class="board-col board-col-custom row-custom-cell"
             :style="boardColumnOrderStyle(`custom_${column.id}`)"
+            @mouseenter="showCopyableHoverText(getOrderCustomText(order, column), $event)"
+            @mouseleave="scheduleCopyableHoverHide"
             @click.stop
           >
             <!-- DROPDOWN: full colored label like STATUS -->
@@ -924,7 +926,7 @@
             </div>
           </div>
 
-          <div v-if="isBoardColumnVisible('packing')" class="board-col board-col-packing" :style="boardColumnOrderStyle('packing')">
+          <div v-if="isBoardColumnVisible('packing')" class="board-col board-col-packing" :style="boardColumnOrderStyle('packing')" @mouseenter="showCopyableHoverText(packingDetailText(order), $event)" @mouseleave="scheduleCopyableHoverHide">
             <input
               class="packing-clean-input"
               :value="packingDetailText(order)"
@@ -944,7 +946,7 @@
           </div>
 
           <!-- NOTES: EDIT DIRECTLY FROM OUTER ORDER ROW -->
-          <div v-if="isBoardColumnVisible('notes')" class="board-col board-col-notes" :style="boardColumnOrderStyle('notes')">
+          <div v-if="isBoardColumnVisible('notes')" class="board-col board-col-notes" :style="boardColumnOrderStyle('notes')" @mouseenter="showCopyableHoverText(orderNotesText(order), $event)" @mouseleave="scheduleCopyableHoverHide">
             <textarea
               class="board-notes-inline-input"
               :value="orderNotesText(order)"
@@ -990,7 +992,7 @@
             />
           </div>
 
-          <div v-if="isBoardColumnVisible('address')" class="board-col board-col-address" :style="boardColumnOrderStyle('address')">
+          <div v-if="isBoardColumnVisible('address')" class="board-col board-col-address" :style="boardColumnOrderStyle('address')" @mouseenter="showCopyableHoverText(order.shippingAddress, $event)" @mouseleave="scheduleCopyableHoverHide">
             <input
               class="board-inline-cell-input"
               :value="order.shippingAddress || ''"
@@ -1008,7 +1010,7 @@
             </div>
           </div>
 
-          <div v-if="isBoardColumnVisible('track')" class="board-col board-col-track" :style="boardColumnOrderStyle('track')">
+          <div v-if="isBoardColumnVisible('track')" class="board-col board-col-track" :style="boardColumnOrderStyle('track')" @mouseenter="showCopyableHoverText(trackingSummary(order.trk), $event)" @mouseleave="scheduleCopyableHoverHide">
             <input
               class="board-inline-cell-input"
               :value="trackingSummary(order.trk)"
@@ -2726,6 +2728,18 @@
         </div>
       </div>
     </div>
+
+    <!-- Fixed layer: never clipped by table overflow; text is selectable/copyable. -->
+    <div
+      v-if="copyableHoverTooltip.text"
+      class="global-copyable-tooltip"
+      :style="copyableHoverTooltipStyle"
+      @mouseenter="cancelCopyableHoverHide"
+      @mouseleave="hideCopyableHoverText"
+      @click.stop
+    >
+      {{ copyableHoverTooltip.text }}
+    </div>
   </div>
   </AppLayout>
 </template>
@@ -2745,6 +2759,13 @@ export default {
   data() {
       return {
       showShippingAddressMenu: false,
+      copyableHoverTooltip: {
+        text: '',
+        top: 0,
+        left: 0,
+        width: 320
+      },
+      copyableHoverHideTimer: null,
       boardSettingsModal: false,
       boardSettingsSaving: false,
       boardSettings: {
@@ -2919,6 +2940,15 @@ activeTrackingIndex: 0,
   },
 
   computed: {
+    copyableHoverTooltipStyle() {
+      return {
+        position: 'fixed',
+        top: `${this.copyableHoverTooltip.top}px`,
+        left: `${this.copyableHoverTooltip.left}px`,
+        width: `${this.copyableHoverTooltip.width}px`,
+        zIndex: 2147483647
+      }
+    },
     boardGroups() {
       const statusColorByLabel = (label, fallback) => {
         const found = this.statusOptions.find(
@@ -3449,6 +3479,58 @@ beforeUnmount()  {
 
 
  methods: {
+    showCopyableHoverText(rawText, event) {
+      const text = String(rawText || '').trim()
+
+      if (!text || text.toLowerCase() === 'n/a') {
+        this.hideCopyableHoverText()
+        return
+      }
+
+      this.cancelCopyableHoverHide()
+
+      const rect = event?.currentTarget?.getBoundingClientRect?.()
+      if (!rect) return
+
+      const width = Math.min(360, Math.max(240, rect.width + 80))
+      const padding = 12
+      let left = rect.left
+      let top = rect.bottom + 6
+
+      if (left + width > window.innerWidth - padding) {
+        left = window.innerWidth - width - padding
+      }
+
+      if (left < padding) left = padding
+
+      // Near the bottom, place the popup above the row.
+      if (top + 190 > window.innerHeight) {
+        top = Math.max(padding, rect.top - 190)
+      }
+
+      this.copyableHoverTooltip = { text, top, left, width }
+    },
+
+    scheduleCopyableHoverHide() {
+      this.cancelCopyableHoverHide()
+      this.copyableHoverHideTimer = setTimeout(
+        () => this.hideCopyableHoverText(),
+        280
+      )
+    },
+
+    cancelCopyableHoverHide() {
+      if (this.copyableHoverHideTimer) {
+        clearTimeout(this.copyableHoverHideTimer)
+        this.copyableHoverHideTimer = null
+      }
+    },
+
+    hideCopyableHoverText() {
+      this.cancelCopyableHoverHide()
+      this.copyableHoverTooltip = { text: '', top: 0, left: 0, width: 320 }
+    },
+
     isBoardColumnVisible(key) {
       return !(this.boardSettings.hidden_columns || []).includes(key)
     },
@@ -5551,13 +5633,22 @@ beforeUnmount()  {
       if (!status) return
 
       const activeWorker = this.workingDesigner(order)
+      const isShipped =
+        String(status.label).trim().toLowerCase() === 'shipped'
+      const shippedBy = isShipped ? this.currentUser : null
 
       try {
         await axios.put(
           `/api/orders/${order.id}`,
           {
             status: status.label,
-            status_color: status.color
+            status_color: status.color,
+            ...(isShipped && shippedBy
+              ? {
+                  shipped_by_user_id: shippedBy.id,
+                  shipped_at: new Date().toISOString()
+                }
+              : {})
           },
           {
             headers: this.headers()
@@ -5568,11 +5659,13 @@ beforeUnmount()  {
         order.statusColor = status.color
         order.group = this.statusToGroup(status.label)
 
-        if (
-          String(status.label).trim().toLowerCase() === 'shipped' &&
-          activeWorker
-        ) {
-          await this.finishWorkForShippedOrder(order, activeWorker)
+        if (isShipped && shippedBy) {
+          this.markOrderFinished(order.id, shippedBy)
+          order.finished_by = shippedBy
+
+          if (activeWorker) {
+            await this.finishWorkForShippedOrder(order, shippedBy)
+          }
         }
 
         if (
@@ -9809,16 +9902,30 @@ shipping_address: this.newOrder.shippingAddress,
     async changeStatus(s) {
       if (!this.selectedOrder) return
       const activeWorker = this.workingDesigner(this.selectedOrder)
+      const isShipped =
+        String(s.label || '').trim().toLowerCase() === 'shipped'
+      const shippedBy = isShipped ? this.currentUser : null
       try {
-        await axios.put(`/api/orders/${this.selectedOrder.id}`, { status: s.label, status_color: s.color || '#6161ff' }, { headers: this.headers() })
+        await axios.put(`/api/orders/${this.selectedOrder.id}`, {
+          status: s.label,
+          status_color: s.color || '#6161ff',
+          ...(isShipped && shippedBy
+            ? {
+                shipped_by_user_id: shippedBy.id,
+                shipped_at: new Date().toISOString()
+              }
+            : {})
+        }, { headers: this.headers() })
         this.selectedOrder.status = s.label
         this.selectedOrder.statusColor = s.color || '#6161ff'
         this.selectedOrder.group = s.group || 'in_production'
-        if (
-          String(s.label || '').trim().toLowerCase() === 'shipped' &&
-          activeWorker
-        ) {
-          await this.finishWorkForShippedOrder(this.selectedOrder, activeWorker)
+        if (isShipped && shippedBy) {
+          this.markOrderFinished(this.selectedOrder.id, shippedBy)
+          this.selectedOrder.finished_by = shippedBy
+
+          if (activeWorker) {
+            await this.finishWorkForShippedOrder(this.selectedOrder, shippedBy)
+          }
         }
         this.activeGroup = s.group || 'in_production'
         const idx = this.orders.findIndex(o => o.id === this.selectedOrder.id)
@@ -23595,5 +23702,44 @@ body.board-column-resizing .column-resizer::before {
   border-color: #475569;
   background: #f8fafc;
   color: #0f172a;
+}
+
+/* The old in-cell popup can be clipped by table overflow; use fixed popup. */
+.copyable-cell-tooltip {
+  display: none !important;
+}
+
+.global-copyable-tooltip {
+  max-height: 190px;
+  overflow: auto;
+  padding: 13px 15px;
+  border: 1px solid #3f4652;
+  border-radius: 7px;
+  background: #303238;
+  color: #ffffff;
+  box-shadow: 0 14px 34px rgba(15, 23, 42, .32);
+  font-size: 13px;
+  font-weight: 600;
+  line-height: 1.48;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  text-align: left;
+  cursor: text;
+  user-select: text;
+  -webkit-user-select: text;
+  pointer-events: auto;
+}
+
+.global-copyable-tooltip::before {
+  content: '';
+  position: absolute;
+  top: -6px;
+  left: 18px;
+  width: 11px;
+  height: 11px;
+  border-left: 1px solid #3f4652;
+  border-top: 1px solid #3f4652;
+  background: #303238;
+  transform: rotate(45deg);
 }
 </style>
