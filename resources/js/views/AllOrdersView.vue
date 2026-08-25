@@ -636,9 +636,29 @@
               </button>
 
               <div class="order-working-actions">
+                <!-- SHIPPED: SHOW THE PERSON WHO FINISHED THIS ORDER -->
+                <div
+                  v-if="isShippedOrder(order) && finishedDesigner(order)"
+                  class="finished-user-avatar-only"
+                  :title="finishedDesigner(order).name + ' finished this order'"
+                  @click.stop
+                >
+                  <img
+                    v-if="finishedDesigner(order).profile_photo_url"
+                    :src="finishedDesigner(order).profile_photo_url"
+                    :alt="finishedDesigner(order).name"
+                  />
+                  <span v-else class="row-working-avatar-fallback">
+                    {{ initial(finishedDesigner(order).name) }}
+                  </span>
+                  <span class="finished-flag-badge" title="Finished">
+                    <i class="fa-solid fa-flag-checkered"></i>
+                  </span>
+                </div>
+
                 <!-- START WORK: SHOW FOR EVERY ORDER STATUS -->
                 <button
-                  v-if="!workingDesigner(order)"
+                  v-else-if="!workingDesigner(order)"
                   type="button"
                   class="start-working-btn"
                   title="Start Work"
@@ -772,6 +792,14 @@
               @keydown.shift.enter.stop
               @blur="saveOrderCustomText(order, column, $event.target.value)"
             ></textarea>
+
+            <div
+              v-if="column.type !== 'dropdown' && getOrderCustomText(order, column)"
+              class="copyable-cell-tooltip"
+              @click.stop
+            >
+              {{ getOrderCustomText(order, column) }}
+            </div>
           </div>
 
           <div v-if="isBoardColumnVisible('owner')" class="board-col board-col-owner" :style="boardColumnOrderStyle('owner')">
@@ -902,11 +930,17 @@
               :value="packingDetailText(order)"
               type="text"
               placeholder="Add packing detail"
-              :title="packingDetailText(order) || 'Add packing detail'"
               @click.stop
               @keydown.enter.prevent="savePackingInline(order, $event)"
               @blur="savePackingInline(order, $event, true)"
             />
+            <div
+              v-if="packingDetailText(order)"
+              class="copyable-cell-tooltip"
+              @click.stop
+            >
+              {{ packingDetailText(order) }}
+            </div>
           </div>
 
           <!-- NOTES: EDIT DIRECTLY FROM OUTER ORDER ROW -->
@@ -916,13 +950,19 @@
               :value="orderNotesText(order)"
               rows="1"
               placeholder="Write notes..."
-              :title="orderNotesText(order) || 'Write notes'"
               :readonly="!canEditOrderNotes"
               @click.stop
               @keydown.enter.exact.prevent="saveNotesInline(order, $event)"
               @keydown.shift.enter.stop
               @blur="saveNotesInline(order, $event, true)"
             ></textarea>
+            <div
+              v-if="orderNotesText(order)"
+              class="copyable-cell-tooltip"
+              @click.stop
+            >
+              {{ orderNotesText(order) }}
+            </div>
           </div>
 
           <div v-if="isBoardColumnVisible('chat')" class="board-col board-col-chat" :style="boardColumnOrderStyle('chat')">
@@ -956,10 +996,16 @@
               :value="order.shippingAddress || ''"
               type="text"
               placeholder="Add address"
-              title="Click and edit address"
               @click.stop
               @change="saveDirectInlineField(order, 'shipping_address', $event.target.value)"
             />
+            <div
+              v-if="order.shippingAddress"
+              class="copyable-cell-tooltip"
+              @click.stop
+            >
+              {{ order.shippingAddress }}
+            </div>
           </div>
 
           <div v-if="isBoardColumnVisible('track')" class="board-col board-col-track" :style="boardColumnOrderStyle('track')">
@@ -968,10 +1014,16 @@
               :value="trackingSummary(order.trk)"
               type="text"
               placeholder="Tracking #"
-              title="Click and edit tracking"
               @click.stop
               @change="saveDirectInlineField(order, 'trk', $event.target.value)"
             />
+            <div
+              v-if="trackingSummary(order.trk) && trackingSummary(order.trk) !== 'N/A'"
+              class="copyable-cell-tooltip"
+              @click.stop
+            >
+              {{ trackingSummary(order.trk) }}
+            </div>
           </div>
 
           <div class="board-col board-col-info" style="order:9999">
@@ -4568,9 +4620,6 @@ beforeUnmount()  {
     async startWorking(order) {
       if (!order?.id) return
 
-      // Start button should work ONLY while this order is In Production.
-      if (!this.isInProductionOrder(order)) return
-
       try {
         const response = await axios.post(
           `/api/orders/${order.id}/claim`,
@@ -4588,6 +4637,26 @@ beforeUnmount()  {
           response.data?.working_by ||
           response.data?.user ||
           this.currentUser
+
+        // Any order that starts work belongs in In Production / Working Now.
+        if (!this.isInProductionOrder(order)) {
+          const productionStatus = this.statusOptions.find(
+            item => String(item.label || '').trim().toLowerCase() === 'in production'
+          )
+
+          await axios.put(
+            `/api/orders/${order.id}`,
+            {
+              status: 'In Production',
+              status_color: productionStatus?.color || '#6161ff'
+            },
+            { headers: this.headers() }
+          )
+
+          order.status = 'In Production'
+          order.statusColor = productionStatus?.color || '#6161ff'
+          order.group = 'in_production'
+        }
 
         await this.fetchOrders()
       } catch (error) {
@@ -4708,6 +4777,89 @@ beforeUnmount()  {
         'factory_started_work_order_ids',
         JSON.stringify(ids)
       )
+    },
+
+    getFinishedWorkMap() {
+      try {
+        const value = JSON.parse(
+          localStorage.getItem('factory_finished_work_by_order') || '{}'
+        )
+        return value && typeof value === 'object' ? value : {}
+      } catch (error) {
+        return {}
+      }
+    },
+
+    markOrderFinished(orderId, user) {
+      if (!orderId || !user) return
+
+      const map = this.getFinishedWorkMap()
+      map[Number(orderId)] = {
+        id: user.id || null,
+        name: user.name || 'User',
+        profile_photo_url: user.profile_photo_url || null,
+        finished_at: new Date().toISOString()
+      }
+
+      localStorage.setItem(
+        'factory_finished_work_by_order',
+        JSON.stringify(map)
+      )
+    },
+
+    isShippedOrder(order) {
+      return String(order?.status || '').trim().toLowerCase() === 'shipped'
+    },
+
+    finishedDesigner(order) {
+      if (!order?.id) return null
+
+      return (
+        order.finished_by ||
+        order.shipped_by ||
+        order.completed_by ||
+        this.getFinishedWorkMap()[Number(order.id)] ||
+        null
+      )
+    },
+
+    async finishWorkForShippedOrder(order, worker = null) {
+      if (!order?.id) return
+
+      const finisher = worker || this.workingDesigner(order)
+      if (!finisher) return
+
+      try {
+        const response = await axios.post(
+          `/api/orders/${order.id}/release`,
+          {
+            finish_reason: 'shipped',
+            finished_status: 'Shipped'
+          },
+          { headers: this.headers() }
+        )
+
+        const savedFinisher =
+          response.data?.finished_by ||
+          response.data?.working_by ||
+          response.data?.user ||
+          finisher
+
+        this.markOrderFinished(order.id, savedFinisher)
+        this.clearOrderWorkStarted(order.id)
+        order.finished_by = savedFinisher
+        order.work_started = false
+        order.is_working = false
+        order.work_session_active = false
+        order.working_started_at = null
+        order.working_by = null
+      } catch (error) {
+        console.error('Finish shipped order work error:', error)
+        alert(
+          error.response?.data?.message ||
+          'Order shipped ho gaya, lekin working session finish nahi hua.'
+        )
+      }
     },
 
     hasOrderWorkStarted(order) {
@@ -5398,6 +5550,8 @@ beforeUnmount()  {
 
       if (!status) return
 
+      const activeWorker = this.workingDesigner(order)
+
       try {
         await axios.put(
           `/api/orders/${order.id}`,
@@ -5413,6 +5567,13 @@ beforeUnmount()  {
         order.status = status.label
         order.statusColor = status.color
         order.group = this.statusToGroup(status.label)
+
+        if (
+          String(status.label).trim().toLowerCase() === 'shipped' &&
+          activeWorker
+        ) {
+          await this.finishWorkForShippedOrder(order, activeWorker)
+        }
 
         if (
           this.selectedOrder &&
@@ -9324,6 +9485,13 @@ async fetchClients() {
         is_working: order.is_working === true,
         work_session_active: order.work_session_active === true,
         working_started_at: order.working_started_at || null,
+        finished_by:
+          order.finished_by ||
+          order.shipped_by ||
+          order.completed_by ||
+          this.getFinishedWorkMap()[Number(order.id)] ||
+          null,
+        finished_at: order.finished_at || order.shipped_at || null,
 
         /*
          * Order creator backend se creator relation ke naam se aaye.
@@ -9640,11 +9808,18 @@ shipping_address: this.newOrder.shippingAddress,
 
     async changeStatus(s) {
       if (!this.selectedOrder) return
+      const activeWorker = this.workingDesigner(this.selectedOrder)
       try {
         await axios.put(`/api/orders/${this.selectedOrder.id}`, { status: s.label, status_color: s.color || '#6161ff' }, { headers: this.headers() })
         this.selectedOrder.status = s.label
         this.selectedOrder.statusColor = s.color || '#6161ff'
         this.selectedOrder.group = s.group || 'in_production'
+        if (
+          String(s.label || '').trim().toLowerCase() === 'shipped' &&
+          activeWorker
+        ) {
+          await this.finishWorkForShippedOrder(this.selectedOrder, activeWorker)
+        }
         this.activeGroup = s.group || 'in_production'
         const idx = this.orders.findIndex(o => o.id === this.selectedOrder.id)
         if (idx !== -1) this.orders[idx] = { ...this.selectedOrder }
@@ -20816,6 +20991,50 @@ body.board-column-resizing .column-resizer::before {
   line-height: 1;
 }
 
+/* Shipped order: finisher profile with a checkered finish flag */
+.finished-user-avatar-only {
+  position: relative;
+  width: 34px;
+  height: 34px;
+  min-width: 34px;
+  padding: 0;
+  border: 2px solid #16a34a;
+  border-radius: 50%;
+  overflow: visible;
+  background: #ffffff;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 0 0 2px #fff, 0 0 0 3px rgba(22, 163, 74, .22);
+}
+
+.finished-user-avatar-only > img,
+.finished-user-avatar-only > .row-working-avatar-fallback {
+  width: 100%;
+  height: 100%;
+  border-radius: 50%;
+  object-fit: cover;
+  display: grid;
+  place-items: center;
+  overflow: hidden;
+}
+
+.finished-flag-badge {
+  position: absolute;
+  right: -7px;
+  bottom: -5px;
+  width: 19px;
+  height: 19px;
+  border: 2px solid #ffffff;
+  border-radius: 50%;
+  background: #16a34a;
+  color: #ffffff;
+  display: grid;
+  place-items: center;
+  font-size: 8px;
+  box-shadow: 0 2px 7px rgba(22, 163, 74, .32);
+}
+
 
 
 /* =========================================================
@@ -23233,5 +23452,148 @@ body.board-column-resizing .column-resizer::before {
   .custom-field-type-help {
     grid-template-columns: 1fr;
   }
+}
+
+/* =========================================================
+   FINAL HEADER + FULL-CELL TEXT FIELDS + COPYABLE TOOLTIP
+   ========================================================= */
+
+/* Every heading stays on one exact horizontal level. */
+.factory-board-page .board-table-head {
+  min-height: 68px !important;
+  height: 68px !important;
+  align-items: stretch !important;
+}
+
+.factory-board-page .board-table-head > .board-col {
+  height: 68px !important;
+  min-height: 68px !important;
+  margin: 0 !important;
+  padding: 0 12px !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  align-self: stretch !important;
+  color: #ffffff !important;
+  font-size: 13px !important;
+  font-weight: 900 !important;
+  line-height: 1 !important;
+  letter-spacing: .25px !important;
+  text-transform: uppercase !important;
+  white-space: nowrap !important;
+}
+
+.factory-board-page .board-table-head > .board-col-name {
+  justify-content: flex-start !important;
+}
+
+.factory-board-page .board-table-head > .board-col-check,
+.factory-board-page .board-table-head > .board-col-info {
+  padding: 0 !important;
+}
+
+/* Text is written directly inside the complete column box. */
+.factory-board-page .row-custom-cell,
+.factory-board-page .board-col-packing,
+.factory-board-page .board-col-notes,
+.factory-board-page .board-col-address,
+.factory-board-page .board-col-track {
+  position: relative !important;
+  overflow: visible !important;
+  padding: 0 !important;
+}
+
+.factory-board-page .custom-field-text-input,
+.factory-board-page .custom-field-notes-input,
+.factory-board-page .packing-clean-input,
+.factory-board-page .board-notes-inline-input,
+.factory-board-page .board-col-address > .board-inline-cell-input,
+.factory-board-page .board-col-track > .board-inline-cell-input {
+  width: 100% !important;
+  height: 100% !important;
+  min-height: 54px !important;
+  margin: 0 !important;
+  padding: 10px 14px !important;
+  border: 0 !important;
+  border-radius: 0 !important;
+  outline: 0 !important;
+  background: transparent !important;
+  box-shadow: none !important;
+  color: #111827 !important;
+  font-size: 12px !important;
+  font-weight: 700 !important;
+  line-height: 1.35 !important;
+}
+
+.factory-board-page .custom-field-notes-input,
+.factory-board-page .board-notes-inline-input {
+  resize: none !important;
+  overflow: auto !important;
+}
+
+.factory-board-page .custom-field-text-input:focus,
+.factory-board-page .custom-field-notes-input:focus,
+.factory-board-page .packing-clean-input:focus,
+.factory-board-page .board-notes-inline-input:focus,
+.factory-board-page .board-col-address > .board-inline-cell-input:focus,
+.factory-board-page .board-col-track > .board-inline-cell-input:focus {
+  border: 0 !important;
+  outline: 0 !important;
+  box-shadow: inset 0 0 0 2px #2563eb !important;
+  background: #ffffff !important;
+}
+
+.factory-board-page .custom-field-text-input::placeholder,
+.factory-board-page .custom-field-notes-input::placeholder,
+.factory-board-page .packing-clean-input::placeholder,
+.factory-board-page .board-notes-inline-input::placeholder,
+.factory-board-page .board-inline-cell-input::placeholder {
+  color: #94a3b8 !important;
+  font-weight: 600 !important;
+}
+
+/* Full text on hover; user can select and copy it. */
+.copyable-cell-tooltip {
+  position: absolute;
+  left: 8px;
+  top: calc(100% - 3px);
+  z-index: 2147483000;
+  display: none;
+  width: max-content;
+  min-width: 150px;
+  max-width: 340px;
+  max-height: 180px;
+  overflow: auto;
+  padding: 10px 12px;
+  border: 1px solid #cbd5e1;
+  border-radius: 8px;
+  background: #111827;
+  color: #ffffff;
+  box-shadow: 0 12px 30px rgba(15, 23, 42, .28);
+  font-size: 12px;
+  font-weight: 700;
+  line-height: 1.45;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  text-align: left;
+  cursor: text;
+  user-select: text;
+  -webkit-user-select: text;
+  pointer-events: auto;
+}
+
+.factory-board-page .row-custom-cell:hover > .copyable-cell-tooltip,
+.factory-board-page .board-col-packing:hover > .copyable-cell-tooltip,
+.factory-board-page .board-col-notes:hover > .copyable-cell-tooltip,
+.factory-board-page .board-col-address:hover > .copyable-cell-tooltip,
+.factory-board-page .board-col-track:hover > .copyable-cell-tooltip,
+.copyable-cell-tooltip:hover {
+  display: block;
+}
+
+.factory-board-page.theme-dark .copyable-cell-tooltip {
+  border-color: #475569;
+  background: #f8fafc;
+  color: #0f172a;
 }
 </style>
