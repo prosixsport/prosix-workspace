@@ -268,7 +268,7 @@ class AuthController extends Controller
         if (!$user) {
             throw ValidationException::withMessages([
                 'email' => [
-                    'Account nahi mila. Please pehle sign up karein.',
+                    'Account not found. Please sign up first.',
                 ],
             ]);
         }
