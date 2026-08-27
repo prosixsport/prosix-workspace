@@ -58,19 +58,19 @@
 
     <p style="margin:28px 0 8px;">
         <a
-            href="{{ config('app.frontend_url', config('app.url')) . '/login' }}"
-            style="
-                display:inline-block;
-                padding:13px 20px;
-                border-radius:9px;
-                background:#000000;
-                color:#ffffff;
-                font-weight:bold;
-                text-decoration:none;
-            "
-        >
-            Log In to Prosix CRM
-        </a>
+    href="{{ rtrim(config('app.frontend_url'), '/') . '/login' }}"
+    style="
+        display:inline-block;
+        padding:13px 20px;
+        border-radius:9px;
+        background:#000000;
+        color:#ffffff;
+        font-weight:bold;
+        text-decoration:none;
+    "
+>
+    Log In to Prosix CRM
+</a>
     </p>
 
     <p style="margin-top:28px; color:#777777; font-size:12px;">
