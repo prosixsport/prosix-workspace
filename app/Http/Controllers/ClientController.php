@@ -450,29 +450,32 @@ class ClientController extends Controller
     {
         try {
             DB::transaction(function () use ($client) {
-                if ($client->user_id) {
-                    $user = User::find($client->user_id);
+                $user = $client->user_id
+                    ? User::find($client->user_id)
+                    : null;
 
-                    if ($user) {
-                        $user->tokens()->delete();
-                    }
+                if ($user) {
+                    $user->tokens()->delete();
                 }
 
-                /*
-                 * Client pehle delete karein taake foreign-key issue na aaye.
-                 */
-                $userId = $client->user_id;
+                if (method_exists($client, 'forceDelete')) {
+                    $client->forceDelete();
+                } else {
+                    $client->delete();
+                }
 
-                $client->delete();
-
-                if ($userId) {
-                    User::whereKey($userId)->delete();
+                if ($user) {
+                    if (method_exists($user, 'forceDelete')) {
+                        $user->forceDelete();
+                    } else {
+                        $user->delete();
+                    }
                 }
             });
 
             return response()->json([
                 'success' => true,
-                'message' => 'Client deleted successfully.',
+                'message' => 'Client and linked login account permanently deleted.',
             ]);
         } catch (Throwable $exception) {
             report($exception);
