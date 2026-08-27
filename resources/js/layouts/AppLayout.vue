@@ -1,8 +1,11 @@
 <template>
 
     <div
+
         class="prosix-layout"
+
         :class="{ 'sidebar-collapsed': sidebarCollapsed }"
+
     >
 
         <!-- MOBILE TOP BAR -->
@@ -43,18 +46,32 @@
 
 
 
+
+
         <!-- DESKTOP SIDEBAR HIDE / SHOW -->
+
         <button
+
             type="button"
+
             class="desktop-sidebar-toggle"
+
             :class="{ collapsed: sidebarCollapsed }"
+
             :title="sidebarCollapsed ? 'Show menu' : 'Hide menu'"
+
             @click="toggleDesktopSidebar"
+
         >
+
             <i
+
                 class="fa-solid"
+
                 :class="sidebarCollapsed ? 'fa-bars' : 'fa-angles-left'"
+
             ></i>
+
         </button>
 
         <!-- MOBILE OVERLAY -->
@@ -68,6 +85,8 @@
             @click="sidebarOpen = false"
 
         ></div>
+
+
 
 
 
@@ -99,6 +118,8 @@
 
 
 
+
+
             <!-- =========================
 
                  WHITE LOGO AREA
@@ -120,6 +141,8 @@
                 />
 
             </div>
+
+
 
 
 
@@ -162,6 +185,8 @@
                     </span>
 
                 </router-link>
+
+
 
 
 
@@ -231,6 +256,8 @@
 
 
 
+
+
                 <!-- TEAMSTORE ORDERS -->
 
                 <router-link
@@ -274,6 +301,8 @@
                     </span>
 
                 </router-link>
+
+
 
 
 
@@ -323,6 +352,8 @@
 
 
 
+
+
                 <!-- ARTWORK REQUESTS -->
 
                 <router-link
@@ -363,6 +394,8 @@
 
 
 
+
+
                 <!-- MEMBERS -->
 
                 <router-link
@@ -399,39 +432,51 @@
 
 
 
+
+
                 <!-- CLIENTS -->
 
-                <router-link
+                <div v-if="isSuperAdmin" class="clients-menu">
+                    <button
+                        type="button"
+                        class="nav-link-custom clients-menu-button"
+                        :class="{ active: $route.path.startsWith('/clients') }"
+                        @click="toggleClientsMenu"
+                    >
+                        <span class="nav-icon">
+                            <i class="fa-solid fa-user-tie"></i>
+                        </span>
 
-                    v-if="isSuperAdmin"
+                        <span class="nav-text">Clients</span>
 
-                    to="/clients"
+                        <i
+                            class="fa-solid fa-chevron-down clients-menu-arrow"
+                            :class="{ open: clientsMenuOpen }"
+                        ></i>
+                    </button>
 
-                    class="nav-link-custom"
+                    <div v-show="clientsMenuOpen" class="clients-submenu">
+                        <router-link
+                            to="/clients"
+                            class="clients-submenu-link"
+                            @click="sidebarOpen = false"
+                        >
+                            <i class="fa-solid fa-users"></i>
+                            <span>Customers</span>
+                        </router-link>
 
-                    :class="{
+                        <router-link
+                            to="/clients/requests"
+                            class="clients-submenu-link"
+                            @click="sidebarOpen = false"
+                        >
+                            <i class="fa-solid fa-user-clock"></i>
+                            <span>Try Login Customers</span>
+                        </router-link>
+                    </div>
+                </div>
 
-                        active: $route.path.startsWith('/clients')
 
-                    }"
-
-                    @click="sidebarOpen = false"
-
-                >
-
-                    <span class="nav-icon">
-
-                        <i class="fa-solid fa-user-tie"></i>
-
-                    </span>
-
-                    <span class="nav-text">
-
-                        Clients
-
-                    </span>
-
-                </router-link>
 
 
 
@@ -471,6 +516,8 @@
 
 
 
+
+
                 <!-- ACTIVITY LOGS -->
 
                 <router-link
@@ -504,6 +551,8 @@
                     </span>
 
                 </router-link>
+
+
 
 
 
@@ -545,6 +594,8 @@
 
 
 
+
+
             <!-- =========================
 
                  LOGOUT
@@ -579,6 +630,8 @@
 
 
 
+
+
         <!-- =========================
 
              MAIN CONTENT
@@ -597,6 +650,8 @@
 
 
 
+
+
 <script>
 
 import axios from 'axios'
@@ -607,6 +662,8 @@ export default {
 
 
 
+
+
     data() {
 
         return {
@@ -614,17 +671,22 @@ export default {
             sidebarOpen: false,
 
             sidebarCollapsed:
+
                 localStorage.getItem('prosix_sidebar_collapsed') === '1',
 
             orderNotificationCount: 0,
 
             placeOrderNotificationCount: 0,
 
-            teamStoreNotificationCount: 0
+            teamStoreNotificationCount: 0,
+
+            clientsMenuOpen: this.$route.path.startsWith('/clients')
 
         }
 
     },
+
+
 
 
 
@@ -652,6 +714,8 @@ export default {
 
 
 
+
+
         // SUPER ADMIN
 
         isSuperAdmin() {
@@ -662,6 +726,8 @@ export default {
 
 
 
+
+
         // ADMIN
 
         isAdmin() {
@@ -669,6 +735,8 @@ export default {
             return this.user?.role === 'admin'
 
         },
+
+
 
 
 
@@ -692,6 +760,8 @@ export default {
 
 
 
+
+
     mounted() {
 
         this.loadOrderNotificationCount()
@@ -699,6 +769,8 @@ export default {
         this.loadPlaceOrderNotificationCount()
 
         this.loadTeamStoreNotificationCount()
+
+
 
 
 
@@ -712,6 +784,8 @@ export default {
 
 
 
+
+
         window.addEventListener(
 
             'teamstore-orders-read-updated',
@@ -721,6 +795,8 @@ export default {
         )
 
     },
+
+
 
 
 
@@ -736,6 +812,8 @@ export default {
 
 
 
+
+
         window.removeEventListener(
 
             'teamstore-orders-read-updated',
@@ -748,11 +826,19 @@ export default {
 
 
 
+
+
     watch: {
 
         '$route.path'(newPath) {
 
             this.sidebarOpen = false
+
+            if (newPath.startsWith('/clients')) {
+                this.clientsMenuOpen = true
+            }
+
+
 
 
 
@@ -768,6 +854,8 @@ export default {
 
 
 
+
+
             this.loadPlaceOrderNotificationCount()
 
             this.loadTeamStoreNotificationCount()
@@ -778,7 +866,13 @@ export default {
 
 
 
+
+
     methods: {
+
+        toggleClientsMenu() {
+            this.clientsMenuOpen = !this.clientsMenuOpen
+        },
 
         toggleDesktopSidebar() {
 
@@ -818,6 +912,8 @@ export default {
 
 
 
+
+
         // =========================
 
         // FACTORY ORDERS COUNT
@@ -836,6 +932,8 @@ export default {
 
 
 
+
+
             if (this.$route.path.startsWith('/orders')) {
 
                 this.orderNotificationCount = 0
@@ -843,6 +941,8 @@ export default {
                 return
 
             }
+
+
 
 
 
@@ -862,6 +962,8 @@ export default {
 
 
 
+
+
                 const orders =
 
                     Array.isArray(response.data)
@@ -869,6 +971,8 @@ export default {
                         ? response.data
 
                         : response.data?.data || []
+
+
 
 
 
@@ -898,6 +1002,8 @@ export default {
 
 
 
+
+
         // =========================
 
         // CLEAR FACTORY BADGE
@@ -909,6 +1015,8 @@ export default {
             this.orderNotificationCount = 0
 
         },
+
+
 
 
 
@@ -936,6 +1044,8 @@ export default {
 
 
 
+
+
                 this.placeOrderNotificationCount =
 
                     Number(
@@ -956,11 +1066,15 @@ export default {
 
 
 
+
+
                 this.placeOrderNotificationCount = 0
 
             }
 
         },
+
+
 
 
 
@@ -988,6 +1102,8 @@ export default {
 
 
 
+
+
                 this.teamStoreNotificationCount =
 
                     Number(
@@ -1008,11 +1124,15 @@ export default {
 
 
 
+
+
                 this.teamStoreNotificationCount = 0
 
             }
 
         },
+
+
 
 
 
@@ -1054,9 +1174,13 @@ export default {
 
 
 
+
+
             localStorage.removeItem('token')
 
             localStorage.removeItem('user')
+
+
 
 
 
@@ -1072,13 +1196,15 @@ export default {
 
 
 
+
+
 <style scoped>
 
 /* ==================================================
 
    RESET
 
-================================================== */
+\================================================== */
 
 *,
 
@@ -1089,6 +1215,8 @@ export default {
     box-sizing: border-box;
 
 }
+
+
 
 
 
@@ -1106,11 +1234,15 @@ export default {
 
 
 
+
+
+
+
 /* ==================================================
 
    SIDEBAR
 
-================================================== */
+\================================================== */
 
 .prosix-sidebar {
 
@@ -1160,11 +1292,15 @@ export default {
 
 
 
+
+
+
+
 /* ==================================================
 
    TOP WHITE LOGO SECTION
 
-================================================== */
+\================================================== */
 
 .sidebar-brand {
 
@@ -1210,6 +1346,8 @@ export default {
 
 
 
+
+
 .sidebar-brand::before,
 
 .sidebar-brand::after {
@@ -1230,11 +1368,15 @@ export default {
 
 
 
+
+
+
+
 /* ==================================================
 
    REAL PROSIX LOGO
 
-================================================== */
+\================================================== */
 
 .sidebar-prosix-logo {
 
@@ -1270,11 +1412,15 @@ export default {
 
 
 
+
+
+
+
 /* ==================================================
 
    NAVIGATION
 
-================================================== */
+\================================================== */
 
 .sidebar-nav {
 
@@ -1304,6 +1450,8 @@ export default {
 
 
 
+
+
 .sidebar-nav::-webkit-scrollbar {
 
     width: 4px;
@@ -1312,11 +1460,15 @@ export default {
 
 
 
+
+
 .sidebar-nav::-webkit-scrollbar-track {
 
     background: transparent;
 
 }
+
+
 
 
 
@@ -1332,11 +1484,15 @@ export default {
 
 
 
+
+
+
+
 /* ==================================================
 
    NAV ITEM
 
-================================================== */
+\================================================== */
 
 .nav-link-custom {
 
@@ -1380,6 +1536,8 @@ export default {
 
 
 
+
+
 .nav-link-custom:hover {
 
     background: rgba(255, 255, 255, 0.07);
@@ -1387,6 +1545,8 @@ export default {
     color: #ffffff;
 
 }
+
+
 
 
 
@@ -1402,11 +1562,15 @@ export default {
 
 
 
+
+
+
+
 /* ==================================================
 
    NAV ICON
 
-================================================== */
+\================================================== */
 
 .nav-icon {
 
@@ -1426,6 +1590,8 @@ export default {
 
 
 
+
+
 .nav-link-custom.active .nav-icon {
 
     color: #1a1a1a;
@@ -1436,11 +1602,15 @@ export default {
 
 
 
+
+
+
+
 /* ==================================================
 
    NAV TEXT
 
-================================================== */
+\================================================== */
 
 .nav-text {
 
@@ -1458,11 +1628,15 @@ export default {
 
 
 
+
+
+
+
 /* ==================================================
 
    ORDER BADGES
 
-================================================== */
+\================================================== */
 
 .order-badge {
 
@@ -1498,6 +1672,8 @@ export default {
 
 
 
+
+
 .nav-link-custom.active .order-badge {
 
     background: #111111;
@@ -1510,11 +1686,15 @@ export default {
 
 
 
+
+
+
+
 /* ==================================================
 
    SIDEBAR BOTTOM
 
-================================================== */
+\================================================== */
 
 .sidebar-bottom {
 
@@ -1534,11 +1714,15 @@ export default {
 
 
 
+
+
+
+
 /* ==================================================
 
    LOGOUT BUTTON
 
-================================================== */
+\================================================== */
 
 .logout-btn {
 
@@ -1584,6 +1768,8 @@ export default {
 
 
 
+
+
 .logout-btn:hover {
 
     background: #ffffff;
@@ -1598,11 +1784,15 @@ export default {
 
 
 
+
+
+
+
 /* ==================================================
 
    MOBILE CLOSE BUTTON
 
-================================================== */
+\================================================== */
 
 .sidebar-close-btn {
 
@@ -1644,11 +1834,15 @@ export default {
 
 
 
+
+
+
+
 /* ==================================================
 
    MAIN CONTENT
 
-================================================== */
+\================================================== */
 
 .prosix-main {
 
@@ -1676,11 +1870,15 @@ export default {
 
 
 
+
+
+
+
 /* ==================================================
 
    ORDERS FULL WIDTH
 
-================================================== */
+\================================================== */
 
 .prosix-main.orders-full-width {
 
@@ -1698,11 +1896,15 @@ export default {
 
 
 
+
+
+
+
 /* ==================================================
 
    MOBILE TOP BAR
 
-================================================== */
+\================================================== */
 
 .mobile-topbar {
 
@@ -1744,11 +1946,15 @@ export default {
 
 
 
+
+
+
+
 /* ==================================================
 
    MOBILE LOGO
 
-================================================== */
+\================================================== */
 
 .mobile-logo {
 
@@ -1761,6 +1967,8 @@ export default {
     justify-content: center;
 
 }
+
+
 
 
 
@@ -1790,11 +1998,15 @@ export default {
 
 
 
+
+
+
+
 /* ==================================================
 
    HAMBURGER
 
-================================================== */
+\================================================== */
 
 .hamburger-btn {
 
@@ -1826,11 +2038,15 @@ export default {
 
 
 
+
+
+
+
 /* ==================================================
 
    OVERLAY
 
-================================================== */
+\================================================== */
 
 .sidebar-overlay {
 
@@ -1850,6 +2066,8 @@ export default {
 
 
 
+
+
 .sidebar-overlay.open {
 
     display: block;
@@ -1860,11 +2078,15 @@ export default {
 
 
 
+
+
+
+
 /* ==================================================
 
    FORCE REMOVE LOGO AREA LINES
 
-================================================== */
+\================================================== */
 
 .prosix-sidebar,
 
@@ -1884,6 +2106,8 @@ export default {
 
 
 
+
+
 .prosix-sidebar {
 
     border-right: none !important;
@@ -1892,11 +2116,15 @@ export default {
 
 
 
+
+
 .sidebar-brand {
 
     border: none !important;
 
 }
+
+
 
 
 
@@ -1910,11 +2138,15 @@ export default {
 
 
 
+
+
+
+
 /* ==================================================
 
    TABLET / MOBILE
 
-================================================== */
+\================================================== */
 
 @media (max-width: 768px) {
 
@@ -1926,11 +2158,15 @@ export default {
 
 
 
+
+
     .sidebar-close-btn {
 
         display: flex;
 
     }
+
+
 
 
 
@@ -1950,11 +2186,15 @@ export default {
 
 
 
+
+
     .prosix-sidebar.sidebar-open {
 
         left: 0;
 
     }
+
+
 
 
 
@@ -1972,6 +2212,8 @@ export default {
 
 
 
+
+
     .sidebar-prosix-logo {
 
         width: 125px;
@@ -1982,11 +2224,15 @@ export default {
 
 
 
+
+
     .sidebar-nav {
 
         padding-top: 20px;
 
     }
+
+
 
 
 
@@ -2004,6 +2250,8 @@ export default {
 
 
 
+
+
     .prosix-main.orders-full-width {
 
         width: 100%;
@@ -2018,11 +2266,15 @@ export default {
 
 
 
+
+
+
+
 /* ==================================================
 
    SMALL MOBILE
 
-================================================== */
+\================================================== */
 
 @media (max-width: 480px) {
 
@@ -2033,6 +2285,8 @@ export default {
         left: -245px;
 
     }
+
+
 
 
 
@@ -2048,6 +2302,8 @@ export default {
 
 
 
+
+
     .sidebar-prosix-logo {
 
         width: 110px;
@@ -2058,11 +2314,15 @@ export default {
 
 
 
+
+
     .sidebar-nav {
 
         padding: 18px 10px 12px;
 
     }
+
+
 
 
 
@@ -2082,11 +2342,15 @@ export default {
 
 
 
+
+
+
+
 /* ==================================================
 
    STYLISH PROSIX SIDEBAR - FINAL OVERRIDE
 
-================================================== */
+\================================================== */
 
 /* Keep layout background consistent */
 
@@ -2709,199 +2973,415 @@ export default {
 }
 
 /* ==================================================
+
    DESKTOP SIDEBAR COLLAPSE / EXPAND
-================================================== */
+
+\================================================== */
 
 .desktop-sidebar-toggle {
+
     position: fixed;
+
     top: 190px;
+
     left: 210px;
+
     z-index: 3000;
+
     width: 40px;
+
     height: 40px;
+
     background: #0c1320;
+
     color: #ffffff;
+
     display: flex;
+
     align-items: center;
+
     justify-content: center;
+
     cursor: pointer;
+
     box-shadow: 0 8px 22px rgba(15, 23, 42, .24);
+
     font-size: 14px;
+
     transition: left .25s ease, transform .2s ease, background .2s ease;
+
 }
 
 .desktop-sidebar-toggle:hover {
+
     background: #000000;
+
     transform: translateY(-1px);
+
 }
 
 .prosix-sidebar,
+
 .prosix-main {
+
     transition: transform .25s ease, margin-left .25s ease, width .25s ease !important;
+
 }
 
 .prosix-layout.sidebar-collapsed .prosix-sidebar {
+
     width: 72px !important;
+
     transform: translateX(0) !important;
+
     pointer-events: auto;
+
     overflow: visible !important;
+
 }
 
 .prosix-layout.sidebar-collapsed .prosix-main {
+
     width: calc(100% - 72px) !important;
+
     margin-left: 72px !important;
+
 }
 
 .prosix-layout.sidebar-collapsed .desktop-sidebar-toggle {
+
     left: 16px;
+
     top: 16px;
+
 }
 
 .prosix-layout.sidebar-collapsed .sidebar-brand {
+
     height: 70px !important;
+
     min-height: 70px !important;
+
     padding: 0 !important;
+
 }
 
 .prosix-layout.sidebar-collapsed .sidebar-prosix-logo,
+
 .prosix-layout.sidebar-collapsed .sidebar-brand::before,
+
 .prosix-layout.sidebar-collapsed .sidebar-brand::after {
+
     display: none !important;
+
 }
 
 .prosix-layout.sidebar-collapsed .sidebar-nav {
+
     padding: 14px 9px !important;
+
     overflow-x: visible !important;
+
 }
 
 .prosix-layout.sidebar-collapsed .nav-link-custom {
+
     position: relative;
+
     width: 52px !important;
+
     min-width: 52px !important;
+
     height: 48px !important;
+
     margin: 0 0 7px !important;
+
     padding: 0 !important;
+
     justify-content: center !important;
+
     gap: 0 !important;
+
     border-radius: 10px !important;
+
 }
 
 .prosix-layout.sidebar-collapsed .nav-icon {
+
     width: 100% !important;
+
     min-width: 100% !important;
+
     font-size: 16px !important;
+
 }
 
 .prosix-layout.sidebar-collapsed .nav-text {
+
     position: absolute;
+
     left: 61px;
+
     top: 50%;
+
     z-index: 1400;
+
     width: max-content;
+
     max-width: 220px;
+
     padding: 8px 10px;
+
     border-radius: 7px;
+
     background: #111827;
+
     color: #ffffff;
+
     box-shadow: 0 8px 24px rgba(15, 23, 42, .24);
+
     font-size: 12px;
+
     font-weight: 800;
+
     opacity: 0;
+
     visibility: hidden;
+
     pointer-events: none;
+
     transform: translateY(-50%) translateX(-4px);
+
     transition: opacity .15s ease, transform .15s ease;
+
 }
 
 .prosix-layout.sidebar-collapsed .nav-link-custom:hover .nav-text {
+
     opacity: 1;
+
     visibility: visible;
+
     transform: translateY(-50%) translateX(0);
+
 }
 
 .prosix-layout.sidebar-collapsed .order-badge {
+
     position: absolute;
+
     top: 3px;
+
     right: 3px;
+
     min-width: 17px !important;
+
     width: 17px !important;
+
     height: 17px !important;
+
     padding: 0 !important;
+
     font-size: 8px !important;
+
 }
 
 .prosix-layout.sidebar-collapsed .sidebar-bottom {
+
     padding: 10px !important;
+
 }
 
 .prosix-layout.sidebar-collapsed .logout-btn {
+
     width: 52px !important;
+
     min-width: 52px !important;
+
     padding: 0 !important;
+
     justify-content: center !important;
+
 }
 
 .prosix-layout.sidebar-collapsed .logout-btn span {
+
     display: none !important;
+
 }
 
 @media (max-width: 768px) {
+
     .desktop-sidebar-toggle {
+
         display: none !important;
+
     }
 
     .prosix-layout.sidebar-collapsed .prosix-sidebar {
+
         transform: none !important;
+
         pointer-events: auto;
+
         width: 250px !important;
+
         overflow: hidden !important;
+
     }
 
     .prosix-layout.sidebar-collapsed .prosix-main {
+
         width: 100% !important;
+
         margin-left: 0 !important;
+
     }
 
     .prosix-layout.sidebar-collapsed .sidebar-brand {
+
         height: 165px !important;
+
         min-height: 165px !important;
+
         padding: 18px !important;
+
     }
 
     .prosix-layout.sidebar-collapsed .sidebar-prosix-logo {
+
         display: block !important;
+
     }
 
     .prosix-layout.sidebar-collapsed .sidebar-nav {
+
         padding: 20px 14px !important;
+
         overflow-x: hidden !important;
+
     }
 
     .prosix-layout.sidebar-collapsed .nav-link-custom {
+
         width: 100% !important;
+
         min-width: 0 !important;
+
         height: auto !important;
+
         padding: 12px 14px !important;
+
         justify-content: flex-start !important;
+
         gap: 12px !important;
+
     }
 
     .prosix-layout.sidebar-collapsed .nav-icon {
+
         width: 21px !important;
+
         min-width: 21px !important;
+
         font-size: 13px !important;
+
     }
 
     .prosix-layout.sidebar-collapsed .nav-text {
+
         position: static;
+
         display: inline !important;
+
         width: auto;
+
         padding: 0;
+
         background: transparent;
+
         box-shadow: none;
+
         opacity: 1;
+
         visibility: visible;
+
         transform: none;
+
+    }
+
+}
+
+/* CLIENTS DROPDOWN - only new styles */
+.clients-menu {
+    width: 100%;
+}
+
+.clients-menu-button {
+    width: 100%;
+    border: 0;
+    font-family: inherit;
+    text-align: left;
+    cursor: pointer;
+}
+
+.clients-menu-arrow {
+    margin-left: auto;
+    font-size: 10px;
+    transition: transform 0.2s ease;
+}
+
+.clients-menu-arrow.open {
+    transform: rotate(180deg);
+}
+
+.clients-submenu {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    margin: 4px 0 8px 42px;
+    padding-left: 10px;
+    border-left: 1px solid rgba(255, 255, 255, 0.18);
+}
+
+.clients-submenu-link {
+    display: flex;
+    align-items: center;
+    gap: 9px;
+    min-height: 36px;
+    padding: 8px 10px;
+    border-radius: 8px;
+    color: rgba(255, 255, 255, 0.72);
+    font-size: 12px;
+    font-weight: 700;
+    text-decoration: none;
+    transition: 0.2s ease;
+}
+
+.clients-submenu-link i {
+    width: 14px;
+    text-align: center;
+    font-size: 11px;
+}
+
+.clients-submenu-link:hover,
+.clients-submenu-link.router-link-exact-active {
+    background: #ffffff;
+    color: #111111;
+}
+
+.prosix-layout.sidebar-collapsed .clients-submenu,
+.prosix-layout.sidebar-collapsed .clients-menu-arrow {
+    display: none;
+}
+
+@media (max-width: 991px) {
+    .prosix-layout.sidebar-collapsed .clients-submenu {
+        display: flex;
+    }
+
+    .prosix-layout.sidebar-collapsed .clients-menu-arrow {
+        display: inline-block;
     }
 }
 

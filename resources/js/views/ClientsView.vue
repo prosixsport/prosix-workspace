@@ -61,15 +61,16 @@
                     <input v-model="form.name" placeholder="Client name" />
 
                     <label>Email *</label>
-                    <input v-model="form.email" placeholder="Email" />
-
-                    <label v-if="!editingId">Password *</label>
                     <input
-                        v-if="!editingId"
-                        v-model="form.password"
-                        type="password"
-                        placeholder="Client password"
+                        v-model.trim="form.email"
+                        type="email"
+                        placeholder="client@example.com"
+                        autocomplete="email"
                     />
+
+                    <p class="field-help" v-if="!editingId">
+                       The client will set their own password when they log in for the first time.
+                    </p>
 
                     <label>Phone</label>
                     <input v-model="form.phone" placeholder="Phone" />
@@ -114,7 +115,6 @@ export default {
             form: {
                 name: '',
                 email: '',
-                password: '',
                 phone: '',
                 company: '',
                 address: '',
@@ -153,7 +153,6 @@ export default {
             return {
                 name: '',
                 email: '',
-                password: '',
                 phone: '',
                 company: '',
                 address: '',
@@ -179,7 +178,6 @@ export default {
                 this.form = {
                     name: client.name || '',
                     email: client.email || '',
-                    password: '',
                     phone: client.phone || '',
                     company: client.company || '',
                     address: client.address || '',
@@ -198,6 +196,9 @@ export default {
         },
 
         async saveClient() {
+            this.form.name = this.form.name.trim()
+            this.form.email = this.form.email.trim().toLowerCase()
+
             if (!this.form.name) {
                 alert('Client name required')
                 return
@@ -208,8 +209,10 @@ export default {
                 return
             }
 
-            if (!this.editingId && !this.form.password) {
-                alert('Client password required')
+            const emailPattern = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
+
+            if (!emailPattern.test(this.form.email)) {
+                alert('Please enter a valid client email')
                 return
             }
 
@@ -217,10 +220,7 @@ export default {
 
             try {
                 if (this.editingId) {
-                    const payload = { ...this.form }
-                    delete payload.password
-
-                    await axios.put(`/api/clients/${this.editingId}`, payload, {
+                    await axios.put(`/api/clients/${this.editingId}`, this.form, {
                         headers: this.headers()
                     })
                 } else {
@@ -232,7 +232,12 @@ export default {
                 this.closeModal()
                 this.fetchClients()
             } catch (e) {
-                alert(e.response?.data?.message || 'Client save failed')
+                const errors = e.response?.data?.errors
+                const firstError = errors
+                    ? Object.values(errors).flat()[0]
+                    : null
+
+                alert(firstError || e.response?.data?.message || 'Client save failed')
             } finally {
                 this.saving = false
             }
@@ -273,6 +278,7 @@ th { background: #fafafa; color: #6b7280; font-size: 12px; text-transform: upper
 .client-modal-box h3 { margin: 0 0 18px; font-weight: 900; }
 label { display: block; margin: 12px 0 6px; font-size: 13px; font-weight: 800; }
 input, textarea, select { width: 100%; border: 1.5px solid #d1d5db; border-radius: 10px; padding: 11px 12px; outline: none; }
+.field-help { margin: 7px 0 0; color: #6b7280; font-size: 12px; line-height: 1.5; }
 textarea { min-height: 80px; resize: vertical; }
 .save-btn { width: 100%; margin-top: 18px; }
 .client-modal-box {display: block; background: #fff; width: 460px; max-width: 100%; border-radius: 20px; padding: 24px; position: relative; z-index: 100000;}

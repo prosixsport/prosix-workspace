@@ -726,6 +726,29 @@ Route::post('/user/profile', [
 
     Route::middleware('superadmin')->group(function () {
 
+        /*
+        |--------------------------------------------------------------------------
+        | Customer Signup Requests
+        |--------------------------------------------------------------------------
+        */
+
+        Route::get('/client-requests', [
+            ClientController::class,
+            'requests'
+        ]);
+
+
+        Route::patch('/client-requests/{client}/approve', [
+            ClientController::class,
+            'approve'
+        ]);
+
+
+        Route::patch('/client-requests/{client}/reject', [
+            ClientController::class,
+            'reject'
+        ]);
+
 
         Route::post('/clients', [
             ClientController::class,
