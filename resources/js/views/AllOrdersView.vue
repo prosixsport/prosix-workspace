@@ -40,11 +40,12 @@
         </button>
       </div>
 
-      <div
-        v-if="showChatNotificationMenu"
-        class="chat-notification-dropdown notification-center-dropdown"
-        @click.stop
-      >
+      <Teleport to="body">
+        <div
+          v-if="showChatNotificationMenu"
+          class="chat-notification-dropdown notification-center-dropdown factory-notification-portal"
+          @click.stop
+        >
         <div class="chat-notification-head notification-center-head">
           <div>
             <strong>Notifications</strong>
@@ -150,7 +151,8 @@
             No new order notifications
           </div>
         </div>
-      </div>
+        </div>
+      </Teleport>
   </template>
 </PageHeader>
 
@@ -7324,6 +7326,7 @@ body.board-column-resizing .column-resizer::before {
 }
 
 </style>
+
           </head>
           <body>
             <div class="loading-print">
@@ -9515,9 +9518,38 @@ openPreviewFile(file) {
     async fetchOrders({ silent = false, loadFiles = true } = {}) {
       if (!silent) this.loadingOrders = true
       try {
+        const previousOrders = new Map(
+          this.orders.map(order => [Number(order.id), order])
+        )
+
+        if (this.selectedOrder?.id) {
+          previousOrders.set(Number(this.selectedOrder.id), this.selectedOrder)
+        }
+
         const res = await axios.get('/api/orders', { headers: this.headers() })
         const list = Array.isArray(res.data) ? res.data : (res.data?.data || [])
-        this.orders = list.map(order => this.formatOrder(order))
+        this.orders = list.map(rawOrder => {
+          const freshOrder = this.formatOrder(rawOrder)
+
+          if (!loadFiles) {
+            const previousOrder = previousOrders.get(Number(freshOrder.id))
+
+            if (previousOrder) {
+              freshOrder.invoiceFiles = previousOrder.invoiceFiles || []
+              freshOrder.cards = (freshOrder.cards || []).map(card => {
+                const oldCard = (previousOrder.cards || []).find(
+                  item => item.type === card.type
+                )
+
+                return card.type === 'notes'
+                  ? card
+                  : { ...card, files: oldCard?.files || [] }
+              })
+            }
+          }
+
+          return freshOrder
+        })
 
         // Load file thumbnails for every board row as well.
         // This keeps the 3 thumbnail previews visible after a full page refresh.
@@ -9560,13 +9592,11 @@ openPreviewFile(file) {
               headers: this.headers()
             })
 
-            const files = Array.isArray(res.data)
-              ? res.data
-              : (res.data?.data || [])
+            const files = this.filesFromResponse(res.data)
 
             const normalizedFiles = files.map(file => ({
               ...this.normalizeOrderFile(file),
-              cardType: file.card_type
+              cardType: this.normalizeCardType(file.card_type || file.cardType)
             }))
 
             order.invoiceFiles = normalizedFiles.filter(
@@ -10092,6 +10122,7 @@ shipping_address: this.newOrder.shippingAddress,
       const name = file.original_name || file.name || 'File'
       let url = file.url || ''
       if (!url && file.file_path) url = `/storage/${file.file_path}`
+      if (!url && file.path) url = `/storage/${String(file.path).replace(/^\//, '')}`
       return {
         id: file.id, name, url: encodeURI(url),
         isImage: mime.startsWith('image/') || /\.(jpg|jpeg|png|gif|webp|svg)$/i.test(name),
@@ -10103,12 +10134,42 @@ shipping_address: this.newOrder.shippingAddress,
       }
     },
 
+    filesFromResponse(payload) {
+      if (Array.isArray(payload)) return payload
+      if (Array.isArray(payload?.files)) return payload.files
+      if (Array.isArray(payload?.data)) return payload.data
+      if (Array.isArray(payload?.data?.files)) return payload.data.files
+      return []
+    },
+
+    normalizeCardType(value) {
+      const type = String(value || '')
+        .trim()
+        .toLowerCase()
+        .replace(/[\s-]+/g, '_')
+
+      const aliases = {
+        file: 'order_files',
+        files: 'order_files',
+        order_file: 'order_files',
+        logo: 'logos',
+        roster: 'team_roster',
+        finished_product: 'finished_products',
+        approved_mockups: 'approved_mockup'
+      }
+
+      return aliases[type] || type
+    },
+
     async fetchOrderFiles(orderId) {
       if (!this.selectedOrder) return
       try {
         const res = await axios.get(`/api/orders/${orderId}/files`, { headers: this.headers() })
-        const files = Array.isArray(res.data) ? res.data : (res.data?.data || [])
-        const normalizedFiles = files.map(file => ({ ...this.normalizeOrderFile(file), cardType: file.card_type }))
+        const files = this.filesFromResponse(res.data)
+        const normalizedFiles = files.map(file => ({
+          ...this.normalizeOrderFile(file),
+          cardType: this.normalizeCardType(file.card_type || file.cardType)
+        }))
         this.selectedOrder.invoiceFiles = normalizedFiles.filter(file => file.cardType === 'invoice_files')
         this.selectedOrder.cards.forEach(card => {
           if (card.type === 'notes') return
@@ -23842,5 +23903,31 @@ body.board-column-resizing .column-resizer::before {
   border-top: 1px solid #3f4652;
   background: #303238;
   transform: rotate(45deg);
+}
+
+/* Teleported notification layer: always above the open order detail page. */
+.factory-notification-portal {
+  position: fixed !important;
+  top: 78px !important;
+  right: 24px !important;
+  left: auto !important;
+  z-index: 2147483647 !important;
+  width: min(390px, calc(100vw - 32px)) !important;
+  max-height: min(460px, calc(100vh - 100px)) !important;
+  margin: 0 !important;
+  overflow: hidden !important;
+}
+
+.factory-notification-portal .notification-list {
+  max-height: min(340px, calc(100vh - 220px)) !important;
+  overflow-y: auto !important;
+}
+
+@media (max-width: 780px) {
+  .factory-notification-portal {
+    top: 66px !important;
+    right: 12px !important;
+    width: calc(100vw - 24px) !important;
+  }
 }
 </style>
