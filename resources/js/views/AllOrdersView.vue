@@ -3,7 +3,7 @@
   <div
     class="factory-board-page"
     :class="`theme-${boardTheme}`"
-    @click="closeAllMenus"
+    @click="handlePageBackgroundClick"
   >
     <!-- REUSABLE PAGE HEADER -->
  <PageHeader
@@ -591,10 +591,11 @@
           :class="{
             unread: !order.user_has_seen,
             opened: order.user_has_seen,
-            selected: selectedOrders.includes(order.id)
+            selected: selectedOrders.includes(order.id),
+            'last-opened-order': Number(lastOpenedOrderId) === Number(order.id)
           }"
           :style="boardGridStyle"
-          @click="openBoardOrder(order)"
+          @click.stop="openBoardOrder(order)"
         >
           <div class="board-col board-col-check" style="order:-1">
             <input
@@ -955,11 +956,12 @@
           <div v-if="isBoardColumnVisible('notes')" class="board-col board-col-notes" :style="boardColumnOrderStyle('notes')" @mouseenter="showCopyableHoverText(orderNotesText(order), $event)" @mouseleave="scheduleCopyableHoverHide">
             <textarea
               class="board-notes-inline-input"
-              :value="orderNotesText(order)"
+              :value="inlineTextDraftValue(order, 'notes')"
               rows="1"
               placeholder="Write notes..."
               :readonly="!canEditNotesForOrder(order)"
-              @focus="beginTextEditing"
+              @focus="beginInlineTextEditing(order, 'notes')"
+              @input="updateInlineTextDraft(order, 'notes', $event.target.value)"
               @click.stop
               @keydown.enter.exact.prevent="saveNotesInline(order, $event)"
               @keydown.shift.enter.stop
@@ -995,7 +997,7 @@
               disabled
               title="Payment is managed by Prosix"
             >
-              <option>Not Yet</option>
+              <option>Yet Payment</option>
             </select>
             <input
               v-else
@@ -1013,10 +1015,11 @@
           <div v-if="isBoardColumnVisible('address')" class="board-col board-col-address" :style="boardColumnOrderStyle('address')" @mouseenter="showCopyableHoverText(order.shippingAddress, $event)" @mouseleave="scheduleCopyableHoverHide">
             <input
               class="board-inline-cell-input"
-              :value="order.shippingAddress || ''"
+              :value="inlineTextDraftValue(order, 'shipping_address')"
               type="text"
               placeholder="Add address"
-              @focus="beginTextEditing"
+              @focus="beginInlineTextEditing(order, 'shipping_address')"
+              @input="updateInlineTextDraft(order, 'shipping_address', $event.target.value)"
               @click.stop
               @keydown.enter.prevent="$event.target.blur()"
               @blur="saveTextInline(order, 'shipping_address', $event)"
@@ -1687,7 +1690,7 @@
     </div>
 
     <!-- RIGHT PANEL -->
-    <div v-if="selectedOrder && detailOpen" class="board-detail-overlay" @click.self="closeBoardDetail">
+    <div v-if="selectedOrder && detailOpen" class="board-detail-overlay" @click.self.stop="closeBoardDetail">
       <div class="orders-right board-detail-panel clean-detail-panel">
 
       <!-- HEADER -->
@@ -2005,7 +2008,10 @@
 </div>
           <div class="detail-info-item" style="position:relative" @click.stop>
             <span class="info-label">Payment :</span>
-            <span class="payment-badge payment-summary-badge" @click="!isClient && (showPaymentMenu = !showPaymentMenu)">
+            <select v-if="isClient" class="client-payment-only" disabled>
+              <option>Yet Payment</option>
+            </select>
+            <span v-else class="payment-badge payment-summary-badge" @click="showPaymentMenu = !showPaymentMenu">
                   <span class="payment-chip payment-chip-paid">{{ isClient ? 'Not Yet' : (selectedOrder.payment || 'Not Yet') }}</span>
               <span class="payment-chip payment-chip-received">R ${{ selectedOrder.paymentReceived || 0 }}</span>
               <span class="payment-chip payment-chip-balance">B ${{ selectedOrder.paymentBalance || 0 }}</span>
@@ -2505,6 +2511,9 @@
             </span>
 
             <strong>{{ member.name }}</strong>
+            <button type="button" class="member-preview-remove" title="Remove member" @click="removeBulkMember(member.id)">
+              <i class="fa-solid fa-xmark"></i>
+            </button>
           </div>
         </div>
 
@@ -2639,6 +2648,9 @@
             </span>
 
             <strong>{{ client.name }}</strong>
+            <button type="button" class="member-preview-remove" title="Remove client" @click="removeBulkClient(client.id)">
+              <i class="fa-solid fa-xmark"></i>
+            </button>
           </div>
         </div>
 
@@ -2846,6 +2858,10 @@ export default {
       clientFilterOpen: false,
       textEditing: false,
       noteSaving: false,
+      inlineTextDrafts: {},
+      inlineTextDirty: {},
+      inlineTextSaving: {},
+      lastOpenedOrderId: Number(localStorage.getItem('factory_last_opened_order_id') || 0),
       uploadProgressByOrder: {},
       uploadProgressByCard: {},
       copyableHoverTooltip: {
@@ -4792,8 +4808,22 @@ beforeUnmount()  {
         return
       }
 
-      this.bulkSelectedClients = []
+      const selected = this.orders.filter(order =>
+        this.selectedOrders.map(Number).includes(Number(order.id))
+      )
+      const commonIds = selected.length
+        ? (selected[0].clients || []).map(client => Number(client.id)).filter(id =>
+            selected.every(order => (order.clients || []).some(client => Number(client.id) === id))
+          )
+        : []
+      this.bulkSelectedClients = this.availableClients.filter(client => commonIds.includes(Number(client.id)))
       this.bulkClientsModal = true
+    },
+
+    removeBulkClient(clientId) {
+      this.bulkSelectedClients = this.bulkSelectedClients.filter(
+        client => Number(client.id) !== Number(clientId)
+      )
     },
 
     closeBulkClientsModal() {
@@ -8117,6 +8147,9 @@ body.board-column-resizing .column-resizer::before {
     async openBoardOrder(order) {
       if (!order) return
 
+      this.lastOpenedOrderId = Number(order.id)
+      localStorage.setItem('factory_last_opened_order_id', String(order.id))
+
       /*
        * Keep the currently opened order in the URL.
        * If this page re-renders/remounts because of notifications,
@@ -8535,6 +8568,7 @@ body.board-column-resizing .column-resizer::before {
 
     async saveNotesInline(order, event, fromBlur = false) {
       const input = event?.target
+      const draftKey = this.inlineTextDraftKey(order, 'notes')
 
       if (
         !input ||
@@ -8545,22 +8579,27 @@ body.board-column-resizing .column-resizer::before {
         return
       }
 
-      const value = String(input.value || '').trim()
+      if (this.inlineTextSaving[draftKey]) return
+
+      const value = String(this.inlineTextDraftValue(order, 'notes') || '').trim()
       const oldValue = this.orderNotesText(order)
 
       /*
        * Enter ke baad blur duplicate request na bheje.
        */
       if (fromBlur && value === oldValue) {
+        this.clearInlineTextDraft(draftKey)
         this.endTextEditing()
         return
       }
+
+      this.inlineTextSaving = { ...this.inlineTextSaving, [draftKey]: true }
 
       try {
         await axios.put(
           `/api/orders/${order.id}`,
           {
-            notes: value
+            notes: value === '' ? null : value
           },
           {
             headers: this.headers()
@@ -8607,6 +8646,7 @@ body.board-column-resizing .column-resizer::before {
         }
 
         input.value = value
+        this.clearInlineTextDraft(draftKey)
 
         if (this.isClient) {
           this.clientNoteSavedAtByOrder = {
@@ -8625,13 +8665,14 @@ body.board-column-resizing .column-resizer::before {
           error
         )
 
-        input.value = oldValue
-
         alert(
           error.response?.data?.message ||
           'Notes save nahi huay.'
         )
       } finally {
+        const saving = { ...this.inlineTextSaving }
+        delete saving[draftKey]
+        this.inlineTextSaving = saving
         this.endTextEditing()
       }
     },
@@ -8984,8 +9025,22 @@ selectAllAvailableMembers() {
 
 openBulkMembersModal() {
   if (!this.selectedOrders.length) return
-  this.bulkSelectedMembers = []
+  const selected = this.orders.filter(order =>
+    this.selectedOrders.map(Number).includes(Number(order.id))
+  )
+  const commonIds = selected.length
+    ? (selected[0].owners || []).map(member => Number(member.id)).filter(id =>
+        selected.every(order => (order.owners || []).some(member => Number(member.id) === id))
+      )
+    : []
+  this.bulkSelectedMembers = this.availableMembers.filter(member => commonIds.includes(Number(member.id)))
   this.bulkMembersModal = true
+},
+
+removeBulkMember(memberId) {
+  this.bulkSelectedMembers = this.bulkSelectedMembers.filter(
+    member => Number(member.id) !== Number(memberId)
+  )
 },
 
 closeBulkMembersModal() {
@@ -10739,6 +10794,49 @@ async onFileChange(event, card) {
       this.textEditing = true
     },
 
+    inlineTextDraftKey(order, field) {
+      return `${Number(order?.id || 0)}:${field}`
+    },
+
+    inlineTextServerValue(order, field) {
+      if (field === 'notes') return this.orderNotesText(order)
+      if (field === 'shipping_address') return String(order?.shippingAddress || '')
+      return String(order?.[field] || '')
+    },
+
+    inlineTextDraftValue(order, field) {
+      const key = this.inlineTextDraftKey(order, field)
+      return Object.prototype.hasOwnProperty.call(this.inlineTextDrafts, key)
+        ? this.inlineTextDrafts[key]
+        : this.inlineTextServerValue(order, field)
+    },
+
+    beginInlineTextEditing(order, field) {
+      const key = this.inlineTextDraftKey(order, field)
+      if (!Object.prototype.hasOwnProperty.call(this.inlineTextDrafts, key)) {
+        this.inlineTextDrafts = {
+          ...this.inlineTextDrafts,
+          [key]: this.inlineTextServerValue(order, field)
+        }
+      }
+      this.beginTextEditing()
+    },
+
+    updateInlineTextDraft(order, field, value) {
+      const key = this.inlineTextDraftKey(order, field)
+      this.inlineTextDrafts = { ...this.inlineTextDrafts, [key]: value }
+      this.inlineTextDirty = { ...this.inlineTextDirty, [key]: true }
+    },
+
+    clearInlineTextDraft(key) {
+      const drafts = { ...this.inlineTextDrafts }
+      const dirty = { ...this.inlineTextDirty }
+      delete drafts[key]
+      delete dirty[key]
+      this.inlineTextDrafts = drafts
+      this.inlineTextDirty = dirty
+    },
+
     endTextEditing() {
       this.textEditing = false
     },
@@ -10751,27 +10849,54 @@ async onFileChange(event, card) {
 
     async saveTextInline(order, field, event) {
       const input = event?.target
+      const draftKey = this.inlineTextDraftKey(order, field)
       if (!input || !order?.id) {
         this.endTextEditing()
         return
       }
 
-      const value = String(input.value || '').trim()
+      if (this.inlineTextSaving[draftKey]) return
+
+      const value = String(this.inlineTextDraftValue(order, field) || '').trim()
       const allowed = this.canEditWorkflowFields || (this.isClient && field === 'shipping_address')
       if (!allowed) {
         this.endTextEditing()
         return
       }
 
+      if (value === this.inlineTextServerValue(order, field).trim()) {
+        this.clearInlineTextDraft(draftKey)
+        this.endTextEditing()
+        return
+      }
+
+      this.inlineTextSaving = { ...this.inlineTextSaving, [draftKey]: true }
+
       try {
-        await axios.put(`/api/orders/${order.id}`, { [field]: value }, { headers: this.headers() })
+        await axios.put(
+          `/api/orders/${order.id}`,
+          { [field]: value === '' ? null : value },
+          { headers: this.headers() }
+        )
         if (field === 'shipping_address') order.shippingAddress = value
         else order[field] = value
+        this.clearInlineTextDraft(draftKey)
       } catch (error) {
         console.error('Inline text save error:', error)
         alert(error.response?.data?.message || 'Value could not be saved.')
       } finally {
+        const saving = { ...this.inlineTextSaving }
+        delete saving[draftKey]
+        this.inlineTextSaving = saving
         this.endTextEditing()
+      }
+    },
+
+    handlePageBackgroundClick(event) {
+      this.closeAllMenus()
+      if (!event?.target?.closest?.('.board-table-row')) {
+        this.lastOpenedOrderId = 0
+        localStorage.removeItem('factory_last_opened_order_id')
       }
     },
 
@@ -24285,4 +24410,105 @@ body.board-column-resizing .column-resizer::before {
 .card-upload-progress { position:absolute; left:50%; bottom:12px; transform:translateX(-50%); padding:7px 11px; border-radius:999px; background:#fff; box-shadow:0 5px 18px rgba(15,23,42,.16); }
 .factory-board-page .board-col-name .name-value > small { font-size:11px !important; line-height:1.35 !important; font-weight:700 !important; }
 .board-col-payment select:disabled { opacity:1; color:#111827; cursor:not-allowed; background:#f8fafc; }
+
+/* Smooth inline editing: drafts stay visible until the API confirms the save. */
+.factory-board-page .board-notes-inline-input,
+.factory-board-page .board-col-address .board-inline-cell-input {
+  transition: min-height .18s ease, box-shadow .18s ease, background .18s ease;
+}
+
+.factory-board-page .board-notes-inline-input:focus {
+  min-height: 72px !important;
+  padding: 9px 10px !important;
+  background: #fff !important;
+  box-shadow: inset 0 0 0 2px #2563eb !important;
+  resize: vertical !important;
+  overflow-y: auto !important;
+}
+
+.factory-board-page .board-col-address .board-inline-cell-input:focus {
+  background: #fff !important;
+  box-shadow: inset 0 0 0 2px #2563eb !important;
+}
+
+/* Last order opened by this browser. A normal page-side click clears it. */
+.factory-board-page .board-table-row.last-opened-order {
+  position: relative;
+  z-index: 2;
+  border-radius: 8px;
+  box-shadow: 0 0 0 3px rgba(37, 99, 235, .9), 0 10px 26px rgba(37, 99, 235, .24) !important;
+}
+
+.factory-board-page .board-table-row.last-opened-order::after {
+  content: '';
+  position: absolute;
+  inset: -4px;
+  border-radius: 10px;
+  pointer-events: none;
+}
+
+/* PO is secondary but must remain clearly readable. */
+.factory-board-page .board-col-name .name-value > small {
+  margin-top: 4px !important;
+  color: #64748b !important;
+  font-size: 12px !important;
+  line-height: 1.35 !important;
+  font-weight: 800 !important;
+  letter-spacing: .01em !important;
+}
+
+/* Larger, cleaner assignment dialog with explicit removable selections. */
+.member-select-modal {
+  width: min(760px, calc(100vw - 32px)) !important;
+  max-height: min(760px, calc(100vh - 42px)) !important;
+  border-radius: 18px !important;
+  overflow: hidden !important;
+  box-shadow: 0 28px 80px rgba(15, 23, 42, .28) !important;
+}
+
+.member-multiselect .multiselect__content-wrapper {
+  max-height: 260px !important;
+}
+
+.member-selected-preview {
+  max-height: 170px !important;
+  overflow-y: auto !important;
+  align-content: flex-start;
+}
+
+.member-preview-chip {
+  position: relative;
+  padding-right: 34px !important;
+}
+
+.member-preview-remove {
+  position: absolute;
+  top: 50%;
+  right: 7px;
+  width: 24px;
+  height: 24px;
+  transform: translateY(-50%);
+  border: 0;
+  border-radius: 7px;
+  background: #fee2e2;
+  color: #dc2626;
+  display: grid;
+  place-items: center;
+  cursor: pointer;
+}
+
+.member-preview-remove:hover { background:#dc2626; color:#fff; }
+
+.client-payment-only {
+  min-width: 125px;
+  height: 34px;
+  padding: 0 30px 0 11px;
+  border: 1px solid #cbd5e1;
+  border-radius: 8px;
+  background: #f8fafc;
+  color: #0f172a;
+  font-size: 12px;
+  font-weight: 800;
+  opacity: 1;
+}
 </style>
