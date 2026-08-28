@@ -2762,6 +2762,8 @@ export default {
       copyableHoverHideTimer: null,
       boardSettingsModal: false,
       boardSettingsSaving: false,
+      columnOrderSaveTimer: null,
+      columnOrderDirty: false,
       boardSettings: {
         auto_assign_all_owners: false,
         hidden_columns: [],
@@ -3451,6 +3453,7 @@ beforeUnmount()  {
   clearInterval(this.orderSyncTimer)
   clearInterval(this.chatSyncTimer)
   clearInterval(this.noteClockTimer)
+  clearTimeout(this.columnOrderSaveTimer)
   document.body.style.overflow = ''
 },
 
@@ -3522,14 +3525,23 @@ beforeUnmount()  {
         })
 
         const data = res.data?.data || res.data || {}
+        const serverColumnOrder = Array.isArray(data.settings?.column_order)
+          ? data.settings.column_order
+          : []
+        const localColumnOrder = JSON.parse(
+          localStorage.getItem('factory_board_column_order') || '[]'
+        )
+        const effectiveColumnOrder =
+          this.isSuperAdmin && Array.isArray(localColumnOrder) && localColumnOrder.length
+            ? localColumnOrder
+            : serverColumnOrder
+
         this.boardSettings = {
           auto_assign_all_owners: Boolean(data.settings?.auto_assign_all_owners),
           hidden_columns: Array.isArray(data.settings?.hidden_columns)
             ? data.settings.hidden_columns
             : [],
-          column_order: Array.isArray(data.settings?.column_order)
-            ? data.settings.column_order
-            : []
+          column_order: effectiveColumnOrder
         }
 
         if (Array.isArray(data.settings?.status_options)) {
@@ -3622,8 +3634,8 @@ beforeUnmount()  {
       return { order: index < 0 ? 0 : index + 1 }
     },
 
-    async moveBoardColumn(key, direction) {
-      if (!this.isSuperAdmin || this.boardSettingsSaving) return
+    moveBoardColumn(key, direction) {
+      if (!this.isSuperAdmin) return
 
       const order = this.orderedBoardColumnItems.map(item => item.key)
       const currentIndex = order.indexOf(key)
@@ -3631,11 +3643,27 @@ beforeUnmount()  {
 
       if (currentIndex < 0 || targetIndex < 0 || targetIndex >= order.length) return
 
-      const previousOrder = [...(this.boardSettings.column_order || [])]
       const [movedKey] = order.splice(currentIndex, 1)
       order.splice(targetIndex, 0, movedKey)
 
       this.boardSettings.column_order = order
+      this.columnOrderDirty = true
+      localStorage.setItem(
+        'factory_board_column_order',
+        JSON.stringify(order)
+      )
+
+      clearTimeout(this.columnOrderSaveTimer)
+      this.columnOrderSaveTimer = window.setTimeout(
+        () => this.saveBoardColumnOrder(),
+        500
+      )
+    },
+
+    async saveBoardColumnOrder() {
+      if (!this.isSuperAdmin || !this.columnOrderDirty) return
+
+      const order = [...(this.boardSettings.column_order || [])]
       this.boardSettingsSaving = true
 
       try {
@@ -3653,13 +3681,23 @@ beforeUnmount()  {
           res.data?.settings?.column_order ??
           res.data?.data?.column_order
 
-        if (Array.isArray(savedOrder) && savedOrder.length) {
-          this.boardSettings.column_order = savedOrder
+        if (
+          Array.isArray(savedOrder) &&
+          savedOrder.length &&
+          JSON.stringify(savedOrder) !== JSON.stringify(order)
+        ) {
+          console.warn('Server returned a different column order; keeping Super Admin order.', savedOrder)
         }
+
+        this.boardSettings.column_order = order
+        localStorage.setItem(
+          'factory_board_column_order',
+          JSON.stringify(order)
+        )
+        this.columnOrderDirty = false
       } catch (error) {
-        this.boardSettings.column_order = previousOrder
         console.error('moveBoardColumn error:', error)
-        alert(error.response?.data?.message || 'Column position could not be saved.')
+        alert(error.response?.data?.message || 'Column position is fixed on this browser, but the server could not save it.')
       } finally {
         this.boardSettingsSaving = false
       }
