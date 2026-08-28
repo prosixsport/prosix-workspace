@@ -249,7 +249,7 @@
         </div>
 
         <button
-          v-if="canCreateOrder"
+          v-if="isSuperAdmin"
           type="button"
           class="workflow-add-button"
           title="Add another order section"
@@ -260,7 +260,7 @@
       </div>
 
       <div class="board-toolbar-actions">
-        <div class="board-search client-search">
+        <div v-if="!isClient" class="board-search client-search">
           <i class="fa-solid fa-user-tie"></i>
           <input
             v-model.trim="clientSearch"
@@ -1616,7 +1616,7 @@
       </div>
 
       <!-- ADD CUSTOM STATUS -->
-      <div class="monday-status-add">
+      <div v-if="isSuperAdmin" class="monday-status-add">
         <div class="monday-status-add-title">
           <span class="monday-status-add-icon">
             <i class="fa-solid fa-plus"></i>
@@ -1879,15 +1879,15 @@
 
   <span class="status-group-tag">→ {{ s.groupLabel }}</span>
 
-  <button v-if="s.custom" class="status-action-btn" @click.stop="editCustomStatus(s)">
+  <button v-if="isSuperAdmin && s.custom" class="status-action-btn" @click.stop="editCustomStatus(s)">
     <i class="fa-solid fa-pen"></i>
   </button>
 
-  <button v-if="s.custom" class="status-action-btn danger" @click.stop="deleteCustomStatus(s)">
+  <button v-if="isSuperAdmin && s.custom" class="status-action-btn danger" @click.stop="deleteCustomStatus(s)">
     <i class="fa-solid fa-trash"></i>
   </button>
 </div>
-              <div class="custom-status-box">
+              <div v-if="isSuperAdmin" class="custom-status-box">
                 <input v-model="customStatusLabel" class="custom-status-input" placeholder="Write custom status..." @keydown.enter.prevent="applyCustomStatus" />
                 <input v-model="customStatusColor" type="color" class="custom-status-color" title="Choose label color" />
                 <button class="custom-status-btn" @click="applyCustomStatus">Add</button>
@@ -2881,6 +2881,14 @@ export default {
       unreadChatCount: 0,
       unreadTimer: null,
       notificationTimer: null,
+      sharedBoardTimer: null,
+      orderSyncTimer: null,
+      chatSyncTimer: null,
+      noteClockTimer: null,
+      nowTick: Date.now(),
+      clientNoteSavedAtByOrder: JSON.parse(
+        localStorage.getItem('client_note_saved_at_by_order') || '{}'
+      ),
       notifications: [],
       notificationCount: 0,
       lastNotificationId: null,
@@ -3028,6 +3036,20 @@ activeTracking() {
     return false
   }
 
+  if (this.isClient) {
+    const note = this.selectedOrder.cards?.find(card => card.type === 'notes')
+    const hasNote = Boolean(String(note?.noteText || '').trim())
+    if (!hasNote) return true
+
+    const savedAt = Number(
+      this.clientNoteSavedAtByOrder[Number(this.selectedOrder.id)] ||
+      new Date(this.selectedOrder.notesUpdatedAt || 0).getTime() ||
+      0
+    )
+
+    return savedAt > 0 && (this.nowTick - savedAt) < (5 * 60 * 1000)
+  }
+
   return this.hasFullOrderAccess
     || this.currentUser?.can_create_orders === true
 },
@@ -3068,6 +3090,20 @@ canEditWorkflowFields() {
     },
     userPhoto() { return this.currentUser?.profile_photo_url || null },
 
+    accessibleOrders() {
+      if (!this.isClient) return this.orders
+
+      const userId = Number(this.currentUser?.id || 0)
+      const email = String(this.currentUser?.email || '').trim().toLowerCase()
+
+      return this.orders.filter(order =>
+        (order.clients || []).some(client =>
+          Number(client.user_id || 0) === userId ||
+          String(client.email || '').trim().toLowerCase() === email
+        )
+      )
+    },
+
     detailSearchResults() {
       const query = String(this.detailSearchOrder || '')
         .trim()
@@ -3100,7 +3136,7 @@ canEditWorkflowFields() {
     },
 
 filteredOrders() {
-  return this.orders
+  return this.accessibleOrders
     .filter(o => {
       const groupMatch =
         this.activeGroup === 'all' ||
@@ -3110,45 +3146,7 @@ filteredOrders() {
           String(o.status || '').toLowerCase() === 'delivered'
         )
 
-      const searchText = String(this.searchOrder || '')
-        .trim()
-        .toLowerCase()
-
-      const searchable = [
-        o.name,
-        o.po,
-        o.status,
-        o.shippingAddress,
-        o.trk
-      ]
-        .filter(Boolean)
-        .join(' ')
-        .toLowerCase()
-
-      const searchMatch =
-        !searchText || searchable.includes(searchText)
-
-      const clientText = String(this.clientSearch || '')
-        .trim()
-        .toLowerCase()
-
-      const clientMatch = (
-        !this.selectedClient ||
-        (o.clients || []).some(
-          c => Number(c.id) === Number(this.selectedClient)
-        )
-      ) && (
-        !clientText ||
-        (o.clients || []).some(client =>
-          [client.name, client.email, client.company]
-            .filter(Boolean)
-            .join(' ')
-            .toLowerCase()
-            .includes(clientText)
-        )
-      )
-
-      return groupMatch && searchMatch && clientMatch
+      return groupMatch && this.orderMatchesCurrentSearch(o)
     })
     .sort((a, b) => {
       // Chat activity never changes row position. Newest created order stays first.
@@ -3391,6 +3389,24 @@ async mounted() {
 
   await this.fetchNotifications(false)
 
+  // Cross-user sync fallback. Server remains the single source of truth.
+  this.sharedBoardTimer = window.setInterval(
+    () => this.fetchBoardConfiguration({ silent: true }),
+    3000
+  )
+  this.orderSyncTimer = window.setInterval(
+    () => this.fetchOrders({ silent: true, loadFiles: false }),
+    4000
+  )
+  this.chatSyncTimer = window.setInterval(() => {
+    if (this.showChat && this.selectedOrder?.id) {
+      this.fetchMessages(this.selectedOrder.id, { silent: true })
+    }
+  }, 1500)
+  this.noteClockTimer = window.setInterval(() => {
+    this.nowTick = Date.now()
+  }, 15000)
+
 
   const orderId = this.$route.query.order_id
   const openChat = this.$route.query.open_chat
@@ -3430,18 +3446,13 @@ beforeUnmount()  {
   if (this.notificationTimer) {
     clearInterval(this.notificationTimer)
   }
+
+  clearInterval(this.sharedBoardTimer)
+  clearInterval(this.orderSyncTimer)
+  clearInterval(this.chatSyncTimer)
+  clearInterval(this.noteClockTimer)
+  document.body.style.overflow = ''
 },
-
-
-
-
-
-
-
-
-  beforeUnmount() {
-    document.body.style.overflow = ''
-  },
 
 
 
@@ -3503,6 +3514,8 @@ beforeUnmount()  {
     },
 
     async fetchBoardConfiguration() {
+      if (this.boardSettingsSaving) return
+
       try {
         const res = await axios.get('/api/factory-board/config', {
           headers: this.headers()
@@ -3517,6 +3530,16 @@ beforeUnmount()  {
           column_order: Array.isArray(data.settings?.column_order)
             ? data.settings.column_order
             : []
+        }
+
+        if (Array.isArray(data.settings?.status_options)) {
+          this.statusOptions = data.settings.status_options
+        }
+        if (Array.isArray(data.settings?.custom_groups)) {
+          this.customBoardGroups = data.settings.custom_groups
+        }
+        if (data.settings?.default_group_overrides) {
+          this.defaultBoardGroupOverrides = data.settings.default_group_overrides
         }
         this.customColumns = Array.isArray(data.custom_columns)
           ? data.custom_columns
@@ -5291,6 +5314,8 @@ beforeUnmount()  {
           this.statusOptions.filter(status => status.custom)
         )
       )
+
+      this.saveAllStatusOptions()
     },
 
     deleteWorkflowGroup(group) {
@@ -7743,19 +7768,23 @@ body.board-column-resizing .column-resizer::before {
 
 
     countForGroup(groupKey) {
+      const matchingOrders = this.accessibleOrders.filter(order =>
+        this.orderMatchesCurrentSearch(order)
+      )
+
       if (groupKey === 'all') {
-        return this.orders.length
+        return matchingOrders.length
       }
 
       if (groupKey === 'delivered') {
-        return this.orders.filter(
+        return matchingOrders.filter(
           order =>
             String(order.status || '').toLowerCase() ===
             'delivered'
         ).length
       }
 
-      return this.orders.filter(
+      return matchingOrders.filter(
         order => order.group === groupKey
       ).length
     },
@@ -7781,6 +7810,7 @@ body.board-column-resizing .column-resizer::before {
     },
 
     addWorkflowGroup() {
+      if (!this.isSuperAdmin) return
       const label = window.prompt(
         'New order section name'
       )
@@ -8679,6 +8709,7 @@ shortShippingAddress(address) {
 
 
     editCustomStatus(status) {
+  if (!this.isSuperAdmin) return
 const newName = prompt('Enter new status name', status.label)
   if (!newName || !newName.trim()) return
 
@@ -8688,9 +8719,11 @@ const newName = prompt('Enter new status name', status.label)
     'custom_order_statuses',
     JSON.stringify(this.statusOptions.filter(s => s.custom))
   )
+  this.saveAllStatusOptions()
 },
 
 deleteCustomStatus(status) {
+  if (!this.isSuperAdmin) return
   if (!confirm('Are you sure you want to delete this custom status?')) return
 
   this.statusOptions = this.statusOptions.filter(s => s.label !== status.label)
@@ -8699,6 +8732,7 @@ deleteCustomStatus(status) {
     'custom_order_statuses',
     JSON.stringify(this.statusOptions.filter(s => s.custom))
   )
+  this.saveAllStatusOptions()
 },
   canDeleteFile(file) {
   // Client sirf view/download karega
@@ -8829,6 +8863,41 @@ alert(e.response?.data?.message || 'Orders were not deleted')
       return { Authorization: `Bearer ${localStorage.getItem('token')}`, Accept: 'application/json' }
     },
 
+    orderMatchesCurrentSearch(order) {
+      const orderText = String(this.searchOrder || '').trim().toLowerCase()
+      const clientText = this.isClient
+        ? ''
+        : String(this.clientSearch || '').trim().toLowerCase()
+
+      const orderMatch = !orderText || [
+        order.name,
+        order.po,
+        order.status,
+        order.shippingAddress,
+        order.trk
+      ]
+        .filter(Boolean)
+        .join(' ')
+        .toLowerCase()
+        .includes(orderText)
+
+      const selectedClientMatch =
+        !this.selectedClient ||
+        (order.clients || []).some(
+          client => Number(client.id) === Number(this.selectedClient)
+        )
+
+      const clientMatch = !clientText || (order.clients || []).some(client =>
+        [client.name, client.email, client.company]
+          .filter(Boolean)
+          .join(' ')
+          .toLowerCase()
+          .includes(clientText)
+      )
+
+      return orderMatch && selectedClientMatch && clientMatch
+    },
+
     // Mobile: select order and close left panel
     selectOrderAndClose(order) {
       this.openBoardOrder(order)
@@ -8836,7 +8905,7 @@ alert(e.response?.data?.message || 'Orders were not deleted')
     },
 
     canManageStatusOption(status) {
-      return Boolean(status?.label)
+      return this.isSuperAdmin && Boolean(status?.label)
     },
 
     loadSavedStatusOptions() {
@@ -8898,7 +8967,7 @@ alert(e.response?.data?.message || 'Orders were not deleted')
       }
     },
 
-    saveAllStatusOptions() {
+    async saveAllStatusOptions() {
       const clean = (this.statusOptions || [])
         .filter(item => item?.label)
         .map(item => ({
@@ -8928,10 +8997,25 @@ alert(e.response?.data?.message || 'Orders were not deleted')
             }))
         )
       )
+
+      if (this.isSuperAdmin) {
+        try {
+          await axios.put('/api/factory-board/settings', {
+            auto_assign_all_owners: Boolean(this.boardSettings.auto_assign_all_owners),
+            hidden_columns: this.boardSettings.hidden_columns || [],
+            column_order: this.boardSettings.column_order || [],
+            status_options: clean,
+            custom_groups: this.customBoardGroups || [],
+            default_group_overrides: this.defaultBoardGroupOverrides || {}
+          }, { headers: this.headers() })
+        } catch (error) {
+          console.error('Shared status settings could not be saved:', error)
+        }
+      }
     },
 
     saveCustomStatusOption(status) {
-      if (!status?.label) return
+      if (!this.isSuperAdmin || !status?.label) return
 
       const existsIndex = this.statusOptions.findIndex(
         item =>
@@ -9390,8 +9474,8 @@ openPreviewFile(file) {
   }
 },
 
-    async fetchOrders() {
-      this.loadingOrders = true
+    async fetchOrders({ silent = false, loadFiles = true } = {}) {
+      if (!silent) this.loadingOrders = true
       try {
         const res = await axios.get('/api/orders', { headers: this.headers() })
         const list = Array.isArray(res.data) ? res.data : (res.data?.data || [])
@@ -9399,7 +9483,7 @@ openPreviewFile(file) {
 
         // Load file thumbnails for every board row as well.
         // This keeps the 3 thumbnail previews visible after a full page refresh.
-        await this.loadBoardOrderFiles()
+        if (loadFiles) await this.loadBoardOrderFiles()
 
         /*
          * Preserve the SAME selected order after any refresh.
@@ -9421,7 +9505,11 @@ openPreviewFile(file) {
             this.selectedOrder = fresh
           }
         }
-      } catch (e) { console.error('fetchOrders error:', e) } finally { this.loadingOrders = false }
+      } catch (e) {
+        if (!silent) console.error('fetchOrders error:', e)
+      } finally {
+        if (!silent) this.loadingOrders = false
+      }
     },
 
     async loadBoardOrderFiles() {
@@ -9496,6 +9584,7 @@ async fetchClients() {
       return {
         id: order.id,
         created_at: order.created_at || null,
+        notesUpdatedAt: order.notes_updated_at || null,
         user_has_seen:
           Boolean(order.user_has_seen) ||
           this.persistentSeenOrderIds.includes(Number(order.id)),
@@ -9896,8 +9985,6 @@ shipping_address: this.newOrder.shippingAddress,
     },
 
   async updateShipDate(event) {
-  if (this.isClient) return
-
   if (!this.selectedOrder) return
 
   const raw = event.target.value
@@ -9938,6 +10025,21 @@ shipping_address: this.newOrder.shippingAddress,
     await axios.put(`/api/orders/${this.selectedOrder.id}`, {
       notes: card.noteText
     }, { headers: this.headers() })
+
+    if (this.isClient) {
+      const orderId = Number(this.selectedOrder.id)
+      if (!this.clientNoteSavedAtByOrder[orderId]) {
+        this.clientNoteSavedAtByOrder = {
+          ...this.clientNoteSavedAtByOrder,
+          [orderId]: Date.now()
+        }
+        localStorage.setItem(
+          'client_note_saved_at_by_order',
+          JSON.stringify(this.clientNoteSavedAtByOrder)
+        )
+      }
+      this.nowTick = Date.now()
+    }
 
     card.saved = true
     setTimeout(() => { card.saved = false }, 2500)
