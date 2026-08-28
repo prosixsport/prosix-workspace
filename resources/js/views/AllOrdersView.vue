@@ -215,6 +215,7 @@
           </button>
 
           <div
+            v-if="canManageWorkflow"
             class="workflow-custom-actions"
             @click.stop
           >
@@ -251,7 +252,7 @@
         </div>
 
         <button
-          v-if="isSuperAdmin"
+          v-if="canManageWorkflow"
           type="button"
           class="workflow-add-button"
           title="Add another order section"
@@ -723,18 +724,20 @@
               <button
                 type="button"
                 class="status-ref-trigger"
+                :disabled="!canEditWorkflowFields"
                 :class="{ open: rowStatusMenuId === Number(order.id) }"
                 :style="{
                   '--status-fill': order.statusColor || '#e5e7eb',
                   '--status-text': readableTextColor(order.statusColor || '#e5e7eb')
                 }"
-                @click.stop="toggleRowStatusMenu(order, $event)"
+                @click.stop="canEditWorkflowFields && toggleRowStatusMenu(order, $event)"
               >
 <span class="status-ref-label">
                   {{ order.status }}
                 </span>
 
                 <i
+                  v-if="canEditWorkflowFields"
                   class="fa-solid fa-chevron-down status-ref-chevron"
                   :class="{ rotate: rowStatusMenuId === Number(order.id) }"
                 ></i>
@@ -1494,7 +1497,7 @@
 
     <!-- ROW STATUS DROPDOWN -->
     <div
-      v-if="rowStatusMenuId && rowStatusMenuOrder"
+      v-if="canEditWorkflowFields && rowStatusMenuId && rowStatusMenuOrder"
       class="status-fixed-dropdown monday-status-menu"
       :style="rowStatusMenuStyle"
       @click.stop
@@ -1517,7 +1520,7 @@
 
       <div class="monday-status-options">
         <div
-          v-for="status in statusOptions"
+          v-for="status in workflowStatusOptions"
           :key="'status-fixed-' + status.label"
           class="monday-status-row"
           :class="{
@@ -1618,7 +1621,7 @@
       </div>
 
       <!-- ADD CUSTOM STATUS -->
-      <div v-if="isSuperAdmin" class="monday-status-add">
+      <div v-if="canManageWorkflow" class="monday-status-add">
         <div class="monday-status-add-title">
           <span class="monday-status-add-icon">
             <i class="fa-solid fa-plus"></i>
@@ -1863,12 +1866,12 @@
 </div>
           <div class="detail-info-item" style="position:relative" @click.stop>
             <span class="info-label">Status :</span>
-<span class="status-badge" :style="{ background: selectedOrder.statusColor }" @click="!isClient && (showStatusMenu = !showStatusMenu)">
+<span class="status-badge" :style="{ background: selectedOrder.statusColor }" @click="canEditWorkflowFields && (showStatusMenu = !showStatusMenu)">
                   {{ selectedOrder.status }}
               <i class="fa-solid fa-chevron-down" style="font-size:9px;margin-left:4px"></i>
             </span>
-<div v-if="showStatusMenu && !isClient" class="status-dropdown">
-                  <div v-for="s in statusOptions" :key="s.label" class="status-drop-item" @click="changeStatus(s)">
+<div v-if="showStatusMenu && canEditWorkflowFields" class="status-dropdown">
+                  <div v-for="s in workflowStatusOptions" :key="s.label" class="status-drop-item" @click="changeStatus(s)">
   <input
     type="color"
     class="status-dot status-color-picker"
@@ -1881,15 +1884,15 @@
 
   <span class="status-group-tag">→ {{ s.groupLabel }}</span>
 
-  <button v-if="isSuperAdmin && s.custom" class="status-action-btn" @click.stop="editCustomStatus(s)">
+  <button v-if="canManageWorkflow && s.custom" class="status-action-btn" @click.stop="editCustomStatus(s)">
     <i class="fa-solid fa-pen"></i>
   </button>
 
-  <button v-if="isSuperAdmin && s.custom" class="status-action-btn danger" @click.stop="deleteCustomStatus(s)">
+  <button v-if="canManageWorkflow && s.custom" class="status-action-btn danger" @click.stop="deleteCustomStatus(s)">
     <i class="fa-solid fa-trash"></i>
   </button>
 </div>
-              <div v-if="isSuperAdmin" class="custom-status-box">
+              <div v-if="canManageWorkflow" class="custom-status-box">
                 <input v-model="customStatusLabel" class="custom-status-input" placeholder="Write custom status..." @keydown.enter.prevent="applyCustomStatus" />
                 <input v-model="customStatusColor" type="color" class="custom-status-color" title="Choose label color" />
                 <button class="custom-status-btn" @click="applyCustomStatus">Add</button>
@@ -2941,7 +2944,7 @@ activeTrackingIndex: 0,
         { label: 'In Production', color: '#6161ff', group: 'in_production', groupLabel: 'In Production' },
         { label: 'Completed', color: '#00c875', group: 'completed', groupLabel: 'Completed' },
         { label: 'Shipped', color: '#fdab3d', group: 'shipped', groupLabel: 'Shipped' },
-        { label: 'Delivered', color: '#00c875', group: 'shipped', groupLabel: 'Shipped' }
+        { label: 'Delivered', color: '#00c875', group: 'delivered', groupLabel: 'Delivered' }
       ]
     }
   },
@@ -3011,6 +3014,37 @@ activeTrackingIndex: 0,
       return [...defaults, ...this.customBoardGroups]
     },
 
+    workflowStatusOptions() {
+      const defaultLabels = {
+        in_production: 'In Production',
+        completed: 'Completed',
+        shipped: 'Shipped',
+        delivered: 'Delivered'
+      }
+
+      return this.boardGroups.map(group => {
+        const expectedLabel =
+          this.defaultBoardGroupOverrides?.[group.key]?.label ||
+          defaultLabels[group.key] ||
+          group.label
+
+        const existing = this.statusOptions.find(status =>
+          String(status.label || '').trim().toLowerCase() ===
+            String(expectedLabel || '').trim().toLowerCase()
+        ) || this.statusOptions.find(status =>
+          status.group === group.key && status.custom === true
+        )
+
+        return this.normalizeStatusDefinition(existing || {
+          label: expectedLabel,
+          color: group.color,
+          group: group.key,
+          groupLabel: group.label,
+          custom: group.custom === true
+        })
+      })
+    },
+
     activeBoardGroup() {
       if (this.activeGroup === 'all') {
         return {
@@ -3068,12 +3102,15 @@ canEditOrderNotes() {
     || this.currentUser?.can_create_orders === true
 },
 
-canEditWorkflowFields() {
-  const role = this.currentUser?.role
+canManageWorkflow() {
+  if (this.isClient) return false
 
-  return role === 'super_admin'
-    || role === 'admin'
-    || role === 'member'
+  return this.isSuperAdmin
+    || this.isAdmin
+    || this.currentUser?.can_create_orders === true
+},
+canEditWorkflowFields() {
+  return this.canManageWorkflow
 },
     currentUser() {
       try { return JSON.parse(localStorage.getItem('user')) || null } catch { return null }
@@ -3547,7 +3584,9 @@ beforeUnmount()  {
         }
 
         if (Array.isArray(data.settings?.status_options)) {
-          this.statusOptions = data.settings.status_options
+          this.statusOptions = data.settings.status_options.map(
+            status => this.normalizeStatusDefinition(status)
+          )
         }
         if (Array.isArray(data.settings?.custom_groups)) {
           this.customBoardGroups = data.settings.custom_groups
@@ -5236,7 +5275,7 @@ beforeUnmount()  {
     },
 
     changeWorkflowGroupColor(group, color) {
-      if (!group?.key || !color) return
+      if (!this.canManageWorkflow || !group?.key || !color) return
 
       if (group.custom) {
         const target = this.customBoardGroups.find(
@@ -5299,6 +5338,7 @@ beforeUnmount()  {
     },
 
     editWorkflowGroup(group) {
+      if (!this.canManageWorkflow) return
       const entered = window.prompt(
         'Edit section name',
         group.label
@@ -5359,6 +5399,7 @@ beforeUnmount()  {
     },
 
     deleteWorkflowGroup(group) {
+      if (!this.canManageWorkflow) return
       const count = this.countForGroup(group.key)
 
       if (count > 0) {
@@ -5652,8 +5693,10 @@ beforeUnmount()  {
     async inlineChangeStatus(order, label) {
       if (!this.canEditWorkflowFields) return
 
-      const status = this.statusOptions.find(
-        item => item.label === label
+      const status = this.workflowStatusOptions.find(
+        item =>
+          String(item.label || '').trim().toLowerCase() ===
+          String(label || '').trim().toLowerCase()
       )
 
       if (!status) return
@@ -5683,7 +5726,8 @@ beforeUnmount()  {
 
         order.status = status.label
         order.statusColor = status.color
-        order.group = this.statusToGroup(status.label)
+        const targetGroup = status.group || this.statusToGroup(status.label)
+        order.group = targetGroup
 
         if (isShipped && shippedBy) {
           this.markOrderFinished(order.id, shippedBy)
@@ -5702,6 +5746,10 @@ beforeUnmount()  {
           this.selectedOrder.statusColor = status.color
           this.selectedOrder.group = order.group
         }
+
+        // Force the active tab list/counts to react immediately.
+        this.orders = [...this.orders]
+        await this.fetchOrders({ silent: true, loadFiles: false })
       } catch (error) {
         console.error('Inline status error:', error)
 
@@ -7851,7 +7899,7 @@ body.board-column-resizing .column-resizer::before {
     },
 
     addWorkflowGroup() {
-      if (!this.isSuperAdmin) return
+      if (!this.canManageWorkflow) return
       const label = window.prompt(
         'New order section name'
       )
@@ -8107,7 +8155,7 @@ body.board-column-resizing .column-resizer::before {
     },
 
     toggleRowStatusMenu(order, event) {
-      if (!order?.id) return
+      if (!this.canEditWorkflowFields || !order?.id) return
 
       const id = Number(order.id)
 
@@ -8157,7 +8205,7 @@ body.board-column-resizing .column-resizer::before {
     },
 
     async selectRowStatus(order, status) {
-      if (!order || !status?.label) return
+      if (!this.canEditWorkflowFields || !order || !status?.label) return
 
       this.rowStatusMenuId = null
       this.rowStatusMenuOrder = null
@@ -8169,7 +8217,7 @@ body.board-column-resizing .column-resizer::before {
     },
 
     startRowStatusEdit(status) {
-      if (!status?.label) return
+      if (!this.canManageWorkflow || !status?.label) return
 
       this.rowStatusEditingLabel = status.label
       this.rowStatusEditName = status.label
@@ -8183,7 +8231,7 @@ body.board-column-resizing .column-resizer::before {
     },
 
     async saveRowStatusEdit(status) {
-      if (!status?.label) return
+      if (!this.canManageWorkflow || !status?.label) return
 
       const oldLabel = String(status.label || '').trim()
       const newLabel = String(this.rowStatusEditName || '').trim()
@@ -8256,7 +8304,7 @@ body.board-column-resizing .column-resizer::before {
     },
 
     async deleteRowCustomStatus(status) {
-      if (!status?.label) return
+      if (!this.canManageWorkflow || !status?.label) return
 
       const label = String(status.label || '').trim()
 
@@ -8281,7 +8329,7 @@ body.board-column-resizing .column-resizer::before {
     },
 
     async addCustomRowStatus(order) {
-      if (!order) return
+      if (!this.canManageWorkflow || !order) return
 
       const label = String(this.customStatusLabel || '').trim()
       if (!label) return
@@ -8292,16 +8340,27 @@ body.board-column-resizing .column-resizer::before {
           label.toLowerCase()
       )
 
+      const customGroupKey = label
+        .toLowerCase()
+        .replace(/[^a-z0-9]+/g, '_')
+        .replace(/^_|_$/g, '')
+
+      if (!existing && !this.boardGroups.some(group => group.key === customGroupKey)) {
+        this.customBoardGroups.push({
+          key: customGroupKey,
+          label: label.toUpperCase(),
+          color: this.customStatusColor || '#6161ff',
+          icon: 'fa-solid fa-house',
+          custom: true
+        })
+        this.persistWorkflowGroups()
+      }
+
       const status = existing || {
         label,
         color: this.customStatusColor || '#6161ff',
-        group: order.group || this.activeGroup || 'in_production',
-        groupLabel:
-          this.boardGroups.find(
-            group =>
-              group.key ===
-              (order.group || this.activeGroup)
-          )?.label || 'In Production',
+        group: customGroupKey,
+        groupLabel: label,
         custom: true
       }
 
@@ -8750,6 +8809,7 @@ shortShippingAddress(address) {
 
 
     editCustomStatus(status) {
+  if (!this.canManageWorkflow) return
   if (!this.isSuperAdmin) return
 const newName = prompt('Enter new status name', status.label)
   if (!newName || !newName.trim()) return
@@ -8764,6 +8824,7 @@ const newName = prompt('Enter new status name', status.label)
 },
 
 deleteCustomStatus(status) {
+  if (!this.canManageWorkflow) return
   if (!this.isSuperAdmin) return
   if (!confirm('Are you sure you want to delete this custom status?')) return
 
@@ -8946,7 +9007,7 @@ alert(e.response?.data?.message || 'Orders were not deleted')
     },
 
     canManageStatusOption(status) {
-      return this.isSuperAdmin && Boolean(status?.label)
+      return this.canManageWorkflow && Boolean(status?.label)
     },
 
     loadSavedStatusOptions() {
@@ -8962,13 +9023,7 @@ alert(e.response?.data?.message || 'Orders were not deleted')
         if (Array.isArray(savedAll) && savedAll.length) {
           this.statusOptions = savedAll
             .filter(item => item?.label)
-            .map(item => ({
-              label: String(item.label || '').trim(),
-              color: item.color || '#6161ff',
-              group: item.group || 'in_production',
-              groupLabel: item.groupLabel || 'In Production',
-              custom: item.custom === true
-            }))
+            .map(item => this.normalizeStatusDefinition(item))
 
           return
         }
@@ -9089,7 +9144,7 @@ alert(e.response?.data?.message || 'Orders were not deleted')
     },
 
     async changeStatusOptionColor(status, color) {
-      if (!status || !color) return
+      if (!this.canManageWorkflow || !status || !color) return
 
       status.color = color
 
@@ -9733,19 +9788,50 @@ async fetchClients() {
     },
 
     statusToGroup(status) {
-      const found = this.statusOptions.find(
-        item => item.label === status
+      const normalized = String(status || '').trim().toLowerCase()
+
+      if (normalized === 'completed') return 'completed'
+      if (normalized === 'shipped') return 'shipped'
+      if (normalized === 'delivered') return 'delivered'
+      if (
+        normalized === 'pending' ||
+        normalized === 'designing' ||
+        normalized === 'in production'
+      ) return 'in_production'
+
+      const found = this.workflowStatusOptions.find(
+        item =>
+          String(item.label || '').trim().toLowerCase() === normalized
       )
 
       if (found?.group) {
         return found.group
       }
 
-      if (status === 'Completed') return 'completed'
-      if (status === 'Shipped') return 'shipped'
-      if (status === 'Delivered') return 'delivered'
-
       return 'in_production'
+    },
+
+    normalizeStatusDefinition(status) {
+      const label = String(status?.label || '').trim()
+      const normalized = label.toLowerCase()
+      const canonicalGroups = {
+        pending: ['in_production', 'In Production'],
+        designing: ['in_production', 'In Production'],
+        'in production': ['in_production', 'In Production'],
+        completed: ['completed', 'Completed'],
+        shipped: ['shipped', 'Shipped'],
+        delivered: ['delivered', 'Delivered']
+      }
+      const canonical = canonicalGroups[normalized]
+
+      return {
+        ...status,
+        label,
+        color: status?.color || '#6161ff',
+        group: canonical?.[0] || status?.group || 'in_production',
+        groupLabel: canonical?.[1] || status?.groupLabel || 'In Production',
+        custom: canonical ? false : status?.custom === true
+      }
     },
 
     statusColor(status) {
@@ -10007,7 +10093,7 @@ shipping_address: this.newOrder.shippingAddress,
     },
 
     async applyCustomStatus() {
-      if (!this.selectedOrder) return
+      if (!this.canManageWorkflow || !this.selectedOrder) return
       const label = (this.customStatusLabel || '').trim()
       if (!label) return
       const custom = { label, color: this.customStatusColor || '#6161ff', group: 'in_production', groupLabel: 'In Production', custom: true }
@@ -10018,7 +10104,7 @@ shipping_address: this.newOrder.shippingAddress,
     },
 
     async changeStatus(s) {
-      if (!this.selectedOrder) return
+      if (!this.canEditWorkflowFields || !this.selectedOrder) return
       const activeWorker = this.workingDesigner(this.selectedOrder)
       const isShipped =
         String(s.label || '').trim().toLowerCase() === 'shipped'
@@ -10036,7 +10122,8 @@ shipping_address: this.newOrder.shippingAddress,
         }, { headers: this.headers() })
         this.selectedOrder.status = s.label
         this.selectedOrder.statusColor = s.color || '#6161ff'
-        this.selectedOrder.group = s.group || 'in_production'
+        const targetGroup = s.group || this.statusToGroup(s.label)
+        this.selectedOrder.group = targetGroup
         if (isShipped && shippedBy) {
           this.markOrderFinished(this.selectedOrder.id, shippedBy)
           this.selectedOrder.finished_by = shippedBy
@@ -10045,10 +10132,11 @@ shipping_address: this.newOrder.shippingAddress,
             await this.finishWorkForShippedOrder(this.selectedOrder, shippedBy)
           }
         }
-        this.activeGroup = s.group || 'in_production'
         const idx = this.orders.findIndex(o => o.id === this.selectedOrder.id)
         if (idx !== -1) this.orders[idx] = { ...this.selectedOrder }
+        this.orders = [...this.orders]
         this.showStatusMenu = false
+        await this.fetchOrders({ silent: true, loadFiles: false })
       } catch (e) { console.error('changeStatus error:', e) }
     },
 
@@ -23929,5 +24017,10 @@ body.board-column-resizing .column-resizer::before {
     right: 12px !important;
     width: calc(100vw - 24px) !important;
   }
+}
+
+.status-ref-trigger:disabled {
+  cursor: default !important;
+  opacity: 1 !important;
 }
 </style>
