@@ -263,16 +263,16 @@
       </div>
 
       <div class="board-toolbar-actions">
-        <div v-if="!isClient" class="board-search client-search">
-          <i class="fa-solid fa-user-tie"></i>
-          <input
-            v-model.trim="clientSearch"
-            type="search"
-            placeholder="Search clients..."
-            aria-label="Search orders by client"
-            @click.stop
-          />
-        </div>
+        <button
+          v-if="!isClient"
+          type="button"
+          class="client-filter-trigger"
+          @click.stop="clientFilterOpen = true"
+        >
+          <i class="fa-solid fa-user-group"></i>
+          <span>Client Filter</span>
+          <span v-if="selectedClient" class="client-filter-count">1</span>
+        </button>
 
         <div class="board-search">
           <i class="fa-solid fa-magnifying-glass"></i>
@@ -868,6 +868,13 @@
             </div>
 
             <div class="board-row-files">
+              <div
+                v-if="uploadProgressByOrder[Number(order.id)] !== undefined"
+                class="inline-upload-progress"
+              >
+                <i class="fa-solid fa-spinner fa-spin"></i>
+                {{ uploadProgressByOrder[Number(order.id)] }}%
+              </div>
               <!-- ONLY 3 THUMBNAILS IN OUTER BOARD -->
               <div
                 v-for="file in rowFiles(order).slice(0, 3)"
@@ -951,7 +958,8 @@
               :value="orderNotesText(order)"
               rows="1"
               placeholder="Write notes..."
-              :readonly="!canEditOrderNotes"
+              :readonly="!canEditNotesForOrder(order)"
+              @focus="beginTextEditing"
               @click.stop
               @keydown.enter.exact.prevent="saveNotesInline(order, $event)"
               @keydown.shift.enter.stop
@@ -981,14 +989,24 @@
           </div>
 
           <div v-if="isBoardColumnVisible('payment')" class="board-col board-col-payment" :style="boardColumnOrderStyle('payment')">
-            <input
+            <select
+              v-if="isClient"
               class="board-inline-cell-input payment-input-inline"
-              :value="isClient ? 'Not Yet' : (order.payment || 'Not Yet')"
+              disabled
+              title="Payment is managed by Prosix"
+            >
+              <option>Not Yet</option>
+            </select>
+            <input
+              v-else
+              class="board-inline-cell-input payment-input-inline"
+              :value="order.payment || 'Not Yet'"
               type="text"
-              :readonly="isClient"
-              :title="isClient ? 'Payment is managed by Prosix' : 'Click and edit payment'"
+              title="Click and edit payment"
               @click.stop
-              @change="!isClient && saveDirectInlineField(order, 'payment', $event.target.value)"
+              @focus="beginTextEditing"
+              @keydown.enter.prevent="$event.target.blur()"
+              @blur="saveTextInline(order, 'payment', $event)"
             />
           </div>
 
@@ -998,8 +1016,10 @@
               :value="order.shippingAddress || ''"
               type="text"
               placeholder="Add address"
+              @focus="beginTextEditing"
               @click.stop
-              @change="saveDirectInlineField(order, 'shipping_address', $event.target.value)"
+              @keydown.enter.prevent="$event.target.blur()"
+              @blur="saveTextInline(order, 'shipping_address', $event)"
             />
             <div
               v-if="order.shippingAddress"
@@ -1854,6 +1874,9 @@
       v-model="shippingAddressEdit"
       class="payment-input"
       rows="4"
+      @focus="beginTextEditing"
+      @keydown.enter.exact.prevent="saveShippingAddress"
+      @blur="saveShippingAddress"
     ></textarea>
 
     <button
@@ -2037,11 +2060,14 @@
                   <i class="fa-solid fa-pen-to-square notes-icon"></i>
                   <span class="text-dark">Notes</span>
                 </div>
-              <textarea
+<textarea
   v-model="card.noteText"
   class="notes-textarea text-dark"
   placeholder="Type your notes here..."
   :readonly="!canEditNotes"
+  @focus="beginTextEditing"
+  @keydown.enter.exact.prevent="saveNote(card)"
+  @blur="saveNote(card)"
 ></textarea>
 
 <div class="notes-footer">
@@ -2083,6 +2109,10 @@
                         <i class="fa-solid fa-xmark"></i>
                       </button>
                     </div>
+                  </div>
+                  <div v-if="uploadProgressByCard[card.type] !== undefined" class="card-upload-progress">
+                    <i class="fa-solid fa-spinner fa-spin"></i>
+                    Uploading {{ uploadProgressByCard[card.type] }}%
                   </div>
                   <div v-else class="card-empty-preview">
                     <img v-if="card.thumbnail" :src="card.thumbnail" class="card-thumbnail-img" />
@@ -2739,6 +2769,61 @@
     >
       {{ copyableHoverTooltip.text }}
     </div>
+
+    <Teleport to="body">
+      <Transition name="client-filter-slide">
+        <div
+          v-if="clientFilterOpen"
+          class="client-filter-overlay"
+          @click.self="closeClientFilter"
+        >
+          <aside class="client-filter-drawer" @click.stop>
+            <header class="client-filter-header">
+              <div>
+                <h2>Client Filter</h2>
+                <p>Select a client to view their orders.</p>
+              </div>
+              <button type="button" class="client-filter-close" @click="closeClientFilter">
+                <i class="fa-solid fa-xmark"></i>
+              </button>
+            </header>
+
+            <div class="client-filter-search">
+              <i class="fa-solid fa-magnifying-glass"></i>
+              <input v-model.trim="clientSearch" type="search" placeholder="Search clients..." autofocus />
+            </div>
+
+            <div class="client-filter-list">
+              <button
+                type="button"
+                class="client-filter-item"
+                :class="{ active: !selectedClient }"
+                @click="selectClientFilter('')"
+              >
+                <span class="client-filter-avatar"><i class="fa-solid fa-users"></i></span>
+                <span><strong>All Clients</strong><small>Show every order</small></span>
+                <i v-if="!selectedClient" class="fa-solid fa-check"></i>
+              </button>
+
+              <button
+                v-for="client in filteredClientOptions"
+                :key="client.id"
+                type="button"
+                class="client-filter-item"
+                :class="{ active: Number(selectedClient) === Number(client.id) }"
+                @click="selectClientFilter(client.id)"
+              >
+                <span class="client-filter-avatar">{{ initial(client.name || client.email) }}</span>
+                <span><strong>{{ client.name || 'Unnamed client' }}</strong><small>{{ client.email || client.company || '' }}</small></span>
+                <i v-if="Number(selectedClient) === Number(client.id)" class="fa-solid fa-check"></i>
+              </button>
+
+              <div v-if="filteredClientOptions.length === 0" class="client-filter-empty">No clients found.</div>
+            </div>
+          </aside>
+        </div>
+      </Transition>
+    </Teleport>
   </div>
   </AppLayout>
 </template>
@@ -2758,6 +2843,11 @@ export default {
   data() {
       return {
       showShippingAddressMenu: false,
+      clientFilterOpen: false,
+      textEditing: false,
+      noteSaving: false,
+      uploadProgressByOrder: {},
+      uploadProgressByCard: {},
       copyableHoverTooltip: {
         text: '',
         top: 0,
@@ -3077,15 +3167,7 @@ activeTracking() {
   if (this.isClient) {
     const note = this.selectedOrder.cards?.find(card => card.type === 'notes')
     const hasNote = Boolean(String(note?.noteText || '').trim())
-    if (!hasNote) return true
-
-    const savedAt = Number(
-      this.clientNoteSavedAtByOrder[Number(this.selectedOrder.id)] ||
-      new Date(this.selectedOrder.notesUpdatedAt || 0).getTime() ||
-      0
-    )
-
-    return savedAt > 0 && (this.nowTick - savedAt) < (5 * 60 * 1000)
+    return !hasNote && !this.clientNoteSavedAtByOrder[Number(this.selectedOrder.id)]
   }
 
   return this.hasFullOrderAccess
@@ -3143,6 +3225,17 @@ canEditWorkflowFields() {
           String(client.email || '').trim().toLowerCase() === email
         )
       )
+    },
+
+    filteredClientOptions() {
+      const query = String(this.clientSearch || '').trim().toLowerCase()
+      return [...this.availableClients]
+        .filter(client => !query || [client.name, client.email, client.company]
+          .filter(Boolean)
+          .join(' ')
+          .toLowerCase()
+          .includes(query))
+        .sort((a, b) => String(a.name || a.email || '').localeCompare(String(b.name || b.email || '')))
     },
 
     detailSearchResults() {
@@ -3436,7 +3529,11 @@ async mounted() {
     3000
   )
   this.orderSyncTimer = window.setInterval(
-    () => this.fetchOrders({ silent: true, loadFiles: false }),
+    () => {
+      if (!this.textEditing) {
+        this.fetchOrders({ silent: true, loadFiles: false })
+      }
+    },
     4000
   )
   this.chatSyncTimer = window.setInterval(() => {
@@ -8442,8 +8539,9 @@ body.board-column-resizing .column-resizer::before {
       if (
         !input ||
         !order?.id ||
-        !this.canEditOrderNotes
+        !this.canEditNotesForOrder(order)
       ) {
+        this.endTextEditing()
         return
       }
 
@@ -8454,6 +8552,7 @@ body.board-column-resizing .column-resizer::before {
        * Enter ke baad blur duplicate request na bheje.
        */
       if (fromBlur && value === oldValue) {
+        this.endTextEditing()
         return
       }
 
@@ -8509,6 +8608,14 @@ body.board-column-resizing .column-resizer::before {
 
         input.value = value
 
+        if (this.isClient) {
+          this.clientNoteSavedAtByOrder = {
+            ...this.clientNoteSavedAtByOrder,
+            [Number(order.id)]: Date.now()
+          }
+          localStorage.setItem('client_note_saved_at_by_order', JSON.stringify(this.clientNoteSavedAtByOrder))
+        }
+
         if (!fromBlur) {
           input.blur()
         }
@@ -8524,6 +8631,8 @@ body.board-column-resizing .column-resizer::before {
           error.response?.data?.message ||
           'Notes save nahi huay.'
         )
+      } finally {
+        this.endTextEditing()
       }
     },
 
@@ -8763,7 +8872,10 @@ shortLastMessage(text) {
 
 
  async saveShippingAddress() {
-  if (!this.selectedOrder) return
+  if (!this.selectedOrder) {
+    this.endTextEditing()
+    return
+  }
 
   try {
     await axios.put(
@@ -8793,6 +8905,8 @@ shortLastMessage(text) {
   } catch (e) {
     console.error(e)
     alert('Shipping address not saved ')
+  } finally {
+    this.endTextEditing()
   }
 },
 
@@ -8967,9 +9081,6 @@ alert(e.response?.data?.message || 'Orders were not deleted')
 
     orderMatchesCurrentSearch(order) {
       const orderText = String(this.searchOrder || '').trim().toLowerCase()
-      const clientText = this.isClient
-        ? ''
-        : String(this.clientSearch || '').trim().toLowerCase()
 
       const orderMatch = !orderText || [
         order.name,
@@ -8989,15 +9100,7 @@ alert(e.response?.data?.message || 'Orders were not deleted')
           client => Number(client.id) === Number(this.selectedClient)
         )
 
-      const clientMatch = !clientText || (order.clients || []).some(client =>
-        [client.name, client.email, client.company]
-          .filter(Boolean)
-          .join(' ')
-          .toLowerCase()
-          .includes(clientText)
-      )
-
-      return orderMatch && selectedClientMatch && clientMatch
+      return orderMatch && selectedClientMatch
     },
 
     // Mobile: select order and close left panel
@@ -10175,7 +10278,17 @@ shipping_address: this.newOrder.shippingAddress,
     },
 
    async saveNote(card) {
-  if (!this.selectedOrder || !this.canEditNotes) return
+  if (!this.selectedOrder || !this.canEditNotes || this.noteSaving) {
+    this.endTextEditing()
+    return
+  }
+
+  if (!String(card?.noteText || '').trim()) {
+    this.endTextEditing()
+    return
+  }
+
+  this.noteSaving = true
 
   try {
     await axios.put(`/api/orders/${this.selectedOrder.id}`, {
@@ -10202,6 +10315,9 @@ shipping_address: this.newOrder.shippingAddress,
   } catch (e) {
     console.error('saveNote error:', e)
     alert(e.response?.data?.message || 'Note save nahi hua')
+  } finally {
+    this.noteSaving = false
+    this.endTextEditing()
   }
     },
 
@@ -10301,6 +10417,7 @@ if (!this.canUploadFiles || !card || card.type === 'notes') return
 
     async uploadFilesToOrder(files, cardType) {
       if (!files.length || !this.selectedOrder) return
+      const uploadingOrderId = Number(this.selectedOrder.id)
       const card = this.selectedOrder.cards.find(c => c.type === cardType)
       if (!card) return
       const tempFiles = files.map((file, index) => ({
@@ -10313,13 +10430,33 @@ if (!this.canUploadFiles || !card || card.type === 'notes') return
       const formData = new FormData()
       formData.append('card_type', cardType)
       files.forEach(file => { formData.append('files[]', file) })
+      this.uploadProgressByOrder = { ...this.uploadProgressByOrder, [uploadingOrderId]: 0 }
+      this.uploadProgressByCard = { ...this.uploadProgressByCard, [cardType]: 0 }
       try {
-        const res = await axios.post(`/api/orders/${this.selectedOrder.id}/files`, formData, { headers: { Authorization: `Bearer ${localStorage.getItem('token')}`, Accept: 'application/json' } })
+        const res = await axios.post(`/api/orders/${uploadingOrderId}/files`, formData, {
+          headers: { Authorization: `Bearer ${localStorage.getItem('token')}`, Accept: 'application/json' },
+          onUploadProgress: progressEvent => {
+            const total = Number(progressEvent.total || 0)
+            const percent = total > 0 ? Math.min(100, Math.round((progressEvent.loaded * 100) / total)) : 0
+            this.uploadProgressByOrder = { ...this.uploadProgressByOrder, [uploadingOrderId]: percent }
+            this.uploadProgressByCard = { ...this.uploadProgressByCard, [cardType]: percent }
+          }
+        })
         const savedFilesRaw = res.data?.files || []
         const savedFiles = savedFilesRaw.map(file => ({ ...this.normalizeOrderFile(file), cardType }))
         const withoutTemp = (card.files || []).filter(file => !file.uploading)
         card.files = this.mergeFiles(withoutTemp, savedFiles)
-      } catch (e) { card.files = (card.files || []).filter(file => !file.uploading); throw e }
+      } catch (e) {
+        card.files = (card.files || []).filter(file => !file.uploading)
+        throw e
+      } finally {
+        const orderProgress = { ...this.uploadProgressByOrder }
+        const cardProgress = { ...this.uploadProgressByCard }
+        delete orderProgress[uploadingOrderId]
+        delete cardProgress[cardType]
+        this.uploadProgressByOrder = orderProgress
+        this.uploadProgressByCard = cardProgress
+      }
     },
 
 async onFileChange(event, card) {
@@ -10594,6 +10731,58 @@ async onFileChange(event, card) {
       this.packingEditValue = ''
       this.openOrderMenuId = null
       this.detailSearchOpen = false
+      this.showShippingAddressMenu = false
+      this.customFieldMenu = { order: null, column: null, top: 0, left: 0, width: 260 }
+    },
+
+    beginTextEditing() {
+      this.textEditing = true
+    },
+
+    endTextEditing() {
+      this.textEditing = false
+    },
+
+    canEditNotesForOrder(order) {
+      if (!order?.id) return false
+      if (!this.isClient) return this.canEditOrderNotes
+      return !this.orderNotesText(order) && !this.clientNoteSavedAtByOrder[Number(order.id)]
+    },
+
+    async saveTextInline(order, field, event) {
+      const input = event?.target
+      if (!input || !order?.id) {
+        this.endTextEditing()
+        return
+      }
+
+      const value = String(input.value || '').trim()
+      const allowed = this.canEditWorkflowFields || (this.isClient && field === 'shipping_address')
+      if (!allowed) {
+        this.endTextEditing()
+        return
+      }
+
+      try {
+        await axios.put(`/api/orders/${order.id}`, { [field]: value }, { headers: this.headers() })
+        if (field === 'shipping_address') order.shippingAddress = value
+        else order[field] = value
+      } catch (error) {
+        console.error('Inline text save error:', error)
+        alert(error.response?.data?.message || 'Value could not be saved.')
+      } finally {
+        this.endTextEditing()
+      }
+    },
+
+    closeClientFilter() {
+      this.clientFilterOpen = false
+      this.clientSearch = ''
+    },
+
+    selectClientFilter(clientId) {
+      this.selectedClient = clientId
+      this.closeClientFilter()
     },
 
     startResize() {
@@ -24023,4 +24212,77 @@ body.board-column-resizing .column-resizer::before {
   cursor: default !important;
   opacity: 1 !important;
 }
+
+/* Requested client filter, upload feedback and readable PO styling. */
+.client-filter-trigger {
+  min-height: 40px;
+  padding: 0 16px;
+  border: 2px solid #0f172a;
+  border-radius: 999px;
+  background: #fff;
+  color: #0f172a;
+  display: inline-flex;
+  align-items: center;
+  gap: 9px;
+  font-size: 13px;
+  font-weight: 800;
+  cursor: pointer;
+}
+
+.client-filter-count {
+  min-width: 20px;
+  height: 20px;
+  border-radius: 999px;
+  background: #6161ff;
+  color: #fff;
+  display: grid;
+  place-items: center;
+  font-size: 11px;
+}
+
+.client-filter-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 2147483647;
+  background: rgba(15, 23, 42, .36);
+}
+
+.client-filter-drawer {
+  position: absolute;
+  top: 0;
+  right: 0;
+  width: min(430px, 94vw);
+  height: 100%;
+  padding: 24px;
+  background: #fff;
+  box-shadow: -22px 0 50px rgba(15, 23, 42, .22);
+  display: flex;
+  flex-direction: column;
+}
+
+.client-filter-header { display:flex; align-items:flex-start; justify-content:space-between; gap:16px; }
+.client-filter-header h2 { margin:0; color:#0f172a; font-size:23px; }
+.client-filter-header p { margin:5px 0 0; color:#64748b; font-size:13px; }
+.client-filter-close { width:38px; height:38px; border:0; border-radius:10px; background:#f1f5f9; cursor:pointer; }
+.client-filter-search { position:relative; margin:22px 0 14px; }
+.client-filter-search i { position:absolute; left:14px; top:50%; transform:translateY(-50%); color:#64748b; }
+.client-filter-search input { width:100%; height:46px; padding:0 14px 0 42px; border:1px solid #cbd5e1; border-radius:12px; outline:none; }
+.client-filter-search input:focus { border-color:#6161ff; box-shadow:0 0 0 3px rgba(97,97,255,.13); }
+.client-filter-list { overflow-y:auto; min-height:0; display:flex; flex-direction:column; gap:8px; padding-right:3px; }
+.client-filter-item { width:100%; padding:11px; border:1px solid #e2e8f0; border-radius:12px; background:#fff; display:grid; grid-template-columns:40px 1fr auto; align-items:center; gap:11px; text-align:left; cursor:pointer; }
+.client-filter-item:hover,.client-filter-item.active { border-color:#6161ff; background:#f5f5ff; }
+.client-filter-item > span:nth-child(2) { min-width:0; display:flex; flex-direction:column; }
+.client-filter-item strong,.client-filter-item small { overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.client-filter-item small { margin-top:3px; color:#64748b; }
+.client-filter-avatar { width:40px; height:40px; border-radius:50%; background:#111827; color:#fff; display:grid !important; place-items:center; font-weight:900; }
+.client-filter-empty { padding:35px 10px; text-align:center; color:#64748b; }
+.client-filter-slide-enter-active,.client-filter-slide-leave-active { transition:opacity .22s ease; }
+.client-filter-slide-enter-active .client-filter-drawer,.client-filter-slide-leave-active .client-filter-drawer { transition:transform .22s ease; }
+.client-filter-slide-enter-from,.client-filter-slide-leave-to { opacity:0; }
+.client-filter-slide-enter-from .client-filter-drawer,.client-filter-slide-leave-to .client-filter-drawer { transform:translateX(100%); }
+
+.inline-upload-progress,.card-upload-progress { display:inline-flex; align-items:center; gap:6px; color:#4f46e5; font-size:11px; font-weight:900; white-space:nowrap; }
+.card-upload-progress { position:absolute; left:50%; bottom:12px; transform:translateX(-50%); padding:7px 11px; border-radius:999px; background:#fff; box-shadow:0 5px 18px rgba(15,23,42,.16); }
+.factory-board-page .board-col-name .name-value > small { font-size:11px !important; line-height:1.35 !important; font-weight:700 !important; }
+.board-col-payment select:disabled { opacity:1; color:#111827; cursor:not-allowed; background:#f8fafc; }
 </style>
