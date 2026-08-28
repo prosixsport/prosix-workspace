@@ -434,7 +434,7 @@
             ></span>
           </div>
 
-          <div v-if="!isClient && isBoardColumnVisible('status')" class="board-col board-col-status resizable-head-cell" :style="boardColumnOrderStyle('status')">
+          <div v-if="isBoardColumnVisible('status')" class="board-col board-col-status resizable-head-cell" :style="boardColumnOrderStyle('status')">
             STATUS
             <span
               class="column-resizer"
@@ -497,7 +497,7 @@
             ></span>
           </div>
 
-          <div v-if="!isClient && isBoardColumnVisible('payment')" class="board-col board-col-payment resizable-head-cell" :style="boardColumnOrderStyle('payment')">
+          <div v-if="isBoardColumnVisible('payment')" class="board-col board-col-payment resizable-head-cell" :style="boardColumnOrderStyle('payment')">
             PAYMENT
             <span
               class="column-resizer"
@@ -547,6 +547,27 @@
                 @keyup.enter="createInlineOrder"
                 @keyup.esc="cancelInlineOrder"
               />
+
+              <template v-if="isClient">
+                <select class="inline-fixed-select" disabled title="Status is fixed for client orders">
+                  <option>Pending</option>
+                </select>
+
+                <select v-model="inlinePriorityOptionId" class="inline-priority-select">
+                  <option value="">Select Priority</option>
+                  <option
+                    v-for="option in priorityOptions"
+                    :key="option.id"
+                    :value="String(option.id)"
+                  >
+                    {{ option.label }}
+                  </option>
+                </select>
+
+                <select class="inline-fixed-select" disabled title="Payment is fixed for client orders">
+                  <option>Not Yet</option>
+                </select>
+              </template>
 
               <button
                 type="button"
@@ -720,7 +741,7 @@
             </div>
           </div>
 
-          <div v-if="!isClient && isBoardColumnVisible('status')" class="board-col board-col-status row-status-cell" :style="boardColumnOrderStyle('status')" @click.stop>
+          <div v-if="isBoardColumnVisible('status')" class="board-col board-col-status row-status-cell" :style="boardColumnOrderStyle('status')" @click.stop>
             <div class="status-ref-wrap">
               <button
                 type="button"
@@ -991,8 +1012,12 @@
             </button>
           </div>
 
-          <div v-if="!isClient && isBoardColumnVisible('payment')" class="board-col board-col-payment" :style="boardColumnOrderStyle('payment')">
+          <div v-if="isBoardColumnVisible('payment')" class="board-col board-col-payment" :style="boardColumnOrderStyle('payment')">
+            <select v-if="isClient" class="board-inline-cell-input payment-input-inline" disabled>
+              <option>{{ order.payment || 'Not Yet' }}</option>
+            </select>
             <input
+              v-else
               class="board-inline-cell-input payment-input-inline"
               :value="order.payment || 'Not Yet'"
               type="text"
@@ -1882,7 +1907,7 @@
     </button>
   </div>
 </div>
-          <div v-if="!isClient" class="detail-info-item" style="position:relative" @click.stop>
+          <div class="detail-info-item" style="position:relative" @click.stop>
             <span class="info-label">Status :</span>
 <span class="status-badge" :style="{ background: selectedOrder.statusColor }" @click="canEditWorkflowFields && (showStatusMenu = !showStatusMenu)">
                   {{ selectedOrder.status }}
@@ -1998,9 +2023,9 @@
     </button>
   </div>
 </div>
-          <div v-if="!isClient" class="detail-info-item" style="position:relative" @click.stop>
+          <div class="detail-info-item" style="position:relative" @click.stop>
             <span class="info-label">Payment :</span>
-            <span class="payment-badge payment-summary-badge" @click="showPaymentMenu = !showPaymentMenu">
+            <span class="payment-badge payment-summary-badge" @click="!isClient && (showPaymentMenu = !showPaymentMenu)">
                   <span class="payment-chip payment-chip-paid">{{ isClient ? 'Not Yet' : (selectedOrder.payment || 'Not Yet') }}</span>
               <span class="payment-chip payment-chip-received">R ${{ selectedOrder.paymentReceived || 0 }}</span>
               <span class="payment-chip payment-chip-balance">B ${{ selectedOrder.paymentBalance || 0 }}</span>
@@ -2798,6 +2823,7 @@
                 autofocus
                 @input="clientFilterListOpen = true"
               />
+
               <button
                 type="button"
                 class="client-filter-dropdown-toggle"
@@ -2908,6 +2934,7 @@ export default {
       detailOpen: false,
       inlineAddOpen: false,
       inlineOrderName: '',
+      inlinePriorityOptionId: '',
       inlineOrderSaving: false,
       inlineEditingCell: null,
       inlineEditValue: '',
@@ -3388,6 +3415,16 @@ filteredOrders() {
         .filter(column => column && column.is_active !== false)
     },
 
+    priorityColumn() {
+      return this.activeCustomColumns.find(column => this.isPriorityColumn(column)) || null
+    },
+
+    priorityOptions() {
+      return Array.isArray(this.priorityColumn?.options)
+        ? this.priorityColumn.options
+        : []
+    },
+
     orderedCustomColumns() {
       return [...(this.customColumns || [])]
         .filter(Boolean)
@@ -3449,7 +3486,6 @@ filteredOrders() {
         .map(item => item.key)
         .filter(key => {
           if (key === 'name') return true
-          if (this.isClient && (key === 'payment' || key === 'status')) return false
           if (key.startsWith('custom_')) return activeCustomKeys.has(key)
           return this.isBoardColumnVisible(key)
         })
@@ -8809,6 +8845,7 @@ body.board-column-resizing .column-resizer::before {
     startInlineOrder() {
       this.inlineAddOpen = true
       this.inlineOrderName = ''
+      this.inlinePriorityOptionId = ''
 
       this.$nextTick(() => {
         const input = this.$refs.inlineOrderInput
@@ -8827,6 +8864,7 @@ body.board-column-resizing .column-resizer::before {
     cancelInlineOrder() {
       this.inlineAddOpen = false
       this.inlineOrderName = ''
+      this.inlinePriorityOptionId = ''
       this.inlineOrderSaving = false
     },
 
@@ -8845,12 +8883,11 @@ body.board-column-resizing .column-resizer::before {
 
       this.inlineOrderSaving = true
 
-      const activeStatus =
-        this.statusOptions.find(
-          item => item.group === this.activeGroup
-        ) ||
-        this.statusOptions.find(
-          item => item.label === 'Pending'
+      const activeStatus = this.isClient
+        ? this.statusOptions.find(item => item.label === 'Pending')
+        : (
+          this.statusOptions.find(item => item.group === this.activeGroup) ||
+          this.statusOptions.find(item => item.label === 'Pending')
         )
 
       try {
@@ -8881,6 +8918,19 @@ body.board-column-resizing .column-resizer::before {
         const createdId =
           response.data?.order?.id ||
           response.data?.id
+
+        if (
+          this.isClient &&
+          createdId &&
+          this.priorityColumn?.id &&
+          this.inlinePriorityOptionId
+        ) {
+          await axios.put(
+            `/api/orders/${createdId}/custom-values/${this.priorityColumn.id}`,
+            { option_id: Number(this.inlinePriorityOptionId) },
+            { headers: this.headers() }
+          )
+        }
 
         if (
           createdId &&
@@ -24515,6 +24565,39 @@ body.board-column-resizing .column-resizer::before {
 .factory-board-page .custom-field-trigger:disabled {
   cursor: default;
   opacity: 1;
+}
+
+.board-inline-add-main .inline-fixed-select,
+.board-inline-add-main .inline-priority-select {
+  width: 145px;
+  height: 40px;
+  padding: 0 34px 0 11px;
+  border: 1px solid #cbd5e1;
+  border-radius: 7px;
+  background: #fff;
+  color: #0f172a;
+  font-size: 12px;
+  font-weight: 800;
+  outline: none;
+}
+
+.board-inline-add-main .inline-priority-select:focus {
+  border-color: #3157ff;
+  box-shadow: 0 0 0 3px rgba(49,87,255,.14);
+}
+
+.board-inline-add-main .inline-fixed-select:disabled {
+  opacity: 1;
+  color: #475569;
+  background: #f1f5f9;
+  cursor: not-allowed;
+}
+
+@media (max-width: 900px) {
+  .board-inline-add-main {
+    flex-wrap: wrap;
+    padding-block: 10px;
+  }
 }
 
 /* PO is secondary but must remain clearly readable. */
