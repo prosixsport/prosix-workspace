@@ -267,7 +267,7 @@
           v-if="!isClient"
           type="button"
           class="client-filter-trigger"
-          @click.stop="clientFilterOpen = true"
+          @click.stop="openClientFilter"
         >
           <i class="fa-solid fa-user-group"></i>
           <span>Client Filter</span>
@@ -497,7 +497,7 @@
             ></span>
           </div>
 
-          <div v-if="isBoardColumnVisible('payment')" class="board-col board-col-payment resizable-head-cell" :style="boardColumnOrderStyle('payment')">
+          <div v-if="!isClient && isBoardColumnVisible('payment')" class="board-col board-col-payment resizable-head-cell" :style="boardColumnOrderStyle('payment')">
             PAYMENT
             <span
               class="column-resizer"
@@ -990,17 +990,8 @@
             </button>
           </div>
 
-          <div v-if="isBoardColumnVisible('payment')" class="board-col board-col-payment" :style="boardColumnOrderStyle('payment')">
-            <select
-              v-if="isClient"
-              class="board-inline-cell-input payment-input-inline"
-              disabled
-              title="Payment is managed by Prosix"
-            >
-              <option>Yet Payment</option>
-            </select>
+          <div v-if="!isClient && isBoardColumnVisible('payment')" class="board-col board-col-payment" :style="boardColumnOrderStyle('payment')">
             <input
-              v-else
               class="board-inline-cell-input payment-input-inline"
               :value="order.payment || 'Not Yet'"
               type="text"
@@ -2006,12 +1997,9 @@
     </button>
   </div>
 </div>
-          <div class="detail-info-item" style="position:relative" @click.stop>
+          <div v-if="!isClient" class="detail-info-item" style="position:relative" @click.stop>
             <span class="info-label">Payment :</span>
-            <select v-if="isClient" class="client-payment-only" disabled>
-              <option>Yet Payment</option>
-            </select>
-            <span v-else class="payment-badge payment-summary-badge" @click="showPaymentMenu = !showPaymentMenu">
+            <span class="payment-badge payment-summary-badge" @click="showPaymentMenu = !showPaymentMenu">
                   <span class="payment-chip payment-chip-paid">{{ isClient ? 'Not Yet' : (selectedOrder.payment || 'Not Yet') }}</span>
               <span class="payment-chip payment-chip-received">R ${{ selectedOrder.paymentReceived || 0 }}</span>
               <span class="payment-chip payment-chip-balance">B ${{ selectedOrder.paymentBalance || 0 }}</span>
@@ -2802,10 +2790,25 @@
 
             <div class="client-filter-search">
               <i class="fa-solid fa-magnifying-glass"></i>
-              <input v-model.trim="clientSearch" type="search" placeholder="Search clients..." autofocus />
+              <input
+                v-model.trim="clientSearch"
+                type="search"
+                placeholder="Search clients..."
+                autofocus
+                @input="clientFilterListOpen = true"
+              />
+              <button
+                type="button"
+                class="client-filter-dropdown-toggle"
+                :class="{ open: clientFilterListOpen }"
+                title="Show all clients"
+                @click="clientFilterListOpen = !clientFilterListOpen"
+              >
+                <i class="fa-solid fa-chevron-down"></i>
+              </button>
             </div>
 
-            <div class="client-filter-list">
+            <div v-if="clientFilterListOpen" class="client-filter-list">
               <button
                 type="button"
                 class="client-filter-item"
@@ -2856,6 +2859,7 @@ export default {
       return {
       showShippingAddressMenu: false,
       clientFilterOpen: false,
+      clientFilterListOpen: false,
       textEditing: false,
       noteSaving: false,
       inlineTextDrafts: {},
@@ -3444,6 +3448,7 @@ filteredOrders() {
         .map(item => item.key)
         .filter(key => {
           if (key === 'name') return true
+          if (this.isClient && key === 'payment') return false
           if (key.startsWith('custom_')) return activeCustomKeys.has(key)
           return this.isBoardColumnVisible(key)
         })
@@ -9631,7 +9636,11 @@ openPreviewFile(file) {
     isOwnProfile(user) { return Number(user?.id || 0) === Number(this.currentUser?.id || 0) },
 
     async openProfile(user) {
-      if (!user?.id) return
+      // PageHeader profile click does not pass a user; open the normal profile page.
+      if (!user?.id) {
+        this.$router.push('/profile')
+        return
+      }
       try {
         const res = await axios.get(`/api/users/${user.id}/profile`, { headers: this.headers() })
         this.profileUser = res.data
@@ -10894,6 +10903,8 @@ async onFileChange(event, card) {
 
     handlePageBackgroundClick(event) {
       this.closeAllMenus()
+      // Detail page clicks must never clear the remembered board row.
+      if (this.detailOpen) return
       if (!event?.target?.closest?.('.board-table-row')) {
         this.lastOpenedOrderId = 0
         localStorage.removeItem('factory_last_opened_order_id')
@@ -10902,7 +10913,14 @@ async onFileChange(event, card) {
 
     closeClientFilter() {
       this.clientFilterOpen = false
+      this.clientFilterListOpen = false
       this.clientSearch = ''
+    },
+
+    openClientFilter() {
+      this.clientSearch = ''
+      this.clientFilterListOpen = false
+      this.clientFilterOpen = true
     },
 
     selectClientFilter(clientId) {
@@ -24444,8 +24462,29 @@ body.board-column-resizing .column-resizer::before {
   position: absolute;
   inset: -4px;
   border-radius: 10px;
+  border: 3px solid #3157ff;
+  box-shadow: 0 0 0 1px rgba(49, 87, 255, .16);
   pointer-events: none;
 }
+
+.client-filter-search input { padding-right: 48px !important; }
+.client-filter-dropdown-toggle {
+  position: absolute;
+  top: 50%;
+  right: 7px;
+  width: 34px;
+  height: 34px;
+  transform: translateY(-50%);
+  border: 0;
+  border-radius: 9px;
+  background: #eef2ff;
+  color: #3730a3;
+  display: grid;
+  place-items: center;
+  cursor: pointer;
+}
+.client-filter-dropdown-toggle i { position: static !important; transform: none !important; transition: transform .18s ease; }
+.client-filter-dropdown-toggle.open i { transform: rotate(180deg) !important; }
 
 /* PO is secondary but must remain clearly readable. */
 .factory-board-page .board-col-name .name-value > small {
