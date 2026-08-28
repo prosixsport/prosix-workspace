@@ -260,22 +260,16 @@
       </div>
 
       <div class="board-toolbar-actions">
-        <button
-          type="button"
-          class="theme-toggle-button"
-          :title="boardTheme === 'light' ? 'Switch to dark mode' : 'Switch to light mode'"
-          @click.stop="toggleBoardTheme"
-        >
-          <i
-            :class="boardTheme === 'light'
-              ? 'fa-solid fa-moon'
-              : 'fa-solid fa-sun'"
-          ></i>
-
-          <span>
-            {{ boardTheme === 'light' ? 'Dark' : 'Light' }}
-          </span>
-        </button>
+        <div class="board-search client-search">
+          <i class="fa-solid fa-user-tie"></i>
+          <input
+            v-model.trim="clientSearch"
+            type="search"
+            placeholder="Search clients..."
+            aria-label="Search orders by client"
+            @click.stop
+          />
+        </div>
 
         <div class="board-search">
           <i class="fa-solid fa-magnifying-glass"></i>
@@ -984,11 +978,12 @@
           <div v-if="isBoardColumnVisible('payment')" class="board-col board-col-payment" :style="boardColumnOrderStyle('payment')">
             <input
               class="board-inline-cell-input payment-input-inline"
-              :value="order.payment || '0 % Paid'"
+              :value="isClient ? 'Not Yet' : (order.payment || 'Not Yet')"
               type="text"
-              title="Click and edit payment"
+              :readonly="isClient"
+              :title="isClient ? 'Payment is managed by Prosix' : 'Click and edit payment'"
               @click.stop
-              @change="saveDirectInlineField(order, 'payment', $event.target.value)"
+              @change="!isClient && saveDirectInlineField(order, 'payment', $event.target.value)"
             />
           </div>
 
@@ -1792,7 +1787,6 @@
         </div>
 
         <button
-          v-if="!isClient"
           type="button"
           class="clean-detail-chat-button"
           :class="{ active: showChat }"
@@ -1817,11 +1811,11 @@
           </div>
           <div class="detail-info-item" style="position:relative" @click.stop>
             <span class="info-label">Ship Date</span>
-<span class="info-value date-clickable" @click="!isClient && (showDatePicker = !showDatePicker)">
+<span class="info-value date-clickable" @click="showDatePicker = !showDatePicker">
                   {{ selectedOrder.shipDate }}
               <i class="fa-solid fa-calendar-days" style="font-size:11px;margin-left:4px;color:black"></i>
             </span>
-<div v-if="showDatePicker && !isClient" class="date-dropdown">
+<div v-if="showDatePicker" class="date-dropdown">
       <div class="date-dropdown-header">Select Ship Date</div>
 
   <input
@@ -1841,14 +1835,14 @@
 
   <span
   class="info-value"
-  @click="!isClient && (showShippingAddressMenu = !showShippingAddressMenu)"
+  @click="showShippingAddressMenu = !showShippingAddressMenu"
 >
 {{ shortShippingAddress(selectedOrder?.shippingAddress) }}
     <i class="fa-solid fa-pen"></i>
   </span>
 
 <div
-  v-if="showShippingAddressMenu && !isClient"
+  v-if="showShippingAddressMenu"
   class="tracking-dropdown"
 >
     <textarea
@@ -1984,7 +1978,7 @@
           <div class="detail-info-item" style="position:relative" @click.stop>
             <span class="info-label">Payment :</span>
             <span class="payment-badge payment-summary-badge" @click="!isClient && (showPaymentMenu = !showPaymentMenu)">
-                  <span class="payment-chip payment-chip-paid">{{ selectedOrder.payment || '0 % Paid' }}</span>
+                  <span class="payment-chip payment-chip-paid">{{ isClient ? 'Not Yet' : (selectedOrder.payment || 'Not Yet') }}</span>
               <span class="payment-chip payment-chip-received">R ${{ selectedOrder.paymentReceived || 0 }}</span>
               <span class="payment-chip payment-chip-balance">B ${{ selectedOrder.paymentBalance || 0 }}</span>
               <i class="fa-solid fa-chevron-down" style="font-size:9px;margin-left:4px"></i>
@@ -1992,7 +1986,7 @@
            <div v-if="showPaymentMenu && !isClient" class="payment-dropdown payment-dropdown-wide">
                   <div class="payment-dropdown-header">Payment Details</div>
               <div class="payment-read-row paid-row">
-                <span>Paid</span><strong>{{ selectedOrder.payment || '0 % Paid' }}</strong>
+                <span>Paid</span><strong>{{ isClient ? 'Not Yet' : (selectedOrder.payment || 'Not Yet') }}</strong>
               </div>
               <div class="payment-read-row received-row">
                 <span>Received</span><strong>${{ selectedOrder.paymentReceived || 0 }}</strong>
@@ -2114,7 +2108,7 @@
 
         <!-- CHAT PANEL -->
      <OrderChatPanel
-    v-if="showChat && !isClient"
+    v-if="showChat"
           :selected-order="selectedOrder"
           :team-members="teamMembers"
           :available-members="availableMembers"
@@ -2836,7 +2830,7 @@ export default {
       showChatNotificationMenu: false,
       notificationTab: 'chats',
       activeSectionCollapsed: false,
-      boardTheme: localStorage.getItem('artwork_board_theme') || 'light',
+      boardTheme: 'light',
       persistentSeenOrderIds: JSON.parse(
         localStorage.getItem('artwork_seen_order_ids') || '[]'
       ).map(Number),
@@ -2891,6 +2885,7 @@ export default {
       notificationCount: 0,
       lastNotificationId: null,
       searchOrder: '',
+      clientSearch: '',
       detailSearchOrder: '',
       detailSearchOpen: false,
       selectedClient: '',
@@ -2918,7 +2913,7 @@ activeTrackingIndex: 0,
       shippingAddress: '',
       shipDate: '',
       status: 'Pending',
-      payment: '0 % Paid',
+      payment: 'Not Yet',
       trk: 'N/A'
 },
 
@@ -3038,6 +3033,7 @@ activeTracking() {
 },
 canUploadFiles() {
   return this.hasFullOrderAccess
+    || this.isClient
     || this.currentUser?.can_create_orders === true
 },
 
@@ -3061,6 +3057,7 @@ canEditWorkflowFields() {
     hasFullOrderAccess() { return this.isSuperAdmin || this.isAdmin },
    canCreateOrder() {
   return this.hasFullOrderAccess
+    || this.isClient
     || this.currentUser?.can_create_orders === true
 },
 
@@ -3131,65 +3128,35 @@ filteredOrders() {
       const searchMatch =
         !searchText || searchable.includes(searchText)
 
-      const clientMatch =
+      const clientText = String(this.clientSearch || '')
+        .trim()
+        .toLowerCase()
+
+      const clientMatch = (
         !this.selectedClient ||
         (o.clients || []).some(
           c => Number(c.id) === Number(this.selectedClient)
         )
+      ) && (
+        !clientText ||
+        (o.clients || []).some(client =>
+          [client.name, client.email, client.company]
+            .filter(Boolean)
+            .join(' ')
+            .toLowerCase()
+            .includes(clientText)
+        )
+      )
 
       return groupMatch && searchMatch && clientMatch
     })
     .sort((a, b) => {
-      /*
-       * 1)Jis order mein unread chat aaye woh sab se upar.
-       *   Chat view hote hi unread count 0 ho jata hai aur row apni normal
-       *   pinned/A-Z position par wapas chali jati hai.
-       */
-      const aUnread = Number(a.unread_chat_count || 0) > 0
-      const bUnread = Number(b.unread_chat_count || 0) > 0
+      // Chat activity never changes row position. Newest created order stays first.
+      const aCreated = new Date(a.created_at || 0).getTime()
+      const bCreated = new Date(b.created_at || 0).getTime()
 
-      if (aUnread !== bUnread) {
-        return aUnread ? -1 : 1
-      }
-
-      if (aUnread && bUnread) {
-        const aTime = new Date(a.last_message_at || 0).getTime()
-        const bTime = new Date(b.last_message_at || 0).getTime()
-
-        if (aTime !== bTime) {
-          return bTime - aTime
-        }
-      }
-      /*
-       * 2) Is browser se newly-created orders refresh ke baad bhi top par.
-       *    IDs localStorage mein persist hoti hain.
-       */
-      const aNewIndex = this.newlyCreatedOrderIds.indexOf(Number(a.id))
-      const bNewIndex = this.newlyCreatedOrderIds.indexOf(Number(b.id))
-      const aIsNew = aNewIndex !== -1
-      const bIsNew = bNewIndex !== -1
-
-      if (aIsNew !== bIsNew) {
-        return aIsNew ? -1 : 1
-      }
-
-      if (aIsNew && bIsNew && aNewIndex !== bNewIndex) {
-        return aNewIndex - bNewIndex
-      }
-
-      /*
-       * 3) Baqi orders A-Z.
-       */
-
-      return String(a.name || '').localeCompare(
-        String(b.name || ''),
-        'en',
-        {
-          sensitivity: 'base',
-          numeric: true,
-          ignorePunctuation: true
-        }
-      )
+      if (aCreated !== bCreated) return bCreated - aCreated
+      return Number(b.id || 0) - Number(a.id || 0)
     })
 },
     unreadChatOrders() {
@@ -3542,17 +3509,14 @@ beforeUnmount()  {
         })
 
         const data = res.data?.data || res.data || {}
-        const localColumnOrder = JSON.parse(
-          localStorage.getItem('factory_board_column_order') || '[]'
-        )
         this.boardSettings = {
           auto_assign_all_owners: Boolean(data.settings?.auto_assign_all_owners),
           hidden_columns: Array.isArray(data.settings?.hidden_columns)
             ? data.settings.hidden_columns
             : [],
-          column_order: Array.isArray(data.settings?.column_order) && data.settings.column_order.length
+          column_order: Array.isArray(data.settings?.column_order)
             ? data.settings.column_order
-            : (Array.isArray(localColumnOrder) ? localColumnOrder : [])
+            : []
         }
         this.customColumns = Array.isArray(data.custom_columns)
           ? data.custom_columns
@@ -3649,7 +3613,6 @@ beforeUnmount()  {
       order.splice(targetIndex, 0, movedKey)
 
       this.boardSettings.column_order = order
-      localStorage.setItem('factory_board_column_order', JSON.stringify(order))
       this.boardSettingsSaving = true
 
       try {
@@ -3669,11 +3632,9 @@ beforeUnmount()  {
 
         if (Array.isArray(savedOrder) && savedOrder.length) {
           this.boardSettings.column_order = savedOrder
-          localStorage.setItem('factory_board_column_order', JSON.stringify(savedOrder))
         }
       } catch (error) {
         this.boardSettings.column_order = previousOrder
-        localStorage.setItem('factory_board_column_order', JSON.stringify(previousOrder))
         console.error('moveBoardColumn error:', error)
         alert(error.response?.data?.message || 'Column position could not be saved.')
       } finally {
@@ -8607,7 +8568,7 @@ body.board-column-resizing .column-resizer::before {
               activeStatus?.label || 'Pending',
             status_color:
               activeStatus?.color || '#fdab3d',
-            payment: '0 % Paid',
+            payment: 'Not Yet',
             trk: 'N/A',
             notes: '',
             shipping_address: '',
@@ -9549,7 +9510,7 @@ async fetchClients() {
         status,
         statusColor: order.status_color || this.statusColor(status),
         trk: order.trk || 'N/A',
-        payment: order.payment || '0 % Paid',
+        payment: order.payment || 'Not Yet',
         paymentReceived: order.payment_received || 0,
         paymentBalance: order.payment_balance || 0,
         members,
@@ -9793,7 +9754,7 @@ this.newOrder = {
   shippingAddress: '',
   shipDate: '',
   status: 'Pending',
-  payment: '0 % Paid',
+  payment: 'Not Yet',
   trk: 'N/A'
 }
       this.showAddModal = true
@@ -9812,7 +9773,7 @@ this.newOrder = {
         selectedClients: (order.clients || []).map(client => this.availableClients.find(c => Number(c.id) === Number(client.id)) || client),
 shippingAddress: order.shippingAddress || '',
         shipDate: order.shipDateRaw || '', status: order.status || 'Pending',
-        payment: order.payment || '0 % Paid', trk: order.trk === 'N/A' ? '' : (order.trk || 'N/A')
+        payment: order.payment || 'Not Yet', trk: order.trk === 'N/A' ? '' : (order.trk || 'N/A')
       }
       this.showAddModal = true
       this.$nextTick(() => this.$refs.orderNameInput?.focus())
@@ -9828,7 +9789,7 @@ if (!this.hasFullOrderAccess && this.currentUser?.can_create_orders !== true) re
           name: `${order.name} Copy`, po: order.po === 'N/A' ? '' : order.po,
           member_ids: (order.members || []).map(m => m.id), ship_date: order.shipDateRaw || null,
           status: order.status, status_color: status?.color || order.statusColor || '#fdab3d',
-          trk: order.trk || 'N/A', payment: order.payment || '0 % Paid', notes: this.getOrderNote(order)
+          trk: order.trk || 'N/A', payment: order.payment || 'Not Yet', notes: this.getOrderNote(order)
         }, { headers: this.headers() })
         const rawOrder = res.data?.order || res.data?.data || res.data
         const newOrder = this.formatOrder(rawOrder)
@@ -9867,7 +9828,7 @@ if (!this.hasFullOrderAccess && this.currentUser?.can_create_orders !== true) re
 shipping_address: this.newOrder.shippingAddress,
         ship_date: this.newOrder.shipDate || null, status: this.newOrder.status,
         status_color: status?.color || '#fdab3d', trk: this.newOrder.trk || 'N/A',
-        payment: this.newOrder.payment || '0 % Paid'
+        payment: this.isClient ? 'Not Yet' : (this.newOrder.payment || 'Not Yet')
       }
 
       try {
@@ -13912,8 +13873,8 @@ grid-template-columns: 32px 1fr 118px 38px;
 }
 
 .member-select-modal {
-  width: min(620px, 100%);
-  max-height: 86vh;
+  width: min(780px, 100%);
+  max-height: 90vh;
   overflow-y: auto;
   border-radius: 16px;
   background: #ffffff;
@@ -14040,7 +14001,7 @@ grid-template-columns: 32px 1fr 118px 38px;
 }
 
 .member-selected-preview {
-  max-height: 190px;
+  max-height: 280px;
   margin: 14px 20px;
   overflow-y: auto;
   display: grid;
