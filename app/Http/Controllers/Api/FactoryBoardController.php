@@ -113,6 +113,18 @@ class FactoryBoardController extends Controller
 
                     'hidden_columns' =>
                         $setting->hidden_columns ?: [],
+
+                    'column_order' =>
+                        $setting->column_order ?: [],
+
+                    'status_options' =>
+                        $setting->status_options ?: [],
+
+                    'custom_groups' =>
+                        $setting->custom_groups ?: [],
+
+                    'default_group_overrides' =>
+                        $setting->default_group_overrides ?: [],
                 ],
 
                 'custom_columns' => $columns,
@@ -161,6 +173,32 @@ class FactoryBoardController extends Controller
                     'track',
                 ]),
             ],
+
+            'column_order' => [
+                'sometimes',
+                'array',
+            ],
+
+            'column_order.*' => [
+                'string',
+                'max:160',
+                'distinct',
+            ],
+
+            'status_options' => [
+                'sometimes',
+                'array',
+            ],
+
+            'custom_groups' => [
+                'sometimes',
+                'array',
+            ],
+
+            'default_group_overrides' => [
+                'sometimes',
+                'array',
+            ],
         ]);
 
         $setting = FactoryBoardSetting::singleton();
@@ -183,9 +221,29 @@ class FactoryBoardController extends Controller
             )
             : ($setting->hidden_columns ?: []);
 
+        $columnOrder = array_key_exists('column_order', $validated)
+            ? array_values(array_unique($validated['column_order'] ?? []))
+            : ($setting->column_order ?: []);
+
+        $statusOptions = array_key_exists('status_options', $validated)
+            ? array_values($validated['status_options'] ?? [])
+            : ($setting->status_options ?: []);
+
+        $customGroups = array_key_exists('custom_groups', $validated)
+            ? array_values($validated['custom_groups'] ?? [])
+            : ($setting->custom_groups ?: []);
+
+        $defaultGroupOverrides = array_key_exists('default_group_overrides', $validated)
+            ? ($validated['default_group_overrides'] ?? [])
+            : ($setting->default_group_overrides ?: []);
+
         $setting->update([
             'auto_assign_all_owners' => $autoAssign,
             'hidden_columns' => $hiddenColumns,
+            'column_order' => $columnOrder,
+            'status_options' => $statusOptions,
+            'custom_groups' => $customGroups,
+            'default_group_overrides' => $defaultGroupOverrides,
         ]);
 
         $setting->refresh();
@@ -202,6 +260,18 @@ class FactoryBoardController extends Controller
 
                 'hidden_columns' =>
                     $setting->hidden_columns ?: [],
+
+                'column_order' =>
+                    $setting->column_order ?: [],
+
+                'status_options' =>
+                    $setting->status_options ?: [],
+
+                'custom_groups' =>
+                    $setting->custom_groups ?: [],
+
+                'default_group_overrides' =>
+                    $setting->default_group_overrides ?: [],
             ],
 
             'data' => [
@@ -210,6 +280,18 @@ class FactoryBoardController extends Controller
 
                 'hidden_columns' =>
                     $setting->hidden_columns ?: [],
+
+                'column_order' =>
+                    $setting->column_order ?: [],
+
+                'status_options' =>
+                    $setting->status_options ?: [],
+
+                'custom_groups' =>
+                    $setting->custom_groups ?: [],
+
+                'default_group_overrides' =>
+                    $setting->default_group_overrides ?: [],
             ],
         ]);
     }

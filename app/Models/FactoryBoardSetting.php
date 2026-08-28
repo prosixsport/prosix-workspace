@@ -9,11 +9,19 @@ class FactoryBoardSetting extends Model
     protected $fillable = [
         'auto_assign_all_owners',
         'hidden_columns',
+        'column_order',
+        'status_options',
+        'custom_groups',
+        'default_group_overrides',
     ];
 
     protected $casts = [
         'auto_assign_all_owners' => 'boolean',
         'hidden_columns' => 'array',
+        'column_order' => 'array',
+        'status_options' => 'array',
+        'custom_groups' => 'array',
+        'default_group_overrides' => 'array',
     ];
 
     public static function singleton(): self
@@ -23,6 +31,10 @@ class FactoryBoardSetting extends Model
             [
                 'auto_assign_all_owners' => false,
                 'hidden_columns' => [],
+                'column_order' => [],
+                'status_options' => [],
+                'custom_groups' => [],
+                'default_group_overrides' => [],
             ]
         );
     }
