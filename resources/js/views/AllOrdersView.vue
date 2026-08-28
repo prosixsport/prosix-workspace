@@ -434,7 +434,7 @@
             ></span>
           </div>
 
-          <div v-if="isBoardColumnVisible('status')" class="board-col board-col-status resizable-head-cell" :style="boardColumnOrderStyle('status')">
+          <div v-if="!isClient && isBoardColumnVisible('status')" class="board-col board-col-status resizable-head-cell" :style="boardColumnOrderStyle('status')">
             STATUS
             <span
               class="column-resizer"
@@ -720,7 +720,7 @@
             </div>
           </div>
 
-          <div v-if="isBoardColumnVisible('status')" class="board-col board-col-status row-status-cell" :style="boardColumnOrderStyle('status')" @click.stop>
+          <div v-if="!isClient && isBoardColumnVisible('status')" class="board-col board-col-status row-status-cell" :style="boardColumnOrderStyle('status')" @click.stop>
             <div class="status-ref-wrap">
               <button
                 type="button"
@@ -762,7 +762,8 @@
               class="custom-field-trigger custom-field-trigger-filled"
               :class="{ empty: !getOrderCustomOption(order, column) }"
               :style="customFieldButtonStyle(order, column)"
-              @click.stop="openCustomFieldMenu(order, column, $event)"
+              :disabled="!canEditCustomField(column)"
+              @click.stop="canEditCustomField(column) && openCustomFieldMenu(order, column, $event)"
             >
               <span>{{ getOrderCustomOption(order, column)?.label || 'Select' }}</span>
               <i class="fa-solid fa-chevron-down"></i>
@@ -775,7 +776,7 @@
               type="text"
               :value="getOrderCustomText(order, column)"
               placeholder="Write..."
-              :readonly="!canEditWorkflowFields"
+              :readonly="!canEditCustomField(column)"
               @click.stop
               @keydown.enter.prevent="$event.target.blur()"
               @blur="saveOrderCustomText(order, column, $event.target.value)"
@@ -788,7 +789,7 @@
               rows="1"
               :value="getOrderCustomText(order, column)"
               placeholder="Write notes..."
-              :readonly="!canEditWorkflowFields"
+              :readonly="!canEditCustomField(column)"
               @click.stop
               @keydown.enter.exact.prevent="$event.target.blur()"
               @keydown.shift.enter.stop
@@ -1881,7 +1882,7 @@
     </button>
   </div>
 </div>
-          <div class="detail-info-item" style="position:relative" @click.stop>
+          <div v-if="!isClient" class="detail-info-item" style="position:relative" @click.stop>
             <span class="info-label">Status :</span>
 <span class="status-badge" :style="{ background: selectedOrder.statusColor }" @click="canEditWorkflowFields && (showStatusMenu = !showStatusMenu)">
                   {{ selectedOrder.status }}
@@ -3448,7 +3449,7 @@ filteredOrders() {
         .map(item => item.key)
         .filter(key => {
           if (key === 'name') return true
-          if (this.isClient && key === 'payment') return false
+          if (this.isClient && (key === 'payment' || key === 'status')) return false
           if (key.startsWith('custom_')) return activeCustomKeys.has(key)
           return this.isBoardColumnVisible(key)
         })
@@ -4359,7 +4360,7 @@ beforeUnmount()  {
 
     async saveOrderCustomText(order, column, rawValue) {
       if (
-        !this.canEditWorkflowFields ||
+        !this.canEditCustomField(column) ||
         !order ||
         !column
       ) {
@@ -4478,6 +4479,16 @@ beforeUnmount()  {
       }
     },
 
+    isPriorityColumn(column) {
+      return String(column?.name || column?.slug || '')
+        .trim()
+        .toLowerCase() === 'priority'
+    },
+
+    canEditCustomField(column) {
+      return this.canEditWorkflowFields || (this.isClient && this.isPriorityColumn(column))
+    },
+
     openCustomFieldMenu(order, column, event) {
       const rect = event.currentTarget.getBoundingClientRect()
       const width = Math.max(270, rect.width)
@@ -4518,7 +4529,7 @@ beforeUnmount()  {
     },
 
     async saveOrderCustomValue(order, column, option) {
-      if (!this.canEditWorkflowFields || !order || !column) return
+      if (!this.canEditCustomField(column) || !order || !column) return
 
       try {
         const res = await axios.put(
@@ -24485,6 +24496,26 @@ body.board-column-resizing .column-resizer::before {
 }
 .client-filter-dropdown-toggle i { position: static !important; transform: none !important; transition: transform .18s ease; }
 .client-filter-dropdown-toggle.open i { transform: rotate(180deg) !important; }
+
+/* Guaranteed visible last-opened marker across the whole grid row. */
+.factory-board-page .board-table-row.last-opened-order {
+  outline: 3px solid #3157ff !important;
+  outline-offset: -2px !important;
+  box-shadow: inset 5px 0 0 #3157ff, 0 0 0 2px rgba(49,87,255,.22), 0 8px 24px rgba(49,87,255,.22) !important;
+}
+
+.factory-board-page .board-table-row.last-opened-order > .board-col:first-child {
+  border-left: 4px solid #3157ff !important;
+}
+
+.factory-board-page .board-table-row.last-opened-order > .board-col:last-child {
+  border-right: 4px solid #3157ff !important;
+}
+
+.factory-board-page .custom-field-trigger:disabled {
+  cursor: default;
+  opacity: 1;
+}
 
 /* PO is secondary but must remain clearly readable. */
 .factory-board-page .board-col-name .name-value > small {
