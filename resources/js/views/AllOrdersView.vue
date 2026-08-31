@@ -11,7 +11,7 @@
   subtitle="Track production, manage orders and keep your workflow organized."
   :user="currentUser"
   :photo="currentUser?.profile_photo_url"
-  @profile="openProfile"
+  @profile="openCurrentUserProfilePage"
 >
   <template #notifications>
       <div
@@ -9868,12 +9868,14 @@ openPreviewFile(file) {
 
     isOwnProfile(user) { return Number(user?.id || 0) === Number(this.currentUser?.id || 0) },
 
+    openCurrentUserProfilePage() {
+      if (this.$route?.path === '/profile') return
+
+      const navigation = this.$router.push('/profile')
+      if (navigation?.catch) navigation.catch(() => {})
+    },
+
     async openProfile(user) {
-      // PageHeader profile click does not pass a user; open the normal profile page.
-      if (!user?.id) {
-        this.$router.push('/profile')
-        return
-      }
       try {
         const res = await axios.get(`/api/users/${user.id}/profile`, { headers: this.headers() })
         this.profileUser = res.data
