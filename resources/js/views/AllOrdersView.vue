@@ -5453,7 +5453,7 @@ beforeUnmount()  {
       return map[groupKey] || null
     },
 
-    changeWorkflowGroupColor(group, color) {
+    async changeWorkflowGroupColor(group, color) {
       if (!this.canManageWorkflow || !group?.key || !color) return
 
       if (group.custom) {
@@ -5481,6 +5481,7 @@ beforeUnmount()  {
           )
         )
 
+        await this.saveAllStatusOptions()
         return
       }
 
@@ -5514,9 +5515,11 @@ beforeUnmount()  {
           status.color = color
         }
       }
+
+      await this.saveAllStatusOptions()
     },
 
-    editWorkflowGroup(group) {
+    async editWorkflowGroup(group) {
       if (!this.canManageWorkflow) return
       const entered = window.prompt(
         'Edit section name',
@@ -5544,6 +5547,7 @@ beforeUnmount()  {
         }
 
         this.persistDefaultBoardGroupOverrides()
+        await this.saveAllStatusOptions()
         return
       }
 
@@ -5574,22 +5578,17 @@ beforeUnmount()  {
         )
       )
 
-      this.saveAllStatusOptions()
+      await this.saveAllStatusOptions()
     },
 
-    deleteWorkflowGroup(group) {
+    async deleteWorkflowGroup(group) {
       if (!this.canManageWorkflow) return
       const count = this.countForGroup(group.key)
 
-      if (count > 0) {
-        alert(
-          `This section has ${count} order(s). Move those orders to another section before deleting it.`
-        )
-        return
-      }
-
       const confirmed = window.confirm(
-        `Delete "${group.label}" section?`
+        count > 0
+          ? `Delete "${group.label}" section?\n\nIts ${count} order(s) will move to In Production.`
+          : `Delete "${group.label}" section?`
       )
 
       if (!confirmed) return
@@ -5604,12 +5603,40 @@ beforeUnmount()  {
         }
 
         this.persistDefaultBoardGroupOverrides()
+        await this.saveAllStatusOptions()
 
         if (this.activeGroup === group.key) {
           this.activeGroup = this.boardGroups[0]?.key || 'all'
         }
 
         return
+      }
+
+      const affectedOrders = this.orders.filter(
+        order => order.group === group.key
+      )
+
+      if (affectedOrders.length) {
+        const moved = await Promise.allSettled(
+          affectedOrders.map(order =>
+            axios.put(
+              `/api/orders/${order.id}`,
+              { status: 'In Production', status_color: '#6161ff' },
+              { headers: this.headers() }
+            )
+          )
+        )
+
+        if (moved.some(result => result.status === 'rejected')) {
+          alert('Some orders could not be moved. The section was not deleted.')
+          return
+        }
+
+        affectedOrders.forEach(order => {
+          order.status = 'In Production'
+          order.statusColor = '#6161ff'
+          order.group = 'in_production'
+        })
       }
 
       this.customBoardGroups =
@@ -5634,6 +5661,8 @@ beforeUnmount()  {
       if (this.activeGroup === group.key) {
         this.activeGroup = this.boardGroups[0]?.key || 'all'
       }
+
+      await this.saveAllStatusOptions()
     },
 
     rowFiles(order) {
@@ -8423,7 +8452,7 @@ body.board-column-resizing .column-resizer::before {
 
       const duplicate = this.statusOptions.some(
         item =>
-          item !== status &&
+          String(item.label || '').trim().toLowerCase() !== oldLabel.toLowerCase() &&
           String(item.label || '').trim().toLowerCase() ===
           newLabel.toLowerCase()
       )
@@ -8439,11 +8468,46 @@ body.board-column-resizing .column-resizer::before {
           oldLabel.toLowerCase()
       )
 
-      status.label = newLabel
-      status.color = newColor
+      let sourceIndex = this.statusOptions.findIndex(
+        item => String(item.label || '').trim().toLowerCase() === oldLabel.toLowerCase()
+      )
+
+      if (sourceIndex === -1) {
+        this.statusOptions.push(this.normalizeStatusDefinition({
+          label: oldLabel,
+          color: status.color || '#6161ff',
+          group: status.group || 'in_production',
+          groupLabel: status.groupLabel || oldLabel,
+          custom: status.custom === true
+        }))
+        sourceIndex = this.statusOptions.length - 1
+      }
+
+      const sourceStatus = this.statusOptions[sourceIndex]
+      const updatedStatus = {
+        ...sourceStatus,
+        label: newLabel,
+        color: newColor
+      }
+
+      this.statusOptions.splice(sourceIndex, 1, updatedStatus)
+
+      const relatedGroup = this.customBoardGroups.find(
+        group => group.key === updatedStatus.group
+      )
+
+      if (relatedGroup) {
+        const groupWasSameName =
+          String(relatedGroup.label || '').trim().toLowerCase() === oldLabel.toLowerCase()
+
+        relatedGroup.color = newColor
+        if (groupWasSameName) relatedGroup.label = newLabel.toUpperCase()
+        this.customBoardGroups = [...this.customBoardGroups]
+        this.persistWorkflowGroups()
+      }
 
       // Save ALL statuses, including the built-in/default ones.
-      this.saveAllStatusOptions()
+      await this.saveAllStatusOptions()
 
       // Keep already-loaded orders in sync and persist them.
       affectedOrders.forEach(order => {
@@ -8492,18 +8556,65 @@ body.board-column-resizing .column-resizer::before {
 
       if (
         !confirm(
-          `Delete "${label}" status?\n\nOrders already using it will keep their current status until you change them.`
+          `Delete "${label}" status?\n\nOrders using it will move to In Production.`
         )
       ) {
         return
       }
 
-      this.statusOptions = this.statusOptions.filter(
-        item => item !== status
+      const normalizedLabel = label.toLowerCase()
+      const sourceStatus = this.statusOptions.find(
+        item => String(item.label || '').trim().toLowerCase() === normalizedLabel
       )
 
+      const groupKey = sourceStatus?.group || status.group
+      const affectedOrders = this.orders.filter(order =>
+        String(order.status || '').trim().toLowerCase() === normalizedLabel ||
+        (status.custom === true && groupKey && order.group === groupKey)
+      )
+
+      if (affectedOrders.length) {
+        const moved = await Promise.allSettled(
+          affectedOrders.map(order =>
+            axios.put(
+              `/api/orders/${order.id}`,
+              { status: 'In Production', status_color: '#6161ff' },
+              { headers: this.headers() }
+            )
+          )
+        )
+
+        if (moved.some(result => result.status === 'rejected')) {
+          alert('Orders could not be moved. Status was not deleted.')
+          return
+        }
+
+        affectedOrders.forEach(order => {
+          order.status = 'In Production'
+          order.statusColor = '#6161ff'
+          order.group = 'in_production'
+        })
+      }
+
+      this.statusOptions = this.statusOptions.filter(
+        item => String(item.label || '').trim().toLowerCase() !== normalizedLabel
+      )
+
+      if ((sourceStatus?.custom || status.custom) && groupKey) {
+        const groupStillUsed = this.statusOptions.some(
+          item => item.group === groupKey
+        )
+
+        if (!groupStillUsed) {
+          this.customBoardGroups = this.customBoardGroups.filter(
+            group => group.key !== groupKey
+          )
+          this.persistWorkflowGroups()
+        }
+      }
+
       // Persist deletion for built-in and custom statuses.
-      this.saveAllStatusOptions()
+      await this.saveAllStatusOptions()
 
       if (this.rowStatusEditingLabel === label) {
         this.cancelRowStatusEdit()
@@ -8562,9 +8673,24 @@ body.board-column-resizing .column-resizer::before {
     async changeRowCustomStatusColor(status, color) {
       if (!status || !color) return
 
-      status.color = color
-      status.custom = true
-      this.saveCustomStatusOption(status)
+      let source = this.statusOptions.find(
+        item => String(item.label || '').trim().toLowerCase() === String(status.label || '').trim().toLowerCase()
+      )
+      if (!source) {
+        source = this.normalizeStatusDefinition({ ...status, color })
+        this.statusOptions.push(source)
+      }
+
+      source.color = color
+      if (source.custom) {
+        const group = this.customBoardGroups.find(item => item.key === source.group)
+        if (group) {
+          group.color = color
+          this.customBoardGroups = [...this.customBoardGroups]
+          this.persistWorkflowGroups()
+        }
+      }
+      await this.saveAllStatusOptions()
 
       const affectedOrders = this.orders.filter(
         order =>
@@ -9029,33 +9155,45 @@ shortShippingAddress(address) {
 },
 
 
-    editCustomStatus(status) {
+    async editCustomStatus(status) {
   if (!this.canManageWorkflow) return
   if (!this.isSuperAdmin) return
 const newName = prompt('Enter new status name', status.label)
   if (!newName || !newName.trim()) return
 
-  status.label = newName.trim()
+  const oldLabel = String(status.label || '').trim()
+  const sourceIndex = this.statusOptions.findIndex(
+    item => String(item.label || '').trim().toLowerCase() === oldLabel.toLowerCase()
+  )
+  if (sourceIndex === -1) return
+
+  this.statusOptions.splice(sourceIndex, 1, {
+    ...this.statusOptions[sourceIndex],
+    label: newName.trim()
+  })
 
   localStorage.setItem(
     'custom_order_statuses',
     JSON.stringify(this.statusOptions.filter(s => s.custom))
   )
-  this.saveAllStatusOptions()
+  await this.saveAllStatusOptions()
 },
 
-deleteCustomStatus(status) {
+async deleteCustomStatus(status) {
   if (!this.canManageWorkflow) return
   if (!this.isSuperAdmin) return
   if (!confirm('Are you sure you want to delete this custom status?')) return
 
-  this.statusOptions = this.statusOptions.filter(s => s.label !== status.label)
+  const label = String(status.label || '').trim().toLowerCase()
+  this.statusOptions = this.statusOptions.filter(
+    item => String(item.label || '').trim().toLowerCase() !== label
+  )
 
   localStorage.setItem(
     'custom_order_statuses',
     JSON.stringify(this.statusOptions.filter(s => s.custom))
   )
-  this.saveAllStatusOptions()
+  await this.saveAllStatusOptions()
 },
   canDeleteFile(file) {
   // Client sirf view/download karega
@@ -9319,6 +9457,7 @@ alert(e.response?.data?.message || 'Orders were not deleted')
       )
 
       if (this.isSuperAdmin) {
+        this.boardSettingsSaving = true
         try {
           await axios.put('/api/factory-board/settings', {
             auto_assign_all_owners: Boolean(this.boardSettings.auto_assign_all_owners),
@@ -9330,6 +9469,9 @@ alert(e.response?.data?.message || 'Orders were not deleted')
           }, { headers: this.headers() })
         } catch (error) {
           console.error('Shared status settings could not be saved:', error)
+          alert(error.response?.data?.message || 'Status settings could not be saved.')
+        } finally {
+          this.boardSettingsSaving = false
         }
       }
     },
@@ -9370,13 +9512,43 @@ alert(e.response?.data?.message || 'Orders were not deleted')
     async changeStatusOptionColor(status, color) {
       if (!this.canManageWorkflow || !status || !color) return
 
-      status.color = color
+      const source = this.statusOptions.find(
+        item => String(item.label || '').trim().toLowerCase() === String(status.label || '').trim().toLowerCase()
+      )
+      if (!source) return
+
+      source.color = color
+
+      const relatedGroup = this.customBoardGroups.find(
+        group => group.key === source.group
+      )
+      if (source.custom && relatedGroup) {
+        relatedGroup.color = color
+        this.customBoardGroups = [...this.customBoardGroups]
+        this.persistWorkflowGroups()
+      }
+
+      const defaultGroupKey = source.group
+      const defaultStatusLabel = this.defaultStatusLabelForGroup(defaultGroupKey)
+      if (
+        defaultStatusLabel &&
+        String(defaultStatusLabel).toLowerCase() === String(source.label).toLowerCase()
+      ) {
+        this.defaultBoardGroupOverrides = {
+          ...this.defaultBoardGroupOverrides,
+          [defaultGroupKey]: {
+            ...(this.defaultBoardGroupOverrides?.[defaultGroupKey] || {}),
+            color
+          }
+        }
+        this.persistDefaultBoardGroupOverrides()
+      }
 
       /*
        * Save color even for built-in statuses such as:
        * Pending, Designing, In Production, Completed, Shipped, Delivered.
        */
-      this.saveAllStatusOptions()
+      await this.saveAllStatusOptions()
 
       const affectedOrders = this.orders.filter(
         order =>
