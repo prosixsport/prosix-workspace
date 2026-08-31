@@ -3160,26 +3160,43 @@ activeTrackingIndex: 0,
         delivered: 'Delivered'
       }
 
-      return this.boardGroups.map(group => {
+      // Tabs and dropdown statuses are intentionally separate:
+      // - boardGroups controls only the top workflow tabs.
+      // - statusOptions controls every option inside the status dropdown.
+      const options = (this.statusOptions || [])
+        .filter(status => status?.label)
+        .map(status => this.normalizeStatusDefinition(status))
+
+      // Every top tab must also have one matching dropdown status so an
+      // order can be moved into that tab from the status dropdown.
+      this.boardGroups.forEach(group => {
         const expectedLabel =
           this.defaultBoardGroupOverrides?.[group.key]?.label ||
           defaultLabels[group.key] ||
           group.label
 
-        const existing = this.statusOptions.find(status =>
+        const existing = options.find(status =>
           String(status.label || '').trim().toLowerCase() ===
             String(expectedLabel || '').trim().toLowerCase()
-        ) || this.statusOptions.find(status =>
-          status.group === group.key && status.custom === true
         )
 
-        return this.normalizeStatusDefinition(existing || {
-          label: expectedLabel,
-          color: group.color,
-          group: group.key,
-          groupLabel: group.label,
-          custom: group.custom === true
-        })
+        if (!existing) {
+          options.push(this.normalizeStatusDefinition({
+            label: expectedLabel,
+            color: group.color,
+            group: group.key,
+            groupLabel: group.label,
+            custom: group.custom === true
+          }))
+        }
+      })
+
+      const seen = new Set()
+      return options.filter(status => {
+        const key = String(status.label || '').trim().toLowerCase()
+        if (!key || seen.has(key)) return false
+        seen.add(key)
+        return true
       })
     },
 
@@ -8140,10 +8157,16 @@ body.board-column-resizing .column-resizer::before {
         '#f97316'
       ]
 
+      const matchingStatus = this.statusOptions.find(
+        status =>
+          String(status.label || '').trim().toLowerCase() ===
+          cleanLabel.toLowerCase()
+      )
+
       const group = {
         key,
         label: cleanLabel,
-        color:
+        color: matchingStatus?.color ||
           palette[
             this.customBoardGroups.length %
             palette.length
@@ -8159,16 +8182,35 @@ body.board-column-resizing .column-resizer::before {
         JSON.stringify(this.customBoardGroups)
       )
 
-      const statusOption = {
-        label: cleanLabel,
-        color: group.color,
-        group: key,
-        groupLabel: cleanLabel,
-        custom: true
-      }
+      if (matchingStatus) {
+        // A dropdown-only status with the same name already exists.
+        // Link it to the newly created tab instead of creating a duplicate.
+        matchingStatus.group = key
+        matchingStatus.groupLabel = cleanLabel
+        matchingStatus.custom = true
 
-      this.statusOptions.push(statusOption)
-      this.saveCustomStatusOption(statusOption)
+        this.orders.forEach(order => {
+          if (
+            String(order.status || '').trim().toLowerCase() ===
+            cleanLabel.toLowerCase()
+          ) {
+            order.group = key
+          }
+        })
+
+        this.saveAllStatusOptions()
+      } else {
+        const statusOption = {
+          label: cleanLabel,
+          color: group.color,
+          group: key,
+          groupLabel: cleanLabel,
+          custom: true
+        }
+
+        this.statusOptions.push(statusOption)
+        this.saveCustomStatusOption(statusOption)
+      }
 
       this.activeGroup = key
     },
@@ -8600,7 +8642,16 @@ body.board-column-resizing .column-resizer::before {
         item => String(item.label || '').trim().toLowerCase() !== normalizedLabel
       )
 
-      if ((sourceStatus?.custom || status.custom) && groupKey) {
+      const linkedCustomGroup = this.customBoardGroups.find(
+        group => group.key === groupKey
+      )
+      const deletesLinkedTab = Boolean(
+        linkedCustomGroup &&
+        String(linkedCustomGroup.label || '').trim().toLowerCase() ===
+          normalizedLabel
+      )
+
+      if (deletesLinkedTab && groupKey) {
         const groupStillUsed = this.statusOptions.some(
           item => item.group === groupKey
         )
@@ -8633,27 +8684,16 @@ body.board-column-resizing .column-resizer::before {
           label.toLowerCase()
       )
 
-      const customGroupKey = label
-        .toLowerCase()
-        .replace(/[^a-z0-9]+/g, '_')
-        .replace(/^_|_$/g, '')
-
-      if (!existing && !this.boardGroups.some(group => group.key === customGroupKey)) {
-        this.customBoardGroups.push({
-          key: customGroupKey,
-          label: label.toUpperCase(),
-          color: this.customStatusColor || '#6161ff',
-          icon: 'fa-solid fa-house',
-          custom: true
-        })
-        this.persistWorkflowGroups()
-      }
+      // Adding a status from the dropdown must never create a top tab.
+      // If its label matches an existing tab, link it to that tab;
+      // otherwise always keep it under IN PRODUCTION.
+      const targetGroup = this.groupForDropdownStatus(label)
 
       const status = existing || {
         label,
         color: this.customStatusColor || '#6161ff',
-        group: customGroupKey,
-        groupLabel: label,
+        group: targetGroup.key,
+        groupLabel: targetGroup.label,
         custom: true
       }
 
@@ -10201,7 +10241,7 @@ async fetchClients() {
         normalized === 'in production'
       ) return 'in_production'
 
-      const found = this.workflowStatusOptions.find(
+      const found = this.statusOptions.find(
         item =>
           String(item.label || '').trim().toLowerCase() === normalized
       )
@@ -10211,6 +10251,38 @@ async fetchClients() {
       }
 
       return 'in_production'
+    },
+
+    groupForDropdownStatus(label) {
+      const normalizedLabel = String(label || '').trim().toLowerCase()
+
+      const matchingTab = this.boardGroups.find(group => {
+        const groupLabel = String(group.label || '').trim().toLowerCase()
+        const overrideLabel = String(
+          this.defaultBoardGroupOverrides?.[group.key]?.label || ''
+        ).trim().toLowerCase()
+
+        return groupLabel === normalizedLabel || overrideLabel === normalizedLabel
+      })
+
+      if (matchingTab) {
+        return {
+          key: matchingTab.key,
+          label: matchingTab.label
+        }
+      }
+
+      // A dropdown-only/manual status that has no matching top tab must
+      // always stay inside IN PRODUCTION. It must not inherit the order's
+      // current tab and it must never create a new tab automatically.
+      const fallbackTab = this.boardGroups.find(
+        group => group.key === 'in_production'
+      )
+
+      return {
+        key: 'in_production',
+        label: fallbackTab?.label || 'In Production'
+      }
     },
 
     normalizeStatusDefinition(status) {
@@ -10498,7 +10570,14 @@ shipping_address: this.newOrder.shippingAddress,
       if (!this.canManageWorkflow || !this.selectedOrder) return
       const label = (this.customStatusLabel || '').trim()
       if (!label) return
-      const custom = { label, color: this.customStatusColor || '#6161ff', group: 'in_production', groupLabel: 'In Production', custom: true }
+      const targetGroup = this.groupForDropdownStatus(label)
+      const custom = {
+        label,
+        color: this.customStatusColor || '#6161ff',
+        group: targetGroup.key,
+        groupLabel: targetGroup.label,
+        custom: true
+      }
       this.saveCustomStatusOption(custom)
       await this.changeStatus(custom)
       this.customStatusLabel = ''
