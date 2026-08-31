@@ -270,7 +270,7 @@
           @click.stop="openClientFilter"
         >
           <i class="fa-solid fa-user-group"></i>
-          <span>Client Filter</span>
+          <span>Filter</span>
           <span v-if="selectedClient" class="client-filter-count">1</span>
         </button>
 
