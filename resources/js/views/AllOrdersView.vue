@@ -321,7 +321,6 @@
             </span>
           </div>
         </div>
-
         <div class="board-heading-actions" @click.stop>
           <button
             v-if="canCreateOrder"
@@ -345,7 +344,6 @@
           </button>
         </div>
       </section>
-
 
       <section
         v-if="selectedOrders.length > 0"
@@ -746,20 +744,20 @@
               <button
                 type="button"
                 class="status-ref-trigger"
-                :disabled="!canEditWorkflowFields"
+                :disabled="!canChangeOrderStatus"
                 :class="{ open: rowStatusMenuId === Number(order.id) }"
                 :style="{
                   '--status-fill': order.statusColor || '#e5e7eb',
                   '--status-text': readableTextColor(order.statusColor || '#e5e7eb')
                 }"
-                @click.stop="canEditWorkflowFields && toggleRowStatusMenu(order, $event)"
+                @click.stop="canChangeOrderStatus && toggleRowStatusMenu(order, $event)"
               >
 <span class="status-ref-label">
                   {{ order.status }}
                 </span>
 
                 <i
-                  v-if="canEditWorkflowFields"
+                  v-if="canChangeOrderStatus"
                   class="fa-solid fa-chevron-down status-ref-chevron"
                   :class="{ rotate: rowStatusMenuId === Number(order.id) }"
                 ></i>
@@ -1537,7 +1535,7 @@
 
     <!-- ROW STATUS DROPDOWN -->
     <div
-      v-if="canEditWorkflowFields && rowStatusMenuId && rowStatusMenuOrder"
+      v-if="canChangeOrderStatus && rowStatusMenuId && rowStatusMenuOrder"
       class="status-fixed-dropdown monday-status-menu"
       :style="rowStatusMenuStyle"
       @click.stop
@@ -1661,7 +1659,7 @@
       </div>
 
       <!-- ADD CUSTOM STATUS -->
-      <div v-if="canManageWorkflow" class="monday-status-add">
+      <div v-if="canManageStatusDefinitions" class="monday-status-add">
         <div class="monday-status-add-title">
           <span class="monday-status-add-icon">
             <i class="fa-solid fa-plus"></i>
@@ -1909,16 +1907,17 @@
 </div>
           <div class="detail-info-item" style="position:relative" @click.stop>
             <span class="info-label">Status :</span>
-<span class="status-badge" :style="{ background: selectedOrder.statusColor }" @click="canEditWorkflowFields && (showStatusMenu = !showStatusMenu)">
+<span class="status-badge" :style="{ background: selectedOrder.statusColor }" @click="canChangeOrderStatus && (showStatusMenu = !showStatusMenu)">
                   {{ selectedOrder.status }}
               <i class="fa-solid fa-chevron-down" style="font-size:9px;margin-left:4px"></i>
             </span>
-<div v-if="showStatusMenu && canEditWorkflowFields" class="status-dropdown">
+<div v-if="showStatusMenu && canChangeOrderStatus" class="status-dropdown">
                   <div v-for="s in workflowStatusOptions" :key="s.label" class="status-drop-item" @click="changeStatus(s)">
   <input
     type="color"
     class="status-dot status-color-picker"
     :value="s.color"
+    :disabled="!canManageStatusDefinitions"
     @click.stop
     @input.stop="changeStatusOptionColor(s, $event.target.value)"
   />
@@ -1927,15 +1926,15 @@
 
   <span class="status-group-tag">→ {{ s.groupLabel }}</span>
 
-  <button v-if="canManageWorkflow && s.custom" class="status-action-btn" @click.stop="editCustomStatus(s)">
+  <button v-if="canManageStatusDefinitions && s.custom" class="status-action-btn" @click.stop="editCustomStatus(s)">
     <i class="fa-solid fa-pen"></i>
   </button>
 
-  <button v-if="canManageWorkflow && s.custom" class="status-action-btn danger" @click.stop="deleteCustomStatus(s)">
+  <button v-if="canManageStatusDefinitions && s.custom" class="status-action-btn danger" @click.stop="deleteCustomStatus(s)">
     <i class="fa-solid fa-trash"></i>
   </button>
 </div>
-              <div v-if="canManageWorkflow" class="custom-status-box">
+              <div v-if="canManageStatusDefinitions" class="custom-status-box">
                 <input v-model="customStatusLabel" class="custom-status-input" placeholder="Write custom status..." @keydown.enter.prevent="applyCustomStatus" />
                 <input v-model="customStatusColor" type="color" class="custom-status-color" title="Choose label color" />
                 <button class="custom-status-btn" @click="applyCustomStatus">Add</button>
@@ -3258,6 +3257,15 @@ canManageWorkflow() {
 },
 canEditWorkflowFields() {
   return this.canManageWorkflow
+},
+canChangeOrderStatus() {
+  if (this.isClient) return false
+
+  return this.canEditWorkflowFields
+    || this.currentUser?.role === 'member'
+},
+canManageStatusDefinitions() {
+  return this.isSuperAdmin || this.isAdmin
 },
     currentUser() {
       try { return JSON.parse(localStorage.getItem('user')) || null } catch { return null }
@@ -5916,7 +5924,7 @@ beforeUnmount()  {
     },
 
     async inlineChangeStatus(order, label) {
-      if (!this.canEditWorkflowFields) return
+      if (!this.canChangeOrderStatus) return
 
       const status = this.workflowStatusOptions.find(
         item =>
@@ -8408,7 +8416,7 @@ body.board-column-resizing .column-resizer::before {
     },
 
     toggleRowStatusMenu(order, event) {
-      if (!this.canEditWorkflowFields || !order?.id) return
+      if (!this.canChangeOrderStatus || !order?.id) return
 
       const id = Number(order.id)
 
@@ -8423,7 +8431,7 @@ body.board-column-resizing .column-resizer::before {
 
       if (!rect) return
 
-      const width = 320
+      const width = 260
       const gap = 8
       const padding = 12
 
@@ -8458,7 +8466,7 @@ body.board-column-resizing .column-resizer::before {
     },
 
     async selectRowStatus(order, status) {
-      if (!this.canEditWorkflowFields || !order || !status?.label) return
+      if (!this.canChangeOrderStatus || !order || !status?.label) return
 
       this.rowStatusMenuId = null
       this.rowStatusMenuOrder = null
@@ -8470,7 +8478,7 @@ body.board-column-resizing .column-resizer::before {
     },
 
     startRowStatusEdit(status) {
-      if (!this.canManageWorkflow || !status?.label) return
+      if (!this.canManageStatusDefinitions || !status?.label) return
 
       this.rowStatusEditingLabel = status.label
       this.rowStatusEditName = status.label
@@ -8484,7 +8492,7 @@ body.board-column-resizing .column-resizer::before {
     },
 
     async saveRowStatusEdit(status) {
-      if (!this.canManageWorkflow || !status?.label) return
+      if (!this.canManageStatusDefinitions || !status?.label) return
 
       const oldLabel = String(status.label || '').trim()
       const newLabel = String(this.rowStatusEditName || '').trim()
@@ -8592,7 +8600,7 @@ body.board-column-resizing .column-resizer::before {
     },
 
     async deleteRowCustomStatus(status) {
-      if (!this.canManageWorkflow || !status?.label) return
+      if (!this.canManageStatusDefinitions || !status?.label) return
 
       const label = String(status.label || '').trim()
 
@@ -8673,7 +8681,7 @@ body.board-column-resizing .column-resizer::before {
     },
 
     async addCustomRowStatus(order) {
-      if (!this.canManageWorkflow || !order) return
+      if (!this.canManageStatusDefinitions || !order) return
 
       const label = String(this.customStatusLabel || '').trim()
       if (!label) return
@@ -9196,8 +9204,7 @@ shortShippingAddress(address) {
 
 
     async editCustomStatus(status) {
-  if (!this.canManageWorkflow) return
-  if (!this.isSuperAdmin) return
+  if (!this.canManageStatusDefinitions) return
 const newName = prompt('Enter new status name', status.label)
   if (!newName || !newName.trim()) return
 
@@ -9220,8 +9227,7 @@ const newName = prompt('Enter new status name', status.label)
 },
 
 async deleteCustomStatus(status) {
-  if (!this.canManageWorkflow) return
-  if (!this.isSuperAdmin) return
+  if (!this.canManageStatusDefinitions) return
   if (!confirm('Are you sure you want to delete this custom status?')) return
 
   const label = String(status.label || '').trim().toLowerCase()
@@ -9409,7 +9415,7 @@ alert(e.response?.data?.message || 'Orders were not deleted')
     },
 
     canManageStatusOption(status) {
-      return this.canManageWorkflow && Boolean(status?.label)
+      return this.canManageStatusDefinitions && Boolean(status?.label)
     },
 
     loadSavedStatusOptions() {
@@ -9550,7 +9556,7 @@ alert(e.response?.data?.message || 'Orders were not deleted')
     },
 
     async changeStatusOptionColor(status, color) {
-      if (!this.canManageWorkflow || !status || !color) return
+      if (!this.canManageStatusDefinitions || !status || !color) return
 
       const source = this.statusOptions.find(
         item => String(item.label || '').trim().toLowerCase() === String(status.label || '').trim().toLowerCase()
@@ -10567,7 +10573,7 @@ shipping_address: this.newOrder.shippingAddress,
     },
 
     async applyCustomStatus() {
-      if (!this.canManageWorkflow || !this.selectedOrder) return
+      if (!this.canManageStatusDefinitions || !this.selectedOrder) return
       const label = (this.customStatusLabel || '').trim()
       if (!label) return
       const targetGroup = this.groupForDropdownStatus(label)
@@ -10585,7 +10591,7 @@ shipping_address: this.newOrder.shippingAddress,
     },
 
     async changeStatus(s) {
-      if (!this.canEditWorkflowFields || !this.selectedOrder) return
+      if (!this.canChangeOrderStatus || !this.selectedOrder) return
       const activeWorker = this.workingDesigner(this.selectedOrder)
       const isShipped =
         String(s.label || '').trim().toLowerCase() === 'shipped'
@@ -20016,9 +20022,9 @@ body.board-column-resizing .column-resizer::before {
 ========================================================= */
 
 .factory-board-page .monday-status-menu {
-  width: 320px !important;
-  min-width: 320px !important;
-  max-width: min(320px, calc(100vw - 24px)) !important;
+  width: 260px !important;
+  min-width: 260px !important;
+  max-width: min(260px, calc(100vw - 24px)) !important;
 
   padding: 0 !important;
 
@@ -20533,9 +20539,9 @@ body.board-column-resizing .column-resizer::before {
   position: fixed !important;
   z-index: 2147483647 !important;
 
-  width: 320px !important;
-  min-width: 320px !important;
-  max-width: min(320px, calc(100vw - 24px)) !important;
+  width: 260px !important;
+  min-width: 260px !important;
+  max-width: min(260px, calc(100vw - 24px)) !important;
 
   max-height: none !important;
   padding: 0 !important;
