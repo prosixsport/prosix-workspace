@@ -1048,21 +1048,59 @@
             </div>
           </div>
 
-          <div v-if="isBoardColumnVisible('track')" class="board-col board-col-track" :style="boardColumnOrderStyle('track')" @mouseenter="showCopyableHoverText(trackingSummary(order.trk), $event)" @mouseleave="scheduleCopyableHoverHide">
-            <input
-              class="board-inline-cell-input"
-              :value="trackingSummary(order.trk)"
-              type="text"
-              placeholder="Tracking #"
-              @click.stop
-              @change="saveDirectInlineField(order, 'trk', $event.target.value)"
-            />
-            <div
-              v-if="trackingSummary(order.trk) && trackingSummary(order.trk) !== 'N/A'"
-              class="copyable-cell-tooltip"
-              @click.stop
-            >
-              {{ trackingSummary(order.trk) }}
+          <div
+            v-if="isBoardColumnVisible('track')"
+            class="board-col board-col-track board-tracking-cell"
+            :style="boardColumnOrderStyle('track')"
+            @mouseenter="showCopyableHoverText(boardTrackingHoverText(order), $event)"
+            @mouseleave="scheduleCopyableHoverHide"
+            @click.stop
+          >
+            <div class="board-tracking-editor" :data-order-id="order.id">
+              <button
+                type="button"
+                class="board-tracking-nav"
+                title="Previous tracking"
+                :disabled="boardTrackingActiveIndex(order) <= 0"
+                @mousedown.prevent
+                @click.stop="showPreviousBoardTracking(order)"
+              >
+                <i class="fa-solid fa-chevron-left"></i>
+              </button>
+
+              <input
+                class="board-tracking-input"
+                :value="boardTrackingActiveRow(order).number"
+                type="text"
+                placeholder="Tracking #"
+                :readonly="!canEditWorkflowFields"
+                @focus="ensureBoardTrackingDraft(order)"
+                @input="updateActiveBoardTrackingNumber(order, $event.target.value)"
+                @keydown.enter.prevent="$event.target.blur()"
+                @blur="saveBoardTrackingRows(order)"
+              />
+
+              <button
+                type="button"
+                class="board-tracking-nav"
+                title="Next tracking"
+                :disabled="boardTrackingActiveIndex(order) >= boardTrackingRows(order).length - 1"
+                @mousedown.prevent
+                @click.stop="showNextBoardTracking(order)"
+              >
+                <i class="fa-solid fa-chevron-right"></i>
+              </button>
+
+              <button
+                v-if="canEditWorkflowFields"
+                type="button"
+                class="board-tracking-add"
+                title="Add another tracking"
+                @mousedown.prevent
+                @click.stop="addBoardTrackingRow(order)"
+              >
+                <i class="fa-solid fa-plus"></i>
+              </button>
             </div>
           </div>
 
@@ -2118,8 +2156,8 @@
                   </div>
                   <div v-if="card.files && card.files.length" class="card-files-preview">
                     <div v-for="(file, fi) in card.files" :key="file.id || file.url || fi" class="file-thumb">
-                      <img v-if="file.isImage && !file.imageError" :src="file.url" class="file-img" @click.stop="openPreviewFile(file)" @error="file.imageError = true" />
-                      <div v-else class="file-icon-box" @click.stop="openPreviewFile(file)" style="cursor:pointer;">
+                      <img v-if="file.isImage && !file.imageError" :src="file.url" class="file-img" @click.stop="openPreviewFile(file, card.files)" @error="file.imageError = true" />
+                      <div v-else class="file-icon-box" @click.stop="openPreviewFile(file, card.files)" style="cursor:pointer;">
                         <i :class="getFileIcon(file.name)" class="file-type-icon"></i>
                         <span class="file-name-small">{{ file.name }}</span>
                       </div>
@@ -2228,7 +2266,7 @@
               type="button"
               class="files-modal-preview"
               title="Click to view"
-              @click="openPreviewFile(file)"
+              @click="openPreviewFile(file, viewAllCard.files)"
             >
               <img
                 v-if="file.isImage && !file.imageError"
@@ -2247,7 +2285,7 @@
             </div>
 
             <div class="files-modal-item-actions">
-              <button type="button" title="View" @click="openPreviewFile(file)">
+              <button type="button" title="View" @click="openPreviewFile(file, viewAllCard.files)">
                 <i class="fa-solid fa-eye"></i>
               </button>
               <button type="button" title="Download" @click="downloadSingleFile(file)">
@@ -2277,7 +2315,7 @@
     <div
       v-if="previewFile"
       class="image-preview-overlay"
-      @click.self="previewFile = null"
+      @click.self="closePreviewFile"
     >
       <div class="image-preview-modal universal-preview-modal">
         <div class="preview-modal-topbar">
@@ -2286,13 +2324,24 @@
             <button type="button" title="Download" @click="downloadSingleFile(previewFile)">
               <i class="fa-solid fa-download"></i>
             </button>
-            <button type="button" title="Close" @click="previewFile = null">
+            <button type="button" title="Close" @click="closePreviewFile">
               <i class="fa-solid fa-xmark"></i>
             </button>
           </div>
         </div>
 
-        <div class="preview-modal-body">
+        <div class="preview-modal-body clean-preview-body">
+          <button
+            v-if="previewFiles.length > 1"
+            type="button"
+            class="preview-nav-button preview-nav-previous"
+            :disabled="previewFileIndex <= 0"
+            title="Previous file"
+            @click.stop="showPreviousPreviewFile"
+          >
+            <i class="fa-solid fa-chevron-left"></i>
+          </button>
+
           <img
             v-if="previewFile.isImage"
             :src="previewFile.url"
@@ -2315,6 +2364,21 @@
               <i class="fa-solid fa-arrow-up-right-from-square me-1"></i>Open File
             </button>
           </div>
+
+          <button
+            v-if="previewFiles.length > 1"
+            type="button"
+            class="preview-nav-button preview-nav-next"
+            :disabled="previewFileIndex >= previewFiles.length - 1"
+            title="Next file"
+            @click.stop="showNextPreviewFile"
+          >
+            <i class="fa-solid fa-chevron-right"></i>
+          </button>
+
+          <span v-if="previewFiles.length > 1" class="preview-file-counter">
+            {{ previewFileIndex + 1 }} / {{ previewFiles.length }}
+          </span>
         </div>
       </div>
     </div>
@@ -2959,7 +3023,7 @@ export default {
         chat: 85,
         payment: 120,
         address: 240,
-        track: 110,
+        track: 190,
         info: 42
       },
       columnResizeState: null,
@@ -3000,6 +3064,11 @@ export default {
       showTrackingMenu: false,
       showDatePicker: false,
       previewFile: null,
+      previewFiles: [],
+      previewFileIndex: -1,
+      boardTrackingDrafts: {},
+      boardTrackingSaving: {},
+      boardTrackingIndexes: {},
       customStatusLabel: '',
       customStatusColor: '#6161ff',
 
@@ -5714,7 +5783,8 @@ beforeUnmount()  {
           )
       }
 
-      this.openPreviewFile(normalized)
+      const files = this.rowFiles(this.selectedOrder || order)
+      this.openPreviewFile(normalized, files)
     },
 
     async openRowViewAll(order) {
@@ -9016,6 +9086,164 @@ body.board-column-resizing .column-resizer::before {
       return item?.number || 'N/A'
     },
 
+    boardTrackingRows(order) {
+      const orderId = Number(order?.id || 0)
+      const draft = this.boardTrackingDrafts[orderId]
+
+      return Array.isArray(draft)
+        ? draft
+        : this.parseTrackingList(order?.trk)
+    },
+
+    ensureBoardTrackingDraft(order) {
+      const orderId = Number(order?.id || 0)
+      if (!orderId) return []
+
+      if (!Array.isArray(this.boardTrackingDrafts[orderId])) {
+        this.boardTrackingDrafts = {
+          ...this.boardTrackingDrafts,
+          [orderId]: this.parseTrackingList(order.trk).map(item => ({
+            number: item.number || '',
+            company: item.company || ''
+          }))
+        }
+      }
+
+      return this.boardTrackingDrafts[orderId]
+    },
+
+    updateBoardTrackingNumber(order, index, value) {
+      if (!this.canEditWorkflowFields) return
+
+      const rows = this.ensureBoardTrackingDraft(order)
+      if (!rows[index]) return
+
+      rows[index].number = value
+    },
+
+    boardTrackingActiveIndex(order) {
+      const orderId = Number(order?.id || 0)
+      const rows = this.boardTrackingRows(order)
+      const savedIndex = Number(this.boardTrackingIndexes[orderId] || 0)
+
+      return Math.min(Math.max(savedIndex, 0), Math.max(rows.length - 1, 0))
+    },
+
+    boardTrackingActiveRow(order) {
+      const rows = this.boardTrackingRows(order)
+      return rows[this.boardTrackingActiveIndex(order)] || { number: '', company: '' }
+    },
+
+    setBoardTrackingActiveIndex(order, index) {
+      const orderId = Number(order?.id || 0)
+      if (!orderId) return
+
+      const lastIndex = Math.max(this.boardTrackingRows(order).length - 1, 0)
+      this.boardTrackingIndexes = {
+        ...this.boardTrackingIndexes,
+        [orderId]: Math.min(Math.max(Number(index) || 0, 0), lastIndex)
+      }
+    },
+
+    updateActiveBoardTrackingNumber(order, value) {
+      this.updateBoardTrackingNumber(
+        order,
+        this.boardTrackingActiveIndex(order),
+        value
+      )
+    },
+
+    async showPreviousBoardTracking(order) {
+      await this.saveBoardTrackingRows(order)
+      this.setBoardTrackingActiveIndex(
+        order,
+        this.boardTrackingActiveIndex(order) - 1
+      )
+    },
+
+    async showNextBoardTracking(order) {
+      await this.saveBoardTrackingRows(order)
+      this.setBoardTrackingActiveIndex(
+        order,
+        this.boardTrackingActiveIndex(order) + 1
+      )
+    },
+
+    addBoardTrackingRow(order) {
+      if (!this.canEditWorkflowFields) return
+
+      const rows = this.ensureBoardTrackingDraft(order)
+      rows.push({ number: '', company: '' })
+      this.setBoardTrackingActiveIndex(order, rows.length - 1)
+
+      this.$nextTick(() => {
+        const input = document.querySelector(
+          `.board-tracking-editor[data-order-id="${order.id}"] .board-tracking-input`
+        )
+
+        input?.focus()
+      })
+    },
+
+    async removeBoardTrackingRow(order, index) {
+      if (!this.canEditWorkflowFields) return
+
+      const rows = this.ensureBoardTrackingDraft(order)
+      rows.splice(index, 1)
+
+      if (!rows.length) {
+        rows.push({ number: '', company: '' })
+      }
+
+      await this.saveBoardTrackingRows(order)
+    },
+
+    boardTrackingHoverText(order) {
+      const rows = this.boardTrackingRows(order)
+        .filter(item => String(item.number || item.company || '').trim())
+
+      if (!rows.length) return 'N/A'
+
+      return rows
+        .map((item, index) => {
+          const number = String(item.number || 'No tracking number').trim()
+          const company = String(item.company || '').trim()
+          return `${index + 1}. ${number}${company ? ` — ${company}` : ''}`
+        })
+        .join('\n')
+    },
+
+    async saveBoardTrackingRows(order) {
+      if (!this.canEditWorkflowFields || !order?.id) return
+
+      const orderId = Number(order.id)
+      if (this.boardTrackingSaving[orderId]) return
+
+      const rows = this.ensureBoardTrackingDraft(order)
+      const value = this.buildTrackingValue(rows)
+
+      if (value === order.trk) return
+
+      this.boardTrackingSaving = {
+        ...this.boardTrackingSaving,
+        [orderId]: true
+      }
+
+      const saved = await this.saveDirectInlineField(order, 'trk', value)
+
+      if (!saved) {
+        this.boardTrackingDrafts = {
+          ...this.boardTrackingDrafts,
+          [orderId]: this.parseTrackingList(order.trk)
+        }
+      }
+
+      this.boardTrackingSaving = {
+        ...this.boardTrackingSaving,
+        [orderId]: false
+      }
+    },
+
     startInlineOrder() {
       this.inlineAddOpen = true
       this.inlineOrderName = ''
@@ -9793,15 +10021,50 @@ async saveTracking() {
       return domain
     },
 
-openPreviewFile(file) {
+openPreviewFile(file, sourceFiles = null) {
   if (!file?.url) return
 
-  this.previewFile = {
-    ...file,
+  const normalizePreviewFile = item => ({
+    ...item,
     isImage:
-      file.isImage ??
-      /\.(jpg|jpeg|png|gif|webp|svg)$/i.test(file.name || '')
-  }
+      item.isImage ??
+      /\.(jpg|jpeg|png|gif|webp|svg)$/i.test(item.name || '')
+  })
+
+  const providedFiles = Array.isArray(sourceFiles)
+    ? sourceFiles.filter(item => item?.url)
+    : []
+
+  this.previewFiles = (providedFiles.length ? providedFiles : [file])
+    .map(normalizePreviewFile)
+
+  const selectedIndex = this.previewFiles.findIndex(item =>
+    (file.id && Number(item.id) === Number(file.id)) ||
+    (!file.id && item.url === file.url)
+  )
+
+  this.previewFileIndex = selectedIndex >= 0 ? selectedIndex : 0
+  this.previewFile = this.previewFiles[this.previewFileIndex]
+},
+
+showPreviousPreviewFile() {
+  if (this.previewFileIndex <= 0) return
+
+  this.previewFileIndex -= 1
+  this.previewFile = this.previewFiles[this.previewFileIndex]
+},
+
+showNextPreviewFile() {
+  if (this.previewFileIndex >= this.previewFiles.length - 1) return
+
+  this.previewFileIndex += 1
+  this.previewFile = this.previewFiles[this.previewFileIndex]
+},
+
+closePreviewFile() {
+  this.previewFile = null
+  this.previewFiles = []
+  this.previewFileIndex = -1
 },
 
     fileExtension(file) {
@@ -24910,7 +25173,6 @@ body.board-column-resizing .column-resizer::before {
 }
 
 .member-preview-remove:hover { background:#dc2626; color:#fff; }
-
 .client-payment-only {
   min-width: 125px;
   height: 34px;
@@ -24922,5 +25184,167 @@ body.board-column-resizing .column-resizer::before {
   font-size: 12px;
   font-weight: 800;
   opacity: 1;
+}
+
+/* =========================================================
+   FILE PREVIEW: CLEAN FULL IMAGE + PREVIOUS/NEXT NAVIGATION
+========================================================= */
+.universal-preview-modal {
+  width: min(1180px, calc(100vw - 40px)) !important;
+  height: min(860px, calc(100vh - 40px)) !important;
+  max-width: calc(100vw - 40px) !important;
+  max-height: calc(100vh - 40px) !important;
+  padding: 0 !important;
+  overflow: hidden !important;
+}
+
+.clean-preview-body {
+  position: relative !important;
+  min-height: 0 !important;
+  padding: 18px 64px 42px !important;
+  overflow: hidden !important;
+  background: #eef1f5 !important;
+}
+
+.clean-preview-body .image-preview-full {
+  display: block !important;
+  width: 100% !important;
+  height: 100% !important;
+  max-width: 100% !important;
+  max-height: 100% !important;
+  object-fit: contain !important;
+  object-position: center !important;
+  margin: 0 auto !important;
+}
+
+.preview-nav-button {
+  position: absolute !important;
+  top: 50% !important;
+  z-index: 12 !important;
+  width: 44px !important;
+  height: 54px !important;
+  padding: 0 !important;
+  transform: translateY(-50%) !important;
+  display: grid !important;
+  place-items: center !important;
+  border: 1px solid #d7dde6 !important;
+  border-radius: 10px !important;
+  background: rgba(255, 255, 255, .96) !important;
+  color: #111827 !important;
+  box-shadow: 0 8px 24px rgba(15, 23, 42, .16) !important;
+  cursor: pointer !important;
+}
+
+.preview-nav-previous { left: 10px !important; }
+.preview-nav-next { right: 10px !important; }
+
+.preview-nav-button:disabled {
+  opacity: .32 !important;
+  cursor: not-allowed !important;
+}
+
+.preview-file-counter {
+  position: absolute !important;
+  left: 50% !important;
+  bottom: 10px !important;
+  z-index: 12 !important;
+  transform: translateX(-50%) !important;
+  padding: 5px 10px !important;
+  border-radius: 999px !important;
+  background: #111827 !important;
+  color: #ffffff !important;
+  font-size: 11px !important;
+  font-weight: 800 !important;
+}
+
+/* =========================================================
+   OUTER BOARD: MULTIPLE TRACKING ROWS
+========================================================= */
+.factory-board-page .board-tracking-cell {
+  min-width: 0 !important;
+  padding: 0 7px !important;
+  overflow: visible !important;
+}
+
+.factory-board-page .board-tracking-editor {
+  width: 100% !important;
+  min-width: 0 !important;
+  display: grid !important;
+  grid-template-columns: 20px minmax(0, 1fr) 20px 24px !important;
+  align-items: center !important;
+  gap: 2px !important;
+  overflow: visible !important;
+}
+
+.factory-board-page .board-tracking-input {
+  width: 100% !important;
+  min-width: 0 !important;
+  height: 34px !important;
+  padding: 0 5px !important;
+  border: 0 !important;
+  border-radius: 0 !important;
+  background: transparent !important;
+  color: #111827 !important;
+  outline: none !important;
+  box-shadow: none !important;
+  font-size: 11px !important;
+  font-weight: 700 !important;
+}
+
+.factory-board-page .board-tracking-input:focus {
+  border: 0 !important;
+  background: transparent !important;
+  box-shadow: none !important;
+}
+
+.factory-board-page .board-tracking-nav,
+.factory-board-page .board-tracking-add {
+  width: 20px !important;
+  min-width: 20px !important;
+  height: 28px !important;
+  padding: 0 !important;
+  display: grid !important;
+  place-items: center !important;
+  border: 0 !important;
+  border-radius: 5px !important;
+  background: transparent !important;
+  color: #475569 !important;
+  cursor: pointer !important;
+  font-size: 9px !important;
+}
+
+.factory-board-page .board-tracking-nav:hover:not(:disabled),
+.factory-board-page .board-tracking-add:hover {
+  background: #eef2f7 !important;
+  color: #111827 !important;
+}
+
+.factory-board-page .board-tracking-nav:disabled {
+  opacity: .2 !important;
+  cursor: default !important;
+}
+
+.factory-board-page .board-tracking-add {
+  width: 24px !important;
+  min-width: 24px !important;
+  color: #111827 !important;
+}
+
+@media (max-width: 700px) {
+  .universal-preview-modal {
+    width: calc(100vw - 12px) !important;
+    height: calc(100dvh - 12px) !important;
+    max-width: calc(100vw - 12px) !important;
+    max-height: calc(100dvh - 12px) !important;
+  }
+
+  .clean-preview-body {
+    padding-inline: 48px !important;
+  }
+
+  .preview-nav-button {
+    width: 36px !important;
+    height: 46px !important;
+  }
 }
 </style>

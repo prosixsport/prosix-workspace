@@ -832,7 +832,7 @@ td small {
   .filter-card {
     grid-template-columns: 1fr;
   }
-
+           
   .search-btn,
   .clear-btn {
     margin-top: 0;
