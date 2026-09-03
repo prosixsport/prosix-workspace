@@ -271,7 +271,7 @@
         >
           <i class="fa-solid fa-user-group"></i>
           <span>Filter</span>
-          <span v-if="selectedClient" class="client-filter-count">1</span>
+          <span v-if="activeBoardFilterCount" class="client-filter-count">{{ activeBoardFilterCount }}</span>
         </button>
 
         <div class="board-search">
@@ -373,6 +373,41 @@
           <i class="fa-solid fa-user-tie"></i>
           Add Client
         </button>
+
+        <div v-if="canChangeOrderStatus" class="bulk-status-control">
+          <button type="button" class="bulk-status-trigger" @click.stop="toggleBulkStatusMenu($event)">
+            <i class="fa-solid fa-arrows-rotate"></i>
+            {{ bulkStatusLabel || 'Change Status' }}
+            <i class="fa-solid fa-chevron-down" :class="{ rotate: bulkStatusMenuOpen }"></i>
+          </button>
+
+          <Teleport to="body">
+          <div v-if="bulkStatusMenuOpen" class="bulk-status-dropdown" :style="bulkStatusMenuStyle" @click.stop>
+            <div class="bulk-status-head">
+              <div><strong>Change Status</strong><small>{{ selectedOrders.length }} orders selected</small></div>
+              <button type="button" @click="bulkStatusMenuOpen = false"><i class="fa-solid fa-xmark"></i></button>
+            </div>
+
+            <button
+              v-for="status in workflowStatusOptions"
+              :key="status.label"
+              type="button"
+              class="bulk-status-option"
+              :class="{ active: bulkStatusLabel === status.label }"
+              @click="bulkStatusLabel = status.label"
+            >
+              <span :style="{ background: status.color || '#6161ff' }"></span>
+              <strong>{{ status.label }}</strong>
+              <i v-if="bulkStatusLabel === status.label" class="fa-solid fa-check"></i>
+            </button>
+
+            <button type="button" class="bulk-status-apply" :disabled="!bulkStatusLabel || bulkStatusSaving" @click="bulkChangeStatus">
+              <i :class="bulkStatusSaving ? 'fa-solid fa-spinner fa-spin' : 'fa-solid fa-check'"></i>
+              Apply to {{ selectedOrders.length }} Orders
+            </button>
+          </div>
+          </Teleport>
+        </div>
 
         <button
           v-if="hasFullOrderAccess || currentUser?.can_create_orders === true"
@@ -592,11 +627,15 @@
         </div>
 
 
-        <div v-if="loadingOrders && orders.length === 0" class="board-empty-state prosix-loading-state">
+        <div v-if="loadingOrders" class="board-empty-state prosix-loading-state">
           <div class="prosix-loader-logo-wrap">
             <img src="/public/assets/images/P LOGO BLACK.png" alt="Prosix" class="prosix-loader-logo" />
           </div>
-          <span>Loading orders...</span>
+          <strong class="orders-loading-percent">{{ loadingProgress }}%</strong>
+          <span>{{ loadingProgress < 100 ? 'Loading complete order files...' : 'All files ready' }}</span>
+          <div class="orders-loading-track">
+            <span :style="{ width: loadingProgress + '%' }"></span>
+          </div>
         </div>
 
         <div v-else-if="!loadingOrders && filteredOrders.length === 0" class="board-empty-state">
@@ -604,10 +643,12 @@
         </div>
 
         <div
+          v-show="!loadingOrders"
           v-for="order in filteredOrders"
           :key="order.id"
           class="board-table-row"
           :class="{
+            'orders-loading-hidden': loadingOrders,
             unread: !order.user_has_seen,
             opened: order.user_has_seen,
             selected: selectedOrders.includes(order.id),
@@ -2852,9 +2893,11 @@
       v-if="copyableHoverTooltip.text"
       class="global-copyable-tooltip"
       :style="copyableHoverTooltipStyle"
+      tabindex="0"
       @mouseenter="cancelCopyableHoverHide"
       @mouseleave="hideCopyableHoverText"
-      @click.stop
+      @click.stop="$event.currentTarget.focus()"
+      @keydown.ctrl.a.prevent="selectCopyableTooltipText($event)"
     >
       {{ copyableHoverTooltip.text }}
     </div>
@@ -2924,6 +2967,66 @@
               </button>
 
               <div v-if="filteredClientOptions.length === 0" class="client-filter-empty">No clients found.</div>
+            </div>
+
+            <div class="board-advanced-filters">
+              <div v-for="filter in advancedFilterDefinitions" :key="filter.key" class="board-filter-field">
+                <label><i :class="filter.icon"></i> {{ filter.label }}</label>
+
+                <div class="board-filter-search-box">
+                  <i class="fa-solid fa-magnifying-glass"></i>
+                  <input
+                    v-model.trim="filterSearches[filter.key]"
+                    :placeholder="`Search ${filter.label.toLowerCase()}...`"
+                    @input="openAdvancedFilterSearch(filter.key, $event.target.value)"
+                    @keydown.enter.prevent="addAdvancedFilter(filter.key, filterSearches[filter.key])"
+                  />
+                  <button type="button" class="board-filter-toggle" @click="toggleAdvancedFilter(filter.key)">
+                    <i class="fa-solid fa-chevron-down" :class="{ rotate: openAdvancedFilter === `saved:${filter.key}` }"></i>
+                  </button>
+
+                  <div v-if="openAdvancedFilter === `saved:${filter.key}`" class="board-filter-suggestions">
+                    <div class="board-filter-dropdown-head">
+                      <strong>Saved ({{ filterHistory[filter.key].length }})</strong>
+                      <button v-if="filterHistory[filter.key].length" type="button" @click="clearAdvancedFilter(filter.key)">Clear All</button>
+                    </div>
+
+                    <div
+                      v-for="value in filterHistory[filter.key]"
+                      :key="`selected-${filter.key}-${value}`"
+                      class="board-filter-selected-row"
+                      :class="{ active: isAdvancedFilterSelected(filter.key, value) }"
+                    >
+                      <button type="button" class="board-filter-select-saved" @click="toggleSavedFilter(filter.key, value)">
+                        <span>{{ value }}</span>
+                        <i v-if="isAdvancedFilterSelected(filter.key, value)" class="fa-solid fa-check"></i>
+                      </button>
+                      <button type="button" class="board-filter-delete-saved" title="Delete saved filter" @click="deleteSavedFilter(filter.key, value)">
+                        <i class="fa-solid fa-xmark"></i>
+                      </button>
+                    </div>
+
+                    <small v-if="!filterHistory[filter.key].length">No saved filters</small>
+                  </div>
+
+                  <div v-if="openAdvancedFilter === `search:${filter.key}` && filterSearches[filter.key]" class="board-filter-suggestions">
+                    <button v-for="value in filter.suggestions" :key="value" type="button" @click="addAdvancedFilter(filter.key, value)">{{ value }}</button>
+                    <button v-if="filterSearches[filter.key] && !filter.suggestions.length" type="button" @click="addAdvancedFilter(filter.key, filterSearches[filter.key])">
+                      Add “{{ filterSearches[filter.key] }}”
+                    </button>
+                  </div>
+                </div>
+              </div>
+
+              <button
+                v-if="activeBoardFilterCount"
+                type="button"
+                class="board-filter-clear"
+                @click="clearBoardFilters"
+              >
+                <i class="fa-solid fa-rotate-left"></i>
+                Clear Filters
+              </button>
             </div>
           </aside>
         </div>
@@ -3051,6 +3154,7 @@ export default {
       isResizing: false,
       mobileLeftOpen: false,
       loadingOrders: false,
+      loadingProgress: 0,
       savingOrder: false,
       openOrderMenuId: null,
       editingOrderId: null,
@@ -3107,6 +3211,10 @@ export default {
       lastNotificationId: null,
       searchOrder: '',
       clientSearch: '',
+      filterSearches: { status: '', payment: '', priority: '' },
+      filterSelections: { status: [], payment: [], priority: [] },
+      filterHistory: { status: [], payment: [], priority: [] },
+      openAdvancedFilter: '',
       detailSearchOrder: '',
       detailSearchOpen: false,
       selectedClient: '',
@@ -3116,6 +3224,10 @@ export default {
       bulkSelectedMembers: [],
       bulkSaving: false,
       bulkActionLoading: false,
+      bulkStatusLabel: '',
+      bulkStatusSaving: false,
+      bulkStatusMenuOpen: false,
+      bulkStatusMenuStyle: {},
       orderInfoModal: false,
       infoOrder: null,
       orderReadInfo: [],
@@ -3369,6 +3481,58 @@ canManageStatusDefinitions() {
       )
     },
 
+    currentTabOrders() {
+      return this.accessibleOrders.filter(order =>
+        this.activeGroup === 'all' ||
+        order.group === this.activeGroup ||
+        (
+          this.activeGroup === 'delivered' &&
+          String(order.status || '').trim().toLowerCase() === 'delivered'
+        )
+      )
+    },
+
+    currentTabStatusOptions() {
+      return [...new Set(
+        this.currentTabOrders
+          .map(order => String(order.status || '').trim())
+          .filter(Boolean)
+      )].sort((a, b) => a.localeCompare(b))
+    },
+
+    currentTabPaymentOptions() {
+      return [...new Set(
+        this.currentTabOrders
+          .map(order => String(order.payment || 'Not Yet').trim())
+          .filter(Boolean)
+      )].sort((a, b) => a.localeCompare(b))
+    },
+
+    advancedFilterDefinitions() {
+      const definitions = [
+        ['status', 'Status', 'fa-solid fa-tag', this.currentTabStatusOptions],
+        ['payment', 'Payment', 'fa-solid fa-money-check-dollar', this.currentTabPaymentOptions],
+        ['priority', 'Priority', 'fa-solid fa-flag', this.priorityOptions.map(option => option.label)]
+      ]
+
+      return definitions.map(([key, label, icon, values]) => ({
+        key,
+        label,
+        icon,
+        suggestions: this.filterSuggestionValues(
+          values,
+          this.filterSearches[key],
+          this.filterHistory[key]
+        )
+      }))
+    },
+
+    activeBoardFilterCount() {
+      return (this.selectedClient ? 1 : 0) +
+        Object.values(this.filterSelections)
+          .reduce((total, values) => total + values.length, 0)
+    },
+
     filteredClientOptions() {
       const query = String(this.clientSearch || '').trim().toLowerCase()
       return [...this.availableClients]
@@ -3422,7 +3586,9 @@ filteredOrders() {
           String(o.status || '').toLowerCase() === 'delivered'
         )
 
-      return groupMatch && this.orderMatchesCurrentSearch(o)
+      return groupMatch &&
+        this.orderMatchesCurrentSearch(o) &&
+        this.orderMatchesAdvancedFilters(o)
     })
     .sort((a, b) => {
       // Chat activity never changes row position. Newest created order stays first.
@@ -3627,6 +3793,14 @@ filteredOrders() {
 
 
 watch: {
+  activeGroup() {
+    this.filterSearches = { status: '', payment: '', priority: '' }
+    this.filterSelections = { status: [], payment: [], priority: [] }
+    this.openAdvancedFilter = ''
+    this.selectAll = false
+    this.selectedOrders = []
+  },
+
   detailOpen(value) {
     document.body.style.overflow = value
       ? 'hidden'
@@ -3798,6 +3972,17 @@ beforeUnmount()  {
     hideCopyableHoverText() {
       this.cancelCopyableHoverHide()
       this.copyableHoverTooltip = { text: '', top: 0, left: 0, width: 320 }
+    },
+
+    selectCopyableTooltipText(event) {
+      const box = event?.currentTarget
+      if (!box) return
+
+      const selection = window.getSelection()
+      const range = document.createRange()
+      range.selectNodeContents(box)
+      selection.removeAllRanges()
+      selection.addRange(range)
     },
 
     isBoardColumnVisible(key) {
@@ -5993,7 +6178,7 @@ beforeUnmount()  {
       }
     },
 
-    async inlineChangeStatus(order, label) {
+    async inlineChangeStatus(order, label, { refresh = true } = {}) {
       if (!this.canChangeOrderStatus) return
 
       const status = this.workflowStatusOptions.find(
@@ -6052,7 +6237,9 @@ beforeUnmount()  {
 
         // Force the active tab list/counts to react immediately.
         this.orders = [...this.orders]
-        await this.fetchOrders({ silent: true, loadFiles: false })
+        if (refresh) {
+          await this.fetchOrders({ silent: true, loadFiles: false })
+        }
       } catch (error) {
         console.error('Inline status error:', error)
 
@@ -9481,9 +9668,51 @@ async deleteCustomStatus(status) {
     : []
 },
 
+toggleBulkStatusMenu(event) {
+  if (this.bulkStatusMenuOpen) {
+    this.bulkStatusMenuOpen = false
+    return
+  }
+
+  const rect = event.currentTarget.getBoundingClientRect()
+  const width = Math.min(280, window.innerWidth - 24)
+  const left = Math.min(Math.max(12, rect.left), window.innerWidth - width - 12)
+
+  this.bulkStatusMenuStyle = {
+    position: "fixed",
+    top: `${Math.max(12, rect.top - 8)}px`,
+    bottom: "auto",
+    left: `${left}px`,
+    width: `${width}px`
+  }
+  this.bulkStatusMenuOpen = true
+},
+
 clearBulkSelection() {
   this.selectedOrders = []
   this.selectAll = false
+  this.bulkStatusLabel = ''
+  this.bulkStatusMenuOpen = false
+},
+
+async bulkChangeStatus() {
+  if (!this.selectedOrders.length || !this.bulkStatusLabel || this.bulkStatusSaving) return
+
+  const selectedIds = new Set(this.selectedOrders.map(Number))
+  const selected = this.orders.filter(order => selectedIds.has(Number(order.id)))
+  this.bulkStatusSaving = true
+
+  try {
+    await Promise.all(
+      selected.map(order =>
+        this.inlineChangeStatus(order, this.bulkStatusLabel, { refresh: false })
+      )
+    )
+    await this.fetchOrders({ silent: true, loadFiles: false })
+    this.clearBulkSelection()
+  } finally {
+    this.bulkStatusSaving = false
+  }
 },
 
 selectAllAvailableMembers() {
@@ -9634,6 +9863,126 @@ alert(e.response?.data?.message || 'Orders were not deleted')
         )
 
       return orderMatch && selectedClientMatch
+    },
+
+    orderMatchesAdvancedFilters(order) {
+      const statusText = String(order.status || '').trim().toLowerCase()
+      const paymentText = String(order.payment || 'Not Yet').trim().toLowerCase()
+
+      const statusMatch = !this.filterSelections.status.length ||
+        this.filterSelections.status.some(value =>
+          statusText.includes(String(value).trim().toLowerCase())
+        )
+
+      const paymentMatch = !this.filterSelections.payment.length ||
+        this.filterSelections.payment.some(value =>
+          paymentText.includes(String(value).trim().toLowerCase())
+        )
+
+      const selectedPriority = this.getOrderCustomOption(
+        order,
+        this.priorityColumn
+      )
+
+      const priorityText = String(selectedPriority?.label || '').trim().toLowerCase()
+      const priorityMatch = !this.filterSelections.priority.length ||
+        this.filterSelections.priority.some(value =>
+          priorityText.includes(String(value).trim().toLowerCase())
+        )
+
+      return statusMatch && paymentMatch && priorityMatch
+    },
+
+    filterSuggestionValues(values, query, selectedValues = []) {
+      const search = String(query || '').trim().toLowerCase()
+      if (!search) return []
+
+      const selected = new Set(
+        selectedValues.map(value => String(value).trim().toLowerCase())
+      )
+
+      return [...new Set((values || []).filter(Boolean).map(String))]
+        .filter(value =>
+          value.toLowerCase().includes(search) &&
+          !selected.has(value.toLowerCase())
+        )
+        .slice(0, 8)
+    },
+
+    addAdvancedFilter(type, rawValue) {
+      const value = String(rawValue || '').trim()
+      if (!value) return
+      if (!this.filterSelections[type]) return
+
+      const exists = this.filterSelections[type].some(
+        item => String(item).toLowerCase() === value.toLowerCase()
+      )
+
+      if (!exists) this.filterSelections[type].push(value)
+      if (!this.filterHistory[type].some(item => item.toLowerCase() === value.toLowerCase())) {
+        this.filterHistory[type].push(value)
+      }
+      this.filterSearches[type] = value
+      this.openAdvancedFilter = ''
+    },
+
+    isAdvancedFilterSelected(type, value) {
+      return (this.filterSelections[type] || []).includes(value)
+    },
+
+    toggleSavedFilter(type, value) {
+      if (this.isAdvancedFilterSelected(type, value)) {
+        this.removeAdvancedFilter(type, value)
+      } else {
+        this.filterSelections[type].push(value)
+        this.filterSearches[type] = value
+      }
+    },
+
+    deleteSavedFilter(type, value) {
+      this.removeAdvancedFilter(type, value)
+      this.filterHistory[type] = this.filterHistory[type]
+        .filter(item => item !== value)
+    },
+
+    removeAdvancedFilter(type, value) {
+      if (!this.filterSelections[type]) return
+      this.filterSelections[type] = this.filterSelections[type]
+        .filter(item => item !== value)
+
+      if (this.filterSearches[type] === value) {
+        this.filterSearches[type] =
+          this.filterSelections[type][this.filterSelections[type].length - 1] || ''
+      }
+    },
+
+    clearAdvancedFilter(type) {
+      if (!this.filterSelections[type]) return
+      this.filterSelections[type] = []
+      this.filterHistory[type] = []
+      this.filterSearches[type] = ''
+    },
+
+    toggleAdvancedFilter(type) {
+      const key = `saved:${type}`
+      this.openAdvancedFilter = this.openAdvancedFilter === key ? '' : key
+    },
+
+    openAdvancedFilterSearch(type, value) {
+      this.openAdvancedFilter = String(value || '').trim()
+        ? `search:${type}`
+        : ''
+    },
+
+    clearBoardFilters() {
+      this.selectedClient = ''
+      this.clientSearch = ''
+      this.filterSearches = { status: '', payment: '', priority: '' }
+      this.filterSelections = { status: [], payment: [], priority: [] }
+      this.filterHistory = { status: [], payment: [], priority: [] }
+      this.openAdvancedFilter = ''
+      this.selectAll = false
+      this.selectedOrders = []
     },
 
     // Mobile: select order and close left panel
@@ -10282,7 +10631,11 @@ closePreviewFile() {
 },
 
     async fetchOrders({ silent = false, loadFiles = true } = {}) {
-      if (!silent) this.loadingOrders = true
+      const loadingStartedAt = Date.now()
+      if (!silent) {
+        this.loadingProgress = 0
+        this.loadingOrders = true
+      }
       try {
         const previousOrders = new Map(
           this.orders.map(order => [Number(order.id), order])
@@ -10317,9 +10670,11 @@ closePreviewFile() {
           return freshOrder
         })
 
+        if (!silent) this.loadingProgress = 15
+
         // Load file thumbnails for every board row as well.
         // This keeps the 3 thumbnail previews visible after a full page refresh.
-        if (loadFiles) await this.loadBoardOrderFiles()
+        if (loadFiles) await this.loadBoardOrderFiles(!silent)
 
         /*
          * Preserve the SAME selected order after any refresh.
@@ -10344,19 +10699,51 @@ closePreviewFile() {
       } catch (e) {
         if (!silent) console.error('fetchOrders error:', e)
       } finally {
-        if (!silent) this.loadingOrders = false
+        if (!silent) {
+          const remainingLoadingTime = Math.max(
+            0,
+            2000 - (Date.now() - loadingStartedAt)
+          )
+
+          if (remainingLoadingTime) {
+            await new Promise(resolve =>
+              window.setTimeout(resolve, remainingLoadingTime)
+            )
+          }
+
+          this.loadingProgress = 100
+          await this.$nextTick()
+          await new Promise(resolve => window.setTimeout(resolve, 300))
+          this.loadingOrders = false
+        }
       }
     },
 
-    async loadBoardOrderFiles() {
-      if (!Array.isArray(this.orders) || !this.orders.length) return
+    async loadBoardOrderFiles(trackProgress = false) {
+      if (!Array.isArray(this.orders) || !this.orders.length) {
+        if (trackProgress) this.loadingProgress = 100
+        return
+      }
+
+      const totalOrders = this.orders.length
+      let completedOrders = 0
 
       await Promise.all(
         this.orders.map(async order => {
           try {
-            const res = await axios.get(`/api/orders/${order.id}/files`, {
-              headers: this.headers()
-            })
+            let res = null
+
+            for (let attempt = 1; attempt <= 2; attempt += 1) {
+              try {
+                res = await axios.get(`/api/orders/${order.id}/files`, {
+                  headers: this.headers()
+                })
+                break
+              } catch (error) {
+                if (attempt === 2) throw error
+                await new Promise(resolve => window.setTimeout(resolve, 250))
+              }
+            }
 
             const files = this.filesFromResponse(res.data)
 
@@ -10385,6 +10772,15 @@ closePreviewFile() {
             })
           } catch (error) {
             console.error(`Board files load error for order ${order.id}:`, error)
+          } finally {
+            completedOrders += 1
+
+            if (trackProgress) {
+              this.loadingProgress = Math.min(
+                100,
+                15 + Math.round((completedOrders / totalOrders) * 85)
+              )
+            }
           }
         })
       )
@@ -11377,6 +11773,7 @@ async onFileChange(event, card) {
       this.packingEditOrderId = null
       this.packingEditValue = ''
       this.openOrderMenuId = null
+      this.bulkStatusMenuOpen = false
       this.detailSearchOpen = false
       this.showShippingAddressMenu = false
       this.customFieldMenu = { order: null, column: null, top: 0, left: 0, width: 260 }
@@ -11501,14 +11898,21 @@ async onFileChange(event, card) {
     },
 
     openClientFilter() {
-      this.clientSearch = ''
+      const selected = this.availableClients.find(
+        client => Number(client.id) === Number(this.selectedClient)
+      )
+      this.clientSearch = selected?.name || selected?.email || ''
       this.clientFilterListOpen = false
       this.clientFilterOpen = true
     },
 
     selectClientFilter(clientId) {
       this.selectedClient = clientId
-      this.closeClientFilter()
+      const selected = this.availableClients.find(
+        client => Number(client.id) === Number(clientId)
+      )
+      this.clientSearch = selected?.name || selected?.email || ''
+      this.clientFilterListOpen = false
     },
 
     startResize() {
@@ -25346,5 +25750,296 @@ body.board-column-resizing .column-resizer::before {
     width: 36px !important;
     height: 46px !important;
   }
+}
+
+/* =========================================================
+   CURRENT TAB FILTERS
+========================================================= */
+.board-advanced-filters {
+  margin-top: 18px;
+  padding-top: 18px;
+  border-top: 1px solid #e5e7eb;
+  display: grid;
+  gap: 13px;
+}
+
+.board-filter-field {
+  display: grid;
+  gap: 7px;
+}
+
+.board-filter-field label {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  color: #334155;
+  font-size: 11px;
+  font-weight: 900;
+  letter-spacing: .35px;
+  text-transform: uppercase;
+}
+
+.board-filter-search-box {
+  position: relative;
+}
+
+.board-filter-search-box > i {
+  position: absolute;
+  left: 13px;
+  top: 50%;
+  transform: translateY(-50%);
+  color: #94a3b8;
+  font-size: 12px;
+  pointer-events: none;
+}
+
+.board-filter-search-box > input {
+  width: 100%;
+  height: 44px;
+  padding: 0 42px 0 38px;
+  border: 1px solid #cbd5e1;
+  border-radius: 10px;
+  background: #ffffff;
+  color: #0f172a;
+  outline: none;
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.board-filter-toggle {
+  position: absolute;
+  top: 5px;
+  right: 5px;
+  z-index: 3;
+  width: 34px;
+  height: 34px;
+  border: 0;
+  border-radius: 8px;
+  background: #eef2ff;
+  color: #4338ca;
+  cursor: pointer;
+}
+
+.board-filter-toggle i {
+  transition: transform .18s ease;
+}
+
+.board-filter-toggle i.rotate {
+  transform: rotate(180deg);
+}
+
+.board-filter-search-box > input:focus {
+  border-color: #6161ff;
+  box-shadow: 0 0 0 3px rgba(97, 97, 255, .12);
+}
+
+.board-filter-suggestions {
+  position: absolute;
+  top: calc(100% + 5px);
+  left: 0;
+  right: 0;
+  z-index: 30;
+  max-height: 190px;
+  padding: 5px;
+  overflow-y: auto;
+  border: 1px solid #dbe1e8;
+  border-radius: 9px;
+  background: #ffffff;
+  box-shadow: 0 12px 30px rgba(15, 23, 42, .16);
+}
+
+.board-filter-suggestions button {
+  width: 100%;
+  min-height: 35px;
+  padding: 7px 9px;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  color: #0f172a;
+  text-align: left;
+  font-size: 12px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.board-filter-suggestions button:hover {
+  background: #eef2ff;
+}
+
+.board-filter-suggestions > small {
+  display: block;
+  padding: 12px 9px;
+  color: #94a3b8;
+  text-align: center;
+  font-size: 11px;
+}
+
+.board-filter-dropdown-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 5px 7px 8px;
+  border-bottom: 1px solid #eef2f7;
+}
+
+.board-filter-dropdown-head strong {
+  color: #475569;
+  font-size: 10px;
+  text-transform: uppercase;
+}
+
+.board-filter-dropdown-head button {
+  width: auto;
+  min-height: 26px;
+  padding: 3px 7px;
+  color: #dc2626;
+  text-align: right;
+}
+
+.board-filter-suggestions .board-filter-selected-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 32px;
+  align-items: center;
+  gap: 3px;
+  margin: 4px 0;
+  padding: 3px;
+  border-radius: 7px;
+  background: #f8fafc;
+  color: #3730a3;
+}
+
+.board-filter-suggestions .board-filter-selected-row.active { background: #f1f1ff; box-shadow: inset 3px 0 0 #6161ff; }
+.board-filter-suggestions .board-filter-select-saved { display:flex; align-items:center; justify-content:space-between; gap:8px; min-width:0; color:#3730a3; }
+.board-filter-select-saved span { overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.board-filter-suggestions .board-filter-delete-saved { width:30px; min-width:30px; padding:0; display:grid; place-items:center; color:#dc2626; }
+.board-filter-suggestions .board-filter-delete-saved:hover { background:#fee2e2; }
+
+.bulk-status-control {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+}
+
+.bulk-status-trigger {
+  min-width: 170px;
+  height: 36px;
+  padding: 0 11px;
+  border: 1px solid #cbd5e1;
+  border-radius: 8px;
+  background: #ffffff;
+  color: #111827;
+  display: grid;
+  grid-template-columns: 18px minmax(0, 1fr) 14px;
+  align-items: center;
+  gap: 7px;
+  text-align: left;
+  font-size: 12px;
+  font-weight: 800;
+}
+
+.bulk-status-trigger .fa-chevron-down { transition: transform .18s ease; }
+.bulk-status-trigger .fa-chevron-down.rotate { transform: rotate(180deg); }
+.bulk-status-dropdown { position:absolute; top:auto; bottom:calc(100% + 8px); left:0; z-index:2147483000; width:280px; max-height:min(430px,70vh); overflow-y:auto; padding:7px; border:1px solid #e2e8f0; border-radius:13px; background:#fff; box-shadow:0 18px 45px rgba(15,23,42,.22); }
+.bulk-status-head { display:flex; align-items:flex-start; justify-content:space-between; gap:10px; padding:8px 7px 11px; margin-bottom:5px; border-bottom:1px solid #eef2f7; color:#0f172a; }
+.bulk-status-head strong,.bulk-status-head small { display:block; }
+.bulk-status-head strong { font-size:13px; }
+.bulk-status-head small { margin-top:3px; color:#64748b; font-size:10px; }
+.bulk-status-head > button { width:29px; min-width:29px; height:29px; padding:0; border:0; border-radius:7px; background:#f1f5f9; color:#475569; display:grid; place-items:center; }
+.bulk-status-option { width:100%; min-height:39px; padding:7px 9px; border:0; border-radius:8px; background:transparent; color:#334155; display:grid; grid-template-columns:10px minmax(0,1fr) 16px; align-items:center; gap:9px; text-align:left; }
+.bulk-status-option > span { width:9px; height:9px; border-radius:50%; }
+.bulk-status-option strong { overflow:hidden; text-overflow:ellipsis; white-space:nowrap; font-size:11px; }
+.bulk-status-option:hover,.bulk-status-option.active { background:#f1f3f6; }
+.bulk-status-option.active { box-shadow:inset 3px 0 0 #111827; }
+.bulk-status-apply { position:sticky; bottom:0; width:100%; min-height:39px; margin-top:7px; padding:0 12px; border:0; border-radius:8px; background:#111827; color:#fff; display:flex; align-items:center; justify-content:center; gap:7px; font-size:11px; font-weight:800; }
+.bulk-status-control button:disabled {
+  opacity: .5;
+  cursor: not-allowed;
+}
+
+/* Requested chat notification colors. */
+.factory-notification-portal .chat-notification-badge,
+.factory-notification-portal .notification-tabs button:first-child > span {
+  background: #ef4444 !important;
+  color: #ffffff !important;
+  border-color: #ef4444 !important;
+}
+
+/* Ctrl+A remains scoped to the focused hover box. */
+.global-copyable-tooltip:focus {
+  outline: 2px solid rgba(255, 255, 255, .35);
+  outline-offset: 2px;
+}
+
+.board-filter-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 5px;
+}
+
+.board-filter-chips button {
+  min-height: 27px;
+  padding: 4px 8px;
+  border: 0;
+  border-radius: 999px;
+  background: #e8eaff;
+  color: #3730a3;
+  font-size: 10px;
+  font-weight: 800;
+  cursor: pointer;
+}
+
+.board-filter-chips button i {
+  margin-left: 4px;
+}
+
+.board-filter-clear {
+  width: 100%;
+  height: 42px;
+  border: 0;
+  border-radius: 10px;
+  background: #111827;
+  color: #ffffff;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  font-size: 12px;
+  font-weight: 800;
+  cursor: pointer;
+}
+
+/* Keep every row hidden until its complete file data is ready. */
+.factory-board-page .prosix-loading-state {
+  min-height: 220px;
+}
+
+.factory-board-page .board-table-row.orders-loading-hidden {
+  display: none !important;
+}
+
+.orders-loading-percent {
+  margin-top: 8px;
+  color: #111827;
+  font-size: 26px;
+  line-height: 1;
+  font-weight: 900;
+}
+
+.orders-loading-track {
+  width: min(360px, calc(100% - 40px));
+  height: 8px;
+  margin-top: 10px;
+  overflow: hidden;
+  border-radius: 999px;
+  background: #dfe3e8;
+}
+
+.orders-loading-track > span {
+  display: block;
+  height: 100%;
+  border-radius: inherit;
+  background: linear-gradient(90deg, #3157ff, #6161ff);
+  transition: width .22s ease;
 }
 </style>
