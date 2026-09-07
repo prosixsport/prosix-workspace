@@ -9,6 +9,7 @@ use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Mail;
+use Illuminate\Support\Facades\Storage;
 use Illuminate\Validation\Rule;
 use Throwable;
 
@@ -218,6 +219,23 @@ class ClientController extends Controller
                 'max:2000',
             ],
 
+            'source_of_contact' => ['nullable', 'string', 'max:100'],
+            'country' => ['nullable', 'string', 'max:100'],
+            'city_state' => ['nullable', 'string', 'max:150'],
+            'price_list' => ['nullable', 'string'],
+            'lead_status' => [
+                'nullable',
+                Rule::in(['new', 'contacted', 'qualified', 'proposal', 'negotiation', 'won', 'lost', 'follow_up']),
+            ],
+            'team_name' => ['nullable', 'string', 'max:255'],
+            'notes' => ['nullable', 'string'],
+            'price_list_files' => ['nullable', 'array', 'max:10'],
+            'price_list_files.*' => [
+                'file',
+                'mimes:jpg,jpeg,png,webp,pdf,doc,docx,xls,xlsx,csv,txt',
+                'max:10240',
+            ],
+
             'status' => [
                 'required',
                 Rule::in([
@@ -261,6 +279,13 @@ class ClientController extends Controller
                     'phone' => $data['phone'] ?? null,
                     'company' => $data['company'] ?? null,
                     'address' => $data['address'] ?? null,
+                    'source_of_contact' => $data['source_of_contact'] ?? null,
+                    'country' => $data['country'] ?? null,
+                    'city_state' => $data['city_state'] ?? null,
+                    'price_list' => $data['price_list'] ?? null,
+                    'lead_status' => $data['lead_status'] ?? 'new',
+                    'team_name' => $data['team_name'] ?? null,
+                    'notes' => $data['notes'] ?? null,
                     'status' => $data['status'],
                     'created_by' => $request->user()->id,
                 ]);
@@ -270,6 +295,8 @@ class ClientController extends Controller
                     'client' => $client,
                 ];
             });
+
+            $this->addPriceListFiles($request, $result['client']);
 
             /*
              * Local testing ke liye welcome email direct send hogi.
@@ -284,7 +311,7 @@ class ClientController extends Controller
             return response()->json([
                 'success' => true,
                 'message' => 'Client added successfully. Welcome email has been sent.',
-                'client' => $result['client']->load('user'),
+                'client' => $result['client']->fresh()->load('user'),
             ], 201);
         } catch (Throwable $exception) {
             report($exception);
@@ -359,6 +386,24 @@ class ClientController extends Controller
                 'max:2000',
             ],
 
+            'source_of_contact' => ['nullable', 'string', 'max:100'],
+            'country' => ['nullable', 'string', 'max:100'],
+            'city_state' => ['nullable', 'string', 'max:150'],
+            'price_list' => ['nullable', 'string'],
+            'lead_status' => [
+                'nullable',
+                Rule::in(['new', 'contacted', 'qualified', 'proposal', 'negotiation', 'won', 'lost', 'follow_up']),
+            ],
+            'team_name' => ['nullable', 'string', 'max:255'],
+            'notes' => ['nullable', 'string'],
+            'price_list_files' => ['nullable', 'array', 'max:10'],
+            'price_list_files.*' => [
+                'file',
+                'mimes:jpg,jpeg,png,webp,pdf,doc,docx,xls,xlsx,csv,txt',
+                'max:10240',
+            ],
+            'keep_price_list_file_ids' => ['nullable', 'string'],
+
             'status' => [
                 'required',
                 Rule::in([
@@ -419,16 +464,25 @@ class ClientController extends Controller
                     'phone' => $data['phone'] ?? null,
                     'company' => $data['company'] ?? null,
                     'address' => $data['address'] ?? null,
+                    'source_of_contact' => $data['source_of_contact'] ?? null,
+                    'country' => $data['country'] ?? null,
+                    'city_state' => $data['city_state'] ?? null,
+                    'price_list' => $data['price_list'] ?? null,
+                    'lead_status' => $data['lead_status'] ?? 'new',
+                    'team_name' => $data['team_name'] ?? null,
+                    'notes' => $data['notes'] ?? null,
                     'status' => $data['status'],
                 ]);
 
                 return $client;
             });
 
+            $this->syncPriceListFiles($request, $client);
+
             return response()->json([
                 'success' => true,
                 'message' => 'Client updated successfully.',
-                'client' => $client->load('user'),
+                'client' => $client->fresh()->load('user'),
             ]);
         } catch (Throwable $exception) {
             report($exception);
@@ -449,6 +503,8 @@ class ClientController extends Controller
     public function destroy(Client $client): JsonResponse
     {
         try {
+            Storage::disk('public')->deleteDirectory("clients/{$client->id}");
+
             DB::transaction(function () use ($client) {
                 $user = $client->user_id
                     ? User::find($client->user_id)
@@ -485,5 +541,46 @@ class ClientController extends Controller
                 'message' => 'Client delete nahi ho saka.',
             ], 500);
         }
+    }
+
+    private function addPriceListFiles(Request $request, Client $client): void
+    {
+        $savedFiles = $client->price_list_files ?? [];
+
+        foreach ($request->file('price_list_files', []) as $file) {
+            $path = $file->store("clients/{$client->id}/price-lists", 'public');
+
+            $savedFiles[] = [
+                'id' => (string) \Illuminate\Support\Str::uuid(),
+                'name' => $file->getClientOriginalName(),
+                'path' => $path,
+                'url' => '/storage/' . ltrim($path, '/'),
+                'mime_type' => $file->getClientMimeType(),
+                'size' => $file->getSize(),
+            ];
+        }
+
+        if ($request->hasFile('price_list_files')) {
+            $client->update(['price_list_files' => $savedFiles]);
+        }
+    }
+
+    private function syncPriceListFiles(Request $request, Client $client): void
+    {
+        $existingFiles = $client->price_list_files ?? [];
+        $keepIds = json_decode($request->input('keep_price_list_file_ids', '[]'), true);
+        $keepIds = is_array($keepIds) ? array_map('strval', $keepIds) : [];
+
+        $keptFiles = [];
+        foreach ($existingFiles as $file) {
+            if (in_array((string) ($file['id'] ?? ''), $keepIds, true)) {
+                $keptFiles[] = $file;
+            } else if (!empty($file['path'])) {
+                Storage::disk('public')->delete($file['path']);
+            }
+        }
+
+        $client->update(['price_list_files' => $keptFiles]);
+        $this->addPriceListFiles($request, $client->fresh());
     }
 }

@@ -19,6 +19,7 @@
         class="header-board-admin-tools"
         @click.stop
       >
+
         <span class="header-owner-toggle-label">SELECT OWNER</span>
         <button
           type="button"
@@ -58,7 +59,7 @@
             type="button"
             :class="{ active: notificationTab === 'chats' }"
             @click.stop="notificationTab = 'chats'"
-          >
+        >
             <i class="fa-solid fa-comments"></i>
             Chats
             <span v-if="totalUnreadChatCount > 0">
@@ -26009,7 +26010,7 @@ body.board-column-resizing .column-resizer::before {
   cursor: pointer;
 }
 
-/* Keep every row hidden until its complete file data is ready. */
+/* Keep every  row hidden until its complete file data is ready. */
 .factory-board-page .prosix-loading-state {
   min-height: 220px;
 }
