@@ -13,6 +13,7 @@
   :photo="currentUser?.profile_photo_url"
   @profile="openCurrentUserProfilePage"
 >
+
   <template #notifications>
       <div
         v-if="isSuperAdmin"

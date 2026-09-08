@@ -74,19 +74,17 @@
 
                                 <td data-label="Files">
                                     <div v-if="clientPriceFiles(client).length" class="client-table-files">
-                                        <a
+                                        <button
                                             v-for="file in clientPriceFiles(client).slice(0, 2)"
                                             :key="file.id"
-                                            :href="priceListFileUrl(file)"
-                                            target="_blank"
-                                            rel="noopener"
+                                            type="button"
                                             :title="file.name"
-                                            @click.stop
+                                            @click.stop="openFileViewer(client, file)"
                                         >
                                             <img v-if="isImageFile(file)" :src="priceListFileUrl(file)" :alt="file.name" />
                                             <i v-else :class="fileIcon(file)"></i>
-                                        </a>
-                                        <button v-if="clientPriceFiles(client).length > 2" type="button" @click="openClientDetails(client)">
+                                        </button>
+                                        <button v-if="clientPriceFiles(client).length > 2" type="button" @click.stop="openFileViewer(client, clientPriceFiles(client)[2])">
                                             +{{ clientPriceFiles(client).length - 2 }}
                                         </button>
                                     </div>
@@ -160,18 +158,18 @@
 
                         <div v-if="clientPriceFiles(selectedClient).length" class="details-file-grid">
                             <article v-for="file in clientPriceFiles(selectedClient)" :key="file.id" class="details-file-card">
-                                <a :href="priceListFileUrl(file)" target="_blank" rel="noopener" class="details-file-preview">
+                                <button type="button" class="details-file-preview" @click="openFileViewer(selectedClient, file)">
                                     <img v-if="isImageFile(file)" :src="priceListFileUrl(file)" :alt="file.name" />
                                     <i v-else :class="fileIcon(file)"></i>
-                                </a>
+                                </button>
                                 <div class="details-file-copy">
                                     <strong :title="file.name">{{ file.name }}</strong>
                                     <small>{{ formatFileSize(file.size) }}</small>
                                 </div>
                                 <div class="details-file-actions">
-                                    <a :href="priceListFileUrl(file)" target="_blank" rel="noopener" title="View file">
+                                    <button type="button" title="View file" @click="openFileViewer(selectedClient, file)">
                                         <i class="fa-solid fa-eye"></i>
-                                    </a>
+                                    </button>
                                     <a :href="priceListFileUrl(file)" :download="file.name" title="Download file">
                                         <i class="fa-solid fa-download"></i>
                                     </a>
@@ -190,6 +188,48 @@
                     </button>
                 </div>
             </div>
+
+            <Teleport to="body">
+                <div v-if="fileViewerOpen && activePreviewFile" class="client-file-viewer-overlay" @click.self="closeFileViewer">
+                    <section class="client-file-viewer" role="dialog" aria-modal="true" aria-label="File preview">
+                        <header class="client-file-viewer-head">
+                            <div>
+                                <strong :title="activePreviewFile.name">{{ activePreviewFile.name }}</strong>
+                                <small>{{ fileViewerIndex + 1 }} of {{ fileViewerFiles.length }}</small>
+                            </div>
+                            <div class="client-file-viewer-actions">
+                                <a :href="priceListFileUrl(activePreviewFile)" :download="activePreviewFile.name" title="Download">
+                                    <i class="fa-solid fa-download"></i>
+                                </a>
+                                <button type="button" title="Close" @click="closeFileViewer">×</button>
+                            </div>
+                        </header>
+
+                        <div class="client-file-viewer-body">
+                            <button v-if="fileViewerFiles.length > 1" type="button" class="viewer-arrow viewer-prev" title="Previous file" @click="previousFile">
+                                <i class="fa-solid fa-chevron-left"></i>
+                            </button>
+
+                            <div class="client-file-viewer-stage">
+                                <img v-if="isImageFile(activePreviewFile)" :src="priceListFileUrl(activePreviewFile)" :alt="activePreviewFile.name" />
+                                <iframe v-else-if="isPdfFile(activePreviewFile)" :src="priceListFileUrl(activePreviewFile)" :title="activePreviewFile.name"></iframe>
+                                <div v-else class="viewer-file-fallback">
+                                    <i :class="fileIcon(activePreviewFile)"></i>
+                                    <strong>{{ activePreviewFile.name }}</strong>
+                                    <p>This file cannot be previewed in the browser.</p>
+                                    <a :href="priceListFileUrl(activePreviewFile)" :download="activePreviewFile.name">
+                                        <i class="fa-solid fa-download"></i> Download File
+                                    </a>
+                                </div>
+                            </div>
+
+                            <button v-if="fileViewerFiles.length > 1" type="button" class="viewer-arrow viewer-next" title="Next file" @click="nextFile">
+                                <i class="fa-solid fa-chevron-right"></i>
+                            </button>
+                        </div>
+                    </section>
+                </div>
+            </Teleport>
 
             <div v-if="modal" class="modal-overlay" @click.self="closeModal">
 
@@ -457,6 +497,12 @@ export default {
 
             selectedClient: null,
 
+            fileViewerOpen: false,
+
+            fileViewerFiles: [],
+
+            fileViewerIndex: 0,
+
             editingId: null,
 
             clients: [],
@@ -555,6 +601,10 @@ export default {
 
             }
 
+        },
+
+        activePreviewFile() {
+            return this.fileViewerFiles[this.fileViewerIndex] || null
         }
 
     },
@@ -603,6 +653,37 @@ export default {
             const mime = String(file?.mime_type || '').toLowerCase()
             const name = String(file?.name || '').toLowerCase()
             return mime.startsWith('image/') || /\.(jpg|jpeg|png|webp|gif)$/.test(name)
+        },
+
+        isPdfFile(file) {
+            const mime = String(file?.mime_type || '').toLowerCase()
+            const name = String(file?.name || '').toLowerCase()
+            return mime === 'application/pdf' || name.endsWith('.pdf')
+        },
+
+        openFileViewer(client, file) {
+            const files = this.clientPriceFiles(client)
+            if (!files.length) return
+            const index = files.findIndex(item => String(item.id) === String(file?.id))
+            this.fileViewerFiles = files
+            this.fileViewerIndex = index >= 0 ? index : 0
+            this.fileViewerOpen = true
+        },
+
+        closeFileViewer() {
+            this.fileViewerOpen = false
+            this.fileViewerFiles = []
+            this.fileViewerIndex = 0
+        },
+
+        previousFile() {
+            const total = this.fileViewerFiles.length
+            if (total) this.fileViewerIndex = (this.fileViewerIndex - 1 + total) % total
+        },
+
+        nextFile() {
+            const total = this.fileViewerFiles.length
+            if (total) this.fileViewerIndex = (this.fileViewerIndex + 1) % total
         },
 
         fileIcon(file) {
@@ -1061,15 +1142,35 @@ textarea { min-height: 80px; resize: vertical; }
 .details-section-title p { margin: 4px 0 0; color: #64748b; font-size: 10px; }
 .details-file-grid { display: grid; grid-template-columns: repeat(2, minmax(0,1fr)); gap: 9px; margin-top: 12px; }
 .details-file-card { min-width: 0; padding: 8px; border: 1px solid #e2e8f0; border-radius: 11px; background: #fff; display: grid; grid-template-columns: 48px minmax(0,1fr) auto; align-items: center; gap: 9px; }
-.details-file-preview { width: 48px; height: 48px; border-radius: 8px; background: #f1f5f9; color: #475569; display: grid; place-items: center; overflow: hidden; text-decoration: none; }
+.details-file-preview { width: 48px; height: 48px; padding: 0; border: 0; border-radius: 8px; background: #f1f5f9; color: #475569; display: grid; place-items: center; overflow: hidden; text-decoration: none; cursor: pointer; }
 .details-file-preview img { width: 100%; height: 100%; object-fit: cover; }
 .details-file-preview i { font-size: 21px; }
 .details-file-copy { min-width: 0; display: flex; flex-direction: column; gap: 4px; }
 .details-file-copy strong { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: #1e293b; font-size: 11px; }
 .details-file-copy small { color: #94a3b8; font-size: 9px; }
 .details-file-actions { display: flex; gap: 5px; }
-.details-file-actions a { width: 31px; height: 31px; border-radius: 7px; background: #eef2ff; color: #4338ca; display: grid; place-items: center; text-decoration: none; }
+.details-file-actions a, .details-file-actions button { width: 31px; height: 31px; padding: 0; border: 0; border-radius: 7px; background: #eef2ff; color: #4338ca; display: grid; place-items: center; text-decoration: none; cursor: pointer; }
 .details-file-actions a:last-child { background: #ecfdf5; color: #059669; }
+.client-file-viewer-overlay { position: fixed; inset: 0; z-index: 250000; padding: 24px; background: rgba(2,6,23,.78); backdrop-filter: blur(5px); display: grid; place-items: center; }
+.client-file-viewer { width: min(1180px, 96vw); height: min(850px, 93vh); overflow: hidden; border-radius: 18px; background: #fff; box-shadow: 0 30px 90px rgba(0,0,0,.45); display: flex; flex-direction: column; }
+.client-file-viewer-head { min-height: 70px; padding: 12px 16px 12px 20px; border-bottom: 1px solid #e2e8f0; display: flex; align-items: center; justify-content: space-between; gap: 16px; }
+.client-file-viewer-head > div:first-child { min-width: 0; display: flex; flex-direction: column; gap: 4px; }
+.client-file-viewer-head strong { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: #0f172a; font-size: 14px; }
+.client-file-viewer-head small { color: #64748b; font-size: 10px; font-weight: 800; }
+.client-file-viewer-actions { display: flex; align-items: center; gap: 8px; }
+.client-file-viewer-actions a, .client-file-viewer-actions button { width: 38px; height: 38px; padding: 0; border: 0; border-radius: 10px; background: #f1f5f9; color: #0f172a; display: grid; place-items: center; text-decoration: none; cursor: pointer; font-size: 20px; }
+.client-file-viewer-body { position: relative; min-height: 0; flex: 1; padding: 14px 66px; background: #e9edf3; display: grid; place-items: center; }
+.client-file-viewer-stage { position: relative; width: 100%; height: 100%; min-width: 0; min-height: 0; overflow: hidden; border-radius: 12px; background: #fff; display: flex; align-items: center; justify-content: center; }
+.client-file-viewer-stage > img { position: absolute !important; inset: 0 !important; width: 100% !important; height: 100% !important; max-width: 100% !important; max-height: 100% !important; margin: auto !important; object-fit: contain !important; object-position: center !important; transform: none !important; display: block !important; }
+.client-file-viewer-stage > iframe { width: 100%; height: 100%; border: 0; background: #fff; }
+.viewer-arrow { position: absolute; z-index: 2; top: 50%; width: 43px; height: 54px; transform: translateY(-50%); border: 0; border-radius: 12px; background: #fff; color: #0f172a; box-shadow: 0 8px 24px rgba(15,23,42,.2); cursor: pointer; }
+.viewer-prev { left: 12px; }
+.viewer-next { right: 12px; }
+.viewer-file-fallback { padding: 30px; text-align: center; color: #64748b; }
+.viewer-file-fallback > i { display: block; margin-bottom: 14px; color: #4f46e5; font-size: 64px; }
+.viewer-file-fallback strong { display: block; color: #0f172a; font-size: 15px; overflow-wrap: anywhere; }
+.viewer-file-fallback p { margin: 8px 0 18px; font-size: 11px; }
+.viewer-file-fallback a { min-height: 40px; padding: 0 16px; border-radius: 9px; background: #111827; color: #fff; display: inline-flex; align-items: center; gap: 8px; text-decoration: none; font-size: 11px; font-weight: 900; }
 .details-no-files { min-height: 90px; margin-top: 12px; border: 1px dashed #cbd5e1; border-radius: 11px; color: #94a3b8; display: flex; align-items: center; justify-content: center; flex-direction: column; gap: 7px; font-size: 11px; }
 .details-no-files i { font-size: 22px; }
 .details-edit-button { width: 100%; min-height: 43px; margin-top: 17px; border: 0; border-radius: 10px; background: #111827; color: #fff; font-weight: 900; cursor: pointer; }
@@ -1129,7 +1230,13 @@ textarea { min-height: 80px; resize: vertical; }
     .details-grid { grid-template-columns: repeat(2, minmax(0,1fr)); }
     .detail-item.wide { grid-column: 1 / -1; }
     .details-file-grid { grid-template-columns: 1fr; }
+    .client-file-viewer-overlay { padding: 8px; }
+    .client-file-viewer { width: 100%; height: 94vh; border-radius: 14px; }
+    .client-file-viewer-body { padding: 8px 45px; }
+    .viewer-arrow { width: 36px; height: 48px; border-radius: 9px; }
+    .viewer-prev { left: 5px; }
+    .viewer-next { right: 5px; }
 
 }
- 
+
 </style>
