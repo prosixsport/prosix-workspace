@@ -10659,9 +10659,8 @@ closePreviewFile() {
 },
 
     async fetchOrders({ silent = false, loadFiles = true } = {}) {
-      const loadingStartedAt = Date.now()
       if (!silent) {
-        this.loadingProgress = 0
+        this.loadingProgress = 5
         this.loadingOrders = true
       }
       try {
@@ -10673,7 +10672,10 @@ closePreviewFile() {
           previousOrders.set(Number(this.selectedOrder.id), this.selectedOrder)
         }
 
-        const res = await axios.get('/api/orders', { headers: this.headers() })
+        const res = await axios.get('/api/orders', {
+          headers: this.headers(),
+          timeout: 20000
+        })
         const list = Array.isArray(res.data) ? res.data : (res.data?.data || [])
         this.orders = list.map(rawOrder => {
           const freshOrder = this.formatOrder(rawOrder)
@@ -10698,11 +10700,15 @@ closePreviewFile() {
           return freshOrder
         })
 
-        if (!silent) this.loadingProgress = 15
+        if (!silent) this.loadingProgress = 85
 
-        // Load file thumbnails for every board row as well.
-        // This keeps the 3 thumbnail previews visible after a full page refresh.
-        if (loadFiles) await this.loadBoardOrderFiles(!silent)
+        // Never block the complete board behind hundreds of file requests.
+        // Rows appear immediately; thumbnails hydrate safely in background.
+        if (loadFiles) {
+          this.loadBoardOrderFiles(false).catch(error => {
+            console.error('Background order files error:', error)
+          })
+        }
 
         /*
          * Preserve the SAME selected order after any refresh.
@@ -10725,23 +10731,21 @@ closePreviewFile() {
           }
         }
       } catch (e) {
-        if (!silent) console.error('fetchOrders error:', e)
+        console.error('fetchOrders error:', e)
+
+        if (!silent) {
+          const timedOut = e.code === 'ECONNABORTED'
+          alert(
+            timedOut
+              ? 'Orders server response is taking too long. Please try again.'
+              : (e.response?.data?.message || 'Orders could not be loaded.')
+          )
+        }
       } finally {
         if (!silent) {
-          const remainingLoadingTime = Math.max(
-            0,
-            2000 - (Date.now() - loadingStartedAt)
-          )
-
-          if (remainingLoadingTime) {
-            await new Promise(resolve =>
-              window.setTimeout(resolve, remainingLoadingTime)
-            )
-          }
-
           this.loadingProgress = 100
           await this.$nextTick()
-          await new Promise(resolve => window.setTimeout(resolve, 300))
+          await new Promise(resolve => window.setTimeout(resolve, 80))
           this.loadingOrders = false
         }
       }
@@ -10756,8 +10760,13 @@ closePreviewFile() {
       const totalOrders = this.orders.length
       let completedOrders = 0
 
-      await Promise.all(
-        this.orders.map(async order => {
+      const queue = [...this.orders]
+      const workerCount = Math.min(6, queue.length)
+
+      const loadNextFileSet = async () => {
+        while (queue.length) {
+          const order = queue.shift()
+
           try {
             let res = null
 
@@ -10810,7 +10819,11 @@ closePreviewFile() {
               )
             }
           }
-        })
+        }
+      }
+
+      await Promise.all(
+        Array.from({ length: workerCount }, () => loadNextFileSet())
       )
     },
 
