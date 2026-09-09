@@ -6196,12 +6196,43 @@ beforeUnmount()  {
         String(status.label).trim().toLowerCase() === 'shipped'
       const shippedBy = isShipped ? this.currentUser : null
 
+      const previous = {
+        status: order.status,
+        statusColor: order.statusColor,
+        group: order.group,
+        finished_by: order.finished_by
+      }
+
+      const targetGroup = status.group || this.statusToGroup(status.label)
+      const targetColor = this.statusColor(status.label, status.color || '#6161ff')
+
+      // Optimistic update: row moves to the correct tab immediately.
+      order.status = status.label
+      order.statusColor = targetColor
+      order.group = targetGroup
+
+      if (isShipped && shippedBy) {
+        this.markOrderFinished(order.id, shippedBy)
+        order.finished_by = shippedBy
+      }
+
+      if (
+        this.selectedOrder &&
+        Number(this.selectedOrder.id) === Number(order.id)
+      ) {
+        this.selectedOrder.status = status.label
+        this.selectedOrder.statusColor = targetColor
+        this.selectedOrder.group = targetGroup
+      }
+
+      this.orders = [...this.orders]
+
       try {
         await axios.put(
           `/api/orders/${order.id}`,
           {
             status: status.label,
-            status_color: status.color,
+            status_color: targetColor,
             ...(isShipped && shippedBy
               ? {
                   shipped_by_user_id: shippedBy.id,
@@ -6214,35 +6245,31 @@ beforeUnmount()  {
           }
         )
 
-        order.status = status.label
-        order.statusColor = status.color
-        const targetGroup = status.group || this.statusToGroup(status.label)
-        order.group = targetGroup
-
         if (isShipped && shippedBy) {
-          this.markOrderFinished(order.id, shippedBy)
-          order.finished_by = shippedBy
-
           if (activeWorker) {
-            await this.finishWorkForShippedOrder(order, shippedBy)
+            this.finishWorkForShippedOrder(order, shippedBy).catch(error => {
+              console.error('Finish work sync error:', error)
+            })
           }
         }
+      } catch (error) {
+        // Restore the row only when the server rejects the save.
+        order.status = previous.status
+        order.statusColor = previous.statusColor
+        order.group = previous.group
+        order.finished_by = previous.finished_by
 
         if (
           this.selectedOrder &&
           Number(this.selectedOrder.id) === Number(order.id)
         ) {
-          this.selectedOrder.status = status.label
-          this.selectedOrder.statusColor = status.color
-          this.selectedOrder.group = order.group
+          this.selectedOrder.status = previous.status
+          this.selectedOrder.statusColor = previous.statusColor
+          this.selectedOrder.group = previous.group
+          this.selectedOrder.finished_by = previous.finished_by
         }
 
-        // Force the active tab list/counts to react immediately.
         this.orders = [...this.orders]
-        if (refresh) {
-          await this.fetchOrders({ silent: true, loadFiles: false })
-        }
-      } catch (error) {
         console.error('Inline status error:', error)
 
         alert(
@@ -9710,7 +9737,6 @@ async bulkChangeStatus() {
         this.inlineChangeStatus(order, this.bulkStatusLabel, { refresh: false })
       )
     )
-    await this.fetchOrders({ silent: true, loadFiles: false })
     this.clearBulkSelection()
   } finally {
     this.bulkStatusSaving = false
@@ -10829,7 +10855,7 @@ async fetchClients() {
         shipDate: order.ship_date ? this.formatDate(order.ship_date) : 'TBD',
         shipDateRaw: order.ship_date || '',
         status,
-        statusColor: order.status_color || this.statusColor(status),
+        statusColor: this.statusColor(status, order.status_color || '#fdab3d'),
         trk: order.trk || 'N/A',
         payment: order.payment || 'Not Yet',
         paymentReceived: order.payment_received || 0,
@@ -10975,9 +11001,28 @@ async fetchClients() {
       }
     },
 
-    statusColor(status) {
-      const found = this.statusOptions.find(s => s.label === status)
-      return found ? found.color : '#fdab3d'
+    statusColor(status, fallback = '#fdab3d') {
+      const normalized = String(status || '').trim().toLowerCase()
+
+      // A status whose name matches a top tab must always use that tab's
+      // exact color. This fixes old Shipped rows saved with a green color.
+      const matchingTab = this.boardGroups.find(group => {
+        const tabLabel = String(group.label || '').trim().toLowerCase()
+        const configuredLabel = String(
+          this.defaultBoardGroupOverrides?.[group.key]?.label || ''
+        ).trim().toLowerCase()
+
+        return normalized === tabLabel || normalized === configuredLabel
+      })
+
+      if (matchingTab?.color) return matchingTab.color
+
+      const found = this.statusOptions.find(
+        option =>
+          String(option.label || '').trim().toLowerCase() === normalized
+      )
+
+      return found?.color || fallback
     },
 
     initial(name) { return name ? name.charAt(0).toUpperCase() : '?' },
@@ -11253,14 +11298,43 @@ shipping_address: this.newOrder.shippingAddress,
 
     async changeStatus(s) {
       if (!this.canChangeOrderStatus || !this.selectedOrder) return
-      const activeWorker = this.workingDesigner(this.selectedOrder)
+      const order = this.selectedOrder
+      const activeWorker = this.workingDesigner(order)
       const isShipped =
         String(s.label || '').trim().toLowerCase() === 'shipped'
       const shippedBy = isShipped ? this.currentUser : null
+
+      const previous = {
+        status: order.status,
+        statusColor: order.statusColor,
+        group: order.group,
+        finished_by: order.finished_by
+      }
+
+      const targetGroup = s.group || this.statusToGroup(s.label)
+      const targetColor = this.statusColor(s.label, s.color || '#6161ff')
+
+      order.status = s.label
+      order.statusColor = targetColor
+      order.group = targetGroup
+      this.showStatusMenu = false
+
+      if (isShipped && shippedBy) {
+        this.markOrderFinished(order.id, shippedBy)
+        order.finished_by = shippedBy
+      }
+
+      const localIndex = this.orders.findIndex(
+        item => Number(item.id) === Number(order.id)
+      )
+
+      if (localIndex !== -1) this.orders[localIndex] = { ...order }
+      this.orders = [...this.orders]
+
       try {
-        await axios.put(`/api/orders/${this.selectedOrder.id}`, {
+        await axios.put(`/api/orders/${order.id}`, {
           status: s.label,
-          status_color: s.color || '#6161ff',
+          status_color: targetColor,
           ...(isShipped && shippedBy
             ? {
                 shipped_by_user_id: shippedBy.id,
@@ -11268,24 +11342,25 @@ shipping_address: this.newOrder.shippingAddress,
               }
             : {})
         }, { headers: this.headers() })
-        this.selectedOrder.status = s.label
-        this.selectedOrder.statusColor = s.color || '#6161ff'
-        const targetGroup = s.group || this.statusToGroup(s.label)
-        this.selectedOrder.group = targetGroup
         if (isShipped && shippedBy) {
-          this.markOrderFinished(this.selectedOrder.id, shippedBy)
-          this.selectedOrder.finished_by = shippedBy
-
           if (activeWorker) {
-            await this.finishWorkForShippedOrder(this.selectedOrder, shippedBy)
+            this.finishWorkForShippedOrder(order, shippedBy).catch(error => {
+              console.error('Finish work sync error:', error)
+            })
           }
         }
-        const idx = this.orders.findIndex(o => o.id === this.selectedOrder.id)
-        if (idx !== -1) this.orders[idx] = { ...this.selectedOrder }
+      } catch (e) {
+        order.status = previous.status
+        order.statusColor = previous.statusColor
+        order.group = previous.group
+        order.finished_by = previous.finished_by
+
+        if (localIndex !== -1) this.orders[localIndex] = { ...order }
         this.orders = [...this.orders]
-        this.showStatusMenu = false
-        await this.fetchOrders({ silent: true, loadFiles: false })
-      } catch (e) { console.error('changeStatus error:', e) }
+
+        console.error('changeStatus error:', e)
+        alert(e.response?.data?.message || 'Status could not be updated.')
+      }
     },
 
   async updateShipDate(event) {
