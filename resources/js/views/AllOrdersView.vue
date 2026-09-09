@@ -26033,7 +26033,7 @@ body.board-column-resizing .column-resizer::before {
   height: 8px;
   margin-top: 10px;
   overflow: hidden;
-  border-radius: 999px;
+  border-radius: 1000px;
   background: #dfe3e8;
 }
 
