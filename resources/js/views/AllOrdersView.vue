@@ -3047,6 +3047,13 @@ import AppLayout from '../layouts/AppLayout.vue'
 import PageHeader from '../layouts/PageHeader.vue'
 import 'vue-multiselect/dist/vue-multiselect.min.css'
 
+// Memory cache survives Vue Router tab changes. It resets only on full refresh.
+const factoryBoardMemoryCache = {
+  orders: null,
+  members: null,
+  clients: null
+}
+
 export default {
   name: 'AllOrdersView',
   components: { Multiselect, OrderChatPanel, AppLayout, PageHeader },
@@ -3202,6 +3209,9 @@ export default {
       notificationTimer: null,
       sharedBoardTimer: null,
       orderSyncTimer: null,
+      ordersFetchSequence: 0,
+      ordersAppliedSequence: 0,
+      statusMutationLocks: {},
       chatSyncTimer: null,
       noteClockTimer: null,
       nowTick: Date.now(),
@@ -3840,11 +3850,21 @@ async mounted() {
   this.loadDefaultBoardGroupOverrides()
   await this.fetchBoardConfiguration()
 
-  await Promise.all([
-    this.fetchOrders(),
-    this.fetchMembers(),
-    this.fetchClients()
-  ])
+  const hasBoardCache = Array.isArray(factoryBoardMemoryCache.orders)
+
+  if (hasBoardCache) {
+    this.orders = factoryBoardMemoryCache.orders
+    this.availableMembers = factoryBoardMemoryCache.members || []
+    this.availableClients = factoryBoardMemoryCache.clients || []
+    this.loadingProgress = 100
+    this.loadingOrders = false
+  } else {
+    await Promise.all([
+      this.fetchOrders(),
+      this.fetchMembers(),
+      this.fetchClients()
+    ])
+  }
   if ('Notification' in window) {
     Notification.requestPermission()
   }
@@ -3858,7 +3878,7 @@ async mounted() {
   )
   this.orderSyncTimer = window.setInterval(
     () => {
-      if (!this.textEditing) {
+      if (!this.textEditing && !Object.keys(this.statusMutationLocks).length) {
         this.fetchOrders({ silent: true, loadFiles: false })
       }
     },
@@ -3899,6 +3919,52 @@ async mounted() {
 }
   },
 
+activated() {
+  // KeepAlive return: show cached board instantly and restart only background sync.
+  this.loadingOrders = false
+  this.loadingProgress = 100
+
+  if (!this.sharedBoardTimer) {
+    this.sharedBoardTimer = window.setInterval(
+      () => this.fetchBoardConfiguration({ silent: true }),
+      3000
+    )
+  }
+
+  if (!this.orderSyncTimer) {
+    this.orderSyncTimer = window.setInterval(() => {
+      if (!this.textEditing && !Object.keys(this.statusMutationLocks).length) {
+        this.fetchOrders({ silent: true, loadFiles: false })
+      }
+    }, 4000)
+  }
+
+  if (!this.chatSyncTimer) {
+    this.chatSyncTimer = window.setInterval(() => {
+      if (this.showChat && this.selectedOrder?.id) {
+        this.fetchMessages(this.selectedOrder.id, { silent: true })
+      }
+    }, 1500)
+  }
+
+  if (!this.noteClockTimer) {
+    this.noteClockTimer = window.setInterval(() => {
+      this.nowTick = Date.now()
+    }, 15000)
+  }
+},
+
+deactivated() {
+  clearInterval(this.sharedBoardTimer)
+  clearInterval(this.orderSyncTimer)
+  clearInterval(this.chatSyncTimer)
+  clearInterval(this.noteClockTimer)
+  this.sharedBoardTimer = null
+  this.orderSyncTimer = null
+  this.chatSyncTimer = null
+  this.noteClockTimer = null
+},
+
 beforeUnmount()  {
   document.removeEventListener('mousemove', this.resizeSidebar)
   document.removeEventListener('mouseup', this.stopResize)
@@ -3917,6 +3983,10 @@ beforeUnmount()  {
   clearInterval(this.orderSyncTimer)
   clearInterval(this.chatSyncTimer)
   clearInterval(this.noteClockTimer)
+  this.sharedBoardTimer = null
+  this.orderSyncTimer = null
+  this.chatSyncTimer = null
+  this.noteClockTimer = null
   clearTimeout(this.columnOrderSaveTimer)
   document.body.style.overflow = ''
 },
@@ -6181,7 +6251,7 @@ beforeUnmount()  {
     },
 
     async inlineChangeStatus(order, label, { refresh = true } = {}) {
-      if (!this.canChangeOrderStatus) return
+      if (!this.canChangeOrderStatus) return false
 
       const status = this.workflowStatusOptions.find(
         item =>
@@ -6189,7 +6259,7 @@ beforeUnmount()  {
           String(label || '').trim().toLowerCase()
       )
 
-      if (!status) return
+      if (!status) return false
 
       const activeWorker = this.workingDesigner(order)
       const isShipped =
@@ -6205,6 +6275,19 @@ beforeUnmount()  {
 
       const targetGroup = status.group || this.statusToGroup(status.label)
       const targetColor = this.statusColor(status.label, status.color || '#6161ff')
+      const mutationToken = `${Date.now()}-${Math.random()}`
+
+      this.statusMutationLocks = {
+        ...this.statusMutationLocks,
+        [Number(order.id)]: {
+          token: mutationToken,
+          startedAt: Date.now(),
+          confirmedAt: null,
+          status: status.label,
+          statusColor: targetColor,
+          group: targetGroup
+        }
+      }
 
       // Optimistic update: row moves to the correct tab immediately.
       order.status = status.label
@@ -6228,7 +6311,7 @@ beforeUnmount()  {
       this.orders = [...this.orders]
 
       try {
-        await axios.put(
+        const response = await axios.put(
           `/api/orders/${order.id}`,
           {
             status: status.label,
@@ -6245,6 +6328,30 @@ beforeUnmount()  {
           }
         )
 
+        const savedOrder = response.data?.order || response.data
+        if (
+          savedOrder?.status &&
+          String(savedOrder.status).trim().toLowerCase() !==
+            String(status.label).trim().toLowerCase()
+        ) {
+          throw new Error('Server did not confirm the selected status.')
+        }
+
+        const currentLock = this.statusMutationLocks[Number(order.id)]
+        if (currentLock?.token === mutationToken) {
+          currentLock.confirmedAt = Date.now()
+          factoryBoardMemoryCache.orders = this.orders
+
+          window.setTimeout(() => {
+            const latestLock = this.statusMutationLocks[Number(order.id)]
+            if (latestLock?.token === mutationToken) {
+              const nextLocks = { ...this.statusMutationLocks }
+              delete nextLocks[Number(order.id)]
+              this.statusMutationLocks = nextLocks
+            }
+          }, 5000)
+        }
+
         if (isShipped && shippedBy) {
           if (activeWorker) {
             this.finishWorkForShippedOrder(order, shippedBy).catch(error => {
@@ -6252,7 +6359,18 @@ beforeUnmount()  {
             })
           }
         }
+
+        return true
       } catch (error) {
+        const currentLock = this.statusMutationLocks[Number(order.id)]
+
+        // Ignore an older failed request if a newer status was already chosen.
+        if (currentLock?.token !== mutationToken) return false
+
+        const nextLocks = { ...this.statusMutationLocks }
+        delete nextLocks[Number(order.id)]
+        this.statusMutationLocks = nextLocks
+
         // Restore the row only when the server rejects the save.
         order.status = previous.status
         order.statusColor = previous.statusColor
@@ -6276,6 +6394,8 @@ beforeUnmount()  {
           error.response?.data?.message ||
           'Status could not be updated.'
         )
+
+        return false
       }
     },
 
@@ -8751,6 +8871,13 @@ body.board-column-resizing .column-resizer::before {
       this.rowStatusMenuId = id
     },
 
+    closeRowStatusMenu() {
+      this.rowStatusMenuId = null
+      this.rowStatusMenuOrder = null
+      this.rowStatusEditingLabel = null
+      this.rowStatusEditName = ''
+    },
+
     async selectRowStatus(order, status) {
       if (!this.canChangeOrderStatus || !order || !status?.label) return
 
@@ -9732,12 +9859,17 @@ async bulkChangeStatus() {
   this.bulkStatusSaving = true
 
   try {
-    await Promise.all(
+    const results = await Promise.all(
       selected.map(order =>
         this.inlineChangeStatus(order, this.bulkStatusLabel, { refresh: false })
       )
     )
-    this.clearBulkSelection()
+
+    if (results.every(Boolean)) {
+      this.clearBulkSelection()
+    } else {
+      this.bulkStatusMenuOpen = true
+    }
   } finally {
     this.bulkStatusSaving = false
   }
@@ -10659,9 +10791,11 @@ closePreviewFile() {
 },
 
     async fetchOrders({ silent = false, loadFiles = true } = {}) {
-      const loadingStartedAt = Date.now()
+      const requestSequence = ++this.ordersFetchSequence
+      const requestStartedAt = Date.now()
+
       if (!silent) {
-        this.loadingProgress = 0
+        this.loadingProgress = 5
         this.loadingOrders = true
       }
       try {
@@ -10673,14 +10807,39 @@ closePreviewFile() {
           previousOrders.set(Number(this.selectedOrder.id), this.selectedOrder)
         }
 
-        const res = await axios.get('/api/orders', { headers: this.headers() })
+        const res = await axios.get('/api/orders', {
+          headers: this.headers(),
+          timeout: 20000
+        })
+
+        // A newer request has already updated the board; ignore this stale one.
+        if (requestSequence < this.ordersAppliedSequence) return
+        this.ordersAppliedSequence = requestSequence
+
         const list = Array.isArray(res.data) ? res.data : (res.data?.data || [])
         this.orders = list.map(rawOrder => {
           const freshOrder = this.formatOrder(rawOrder)
+          const previousOrder = previousOrders.get(Number(freshOrder.id))
+          const statusLock = this.statusMutationLocks[Number(freshOrder.id)]
+
+          // Never let a polling response that started before status-save
+          // confirmation overwrite the user's newly selected status.
+          const staleForStatusMutation = Boolean(
+            statusLock &&
+            (
+              !statusLock.confirmedAt ||
+              requestStartedAt <= statusLock.confirmedAt
+            )
+          )
+
+          if (staleForStatusMutation && previousOrder) {
+            freshOrder.status = statusLock.status
+            freshOrder.statusColor = statusLock.statusColor
+            freshOrder.group = statusLock.group
+            freshOrder.finished_by = previousOrder.finished_by
+          }
 
           if (!loadFiles) {
-            const previousOrder = previousOrders.get(Number(freshOrder.id))
-
             if (previousOrder) {
               freshOrder.invoiceFiles = previousOrder.invoiceFiles || []
               freshOrder.cards = (freshOrder.cards || []).map(card => {
@@ -10698,11 +10857,17 @@ closePreviewFile() {
           return freshOrder
         })
 
-        if (!silent) this.loadingProgress = 15
+        factoryBoardMemoryCache.orders = this.orders
 
-        // Load file thumbnails for every board row as well.
-        // This keeps the 3 thumbnail previews visible after a full page refresh.
-        if (loadFiles) await this.loadBoardOrderFiles(!silent)
+        if (!silent) this.loadingProgress = 85
+
+        // Orders show immediately. File thumbnails hydrate in controlled
+        // background workers and never hold the complete board loader.
+        if (loadFiles) {
+          this.loadBoardOrderFiles(false).catch(error => {
+            console.error('Background order files error:', error)
+          })
+        }
 
         /*
          * Preserve the SAME selected order after any refresh.
@@ -10725,23 +10890,20 @@ closePreviewFile() {
           }
         }
       } catch (e) {
-        if (!silent) console.error('fetchOrders error:', e)
+        console.error('fetchOrders error:', e)
+
+        if (!silent) {
+          alert(
+            e.code === 'ECONNABORTED'
+              ? 'Orders server response is taking too long. Please try again.'
+              : (e.response?.data?.message || 'Orders could not be loaded.')
+          )
+        }
       } finally {
         if (!silent) {
-          const remainingLoadingTime = Math.max(
-            0,
-            2000 - (Date.now() - loadingStartedAt)
-          )
-
-          if (remainingLoadingTime) {
-            await new Promise(resolve =>
-              window.setTimeout(resolve, remainingLoadingTime)
-            )
-          }
-
           this.loadingProgress = 100
           await this.$nextTick()
-          await new Promise(resolve => window.setTimeout(resolve, 300))
+          await new Promise(resolve => window.setTimeout(resolve, 80))
           this.loadingOrders = false
         }
       }
@@ -10756,8 +10918,13 @@ closePreviewFile() {
       const totalOrders = this.orders.length
       let completedOrders = 0
 
-      await Promise.all(
-        this.orders.map(async order => {
+      const queue = [...this.orders]
+      const workerCount = Math.min(6, queue.length)
+
+      const loadNextFileSet = async () => {
+        while (queue.length) {
+          const order = queue.shift()
+
           try {
             let res = null
 
@@ -10798,6 +10965,8 @@ closePreviewFile() {
                 )
               }
             })
+
+            factoryBoardMemoryCache.orders = this.orders
           } catch (error) {
             console.error(`Board files load error for order ${order.id}:`, error)
           } finally {
@@ -10810,7 +10979,11 @@ closePreviewFile() {
               )
             }
           }
-        })
+        }
+      }
+
+      await Promise.all(
+        Array.from({ length: workerCount }, () => loadNextFileSet())
       )
     },
 
@@ -10818,6 +10991,7 @@ closePreviewFile() {
       try {
         const res = await axios.get('/api/members', { headers: this.headers() })
         this.availableMembers = Array.isArray(res.data) ? res.data : (res.data?.data || [])
+        factoryBoardMemoryCache.members = this.availableMembers
       } catch (e) { console.error('fetchMembers error:', e) }
     },
 async fetchClients() {
@@ -10829,6 +11003,8 @@ async fetchClients() {
     this.availableClients = Array.isArray(res.data)
       ? res.data
       : (res.data?.data || [])
+
+    factoryBoardMemoryCache.clients = this.availableClients
 
     console.log('availableClients:', this.availableClients)
 
@@ -11298,69 +11474,8 @@ shipping_address: this.newOrder.shippingAddress,
 
     async changeStatus(s) {
       if (!this.canChangeOrderStatus || !this.selectedOrder) return
-      const order = this.selectedOrder
-      const activeWorker = this.workingDesigner(order)
-      const isShipped =
-        String(s.label || '').trim().toLowerCase() === 'shipped'
-      const shippedBy = isShipped ? this.currentUser : null
-
-      const previous = {
-        status: order.status,
-        statusColor: order.statusColor,
-        group: order.group,
-        finished_by: order.finished_by
-      }
-
-      const targetGroup = s.group || this.statusToGroup(s.label)
-      const targetColor = this.statusColor(s.label, s.color || '#6161ff')
-
-      order.status = s.label
-      order.statusColor = targetColor
-      order.group = targetGroup
       this.showStatusMenu = false
-
-      if (isShipped && shippedBy) {
-        this.markOrderFinished(order.id, shippedBy)
-        order.finished_by = shippedBy
-      }
-
-      const localIndex = this.orders.findIndex(
-        item => Number(item.id) === Number(order.id)
-      )
-
-      if (localIndex !== -1) this.orders[localIndex] = { ...order }
-      this.orders = [...this.orders]
-
-      try {
-        await axios.put(`/api/orders/${order.id}`, {
-          status: s.label,
-          status_color: targetColor,
-          ...(isShipped && shippedBy
-            ? {
-                shipped_by_user_id: shippedBy.id,
-                shipped_at: new Date().toISOString()
-              }
-            : {})
-        }, { headers: this.headers() })
-        if (isShipped && shippedBy) {
-          if (activeWorker) {
-            this.finishWorkForShippedOrder(order, shippedBy).catch(error => {
-              console.error('Finish work sync error:', error)
-            })
-          }
-        }
-      } catch (e) {
-        order.status = previous.status
-        order.statusColor = previous.statusColor
-        order.group = previous.group
-        order.finished_by = previous.finished_by
-
-        if (localIndex !== -1) this.orders[localIndex] = { ...order }
-        this.orders = [...this.orders]
-
-        console.error('changeStatus error:', e)
-        alert(e.response?.data?.message || 'Status could not be updated.')
-      }
+      await this.inlineChangeStatus(this.selectedOrder, s.label)
     },
 
   async updateShipDate(event) {
