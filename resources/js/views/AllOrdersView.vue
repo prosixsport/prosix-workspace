@@ -9506,9 +9506,13 @@ body.board-column-resizing .column-resizer::before {
           }
         )
 
-        const createdId =
-          response.data?.order?.id ||
-          response.data?.id
+        const rawCreatedOrder =
+          response.data?.order ||
+          response.data?.data ||
+          response.data
+
+        const createdOrder = this.formatOrder(rawCreatedOrder)
+        const createdId = createdOrder.id
 
         if (
           this.isClient &&
@@ -9539,8 +9543,17 @@ body.board-column-resizing .column-resizer::before {
           )
         }
 
+        const existingIndex = this.orders.findIndex(
+          order => Number(order.id) === Number(createdId)
+        )
+
+        if (existingIndex !== -1) {
+          this.orders.splice(existingIndex, 1, createdOrder)
+        } else {
+          this.orders.unshift(createdOrder)
+        }
+
         this.cancelInlineOrder()
-        await this.fetchOrders()
 
         /*
          * Order create hone ke baad row list mein hi rahegi.
@@ -11225,9 +11238,8 @@ shipping_address: this.newOrder.shippingAddress,
         if (idx !== -1) this.orders.splice(idx, 1, order)
         else this.orders.unshift(order)
         this.activeGroup = order.group
-        await this.fetchOrders()
-        const freshOrder = this.orders.find(o => Number(o.id) === Number(order.id)) || order
-        await this.selectOrder(freshOrder)
+
+        await this.selectOrder(order)
         this.closeOrderModal()
       } catch (e) { console.error('confirmAddOrder error:', e); alert(e.response?.data?.message || 'Order could not be saved') }
       finally { this.savingOrder = false }
