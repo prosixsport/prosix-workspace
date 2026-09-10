@@ -465,6 +465,11 @@ Route::post('/user/profile', [
         'bulkMembers'
     ]);
 
+    Route::post('/orders/bulk-status', [
+        OrderController::class,
+        'bulkStatus'
+    ]);
+
 
     Route::post('/orders/bulk-duplicate', [
         OrderController::class,
@@ -505,6 +510,16 @@ Route::post('/user/profile', [
     Route::get('/orders', [
         OrderController::class,
         'index'
+    ]);
+
+    Route::get('/orders/changes', [
+        OrderController::class,
+        'changes'
+    ]);
+
+    Route::get('/orders/notification-summary', [
+        OrderController::class,
+        'notificationSummary'
     ]);
 
 

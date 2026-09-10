@@ -1,6 +1,7 @@
 <?php
 
 namespace App\Http\Controllers;
+use App\Jobs\SendFcmNotification;
 use App\Models\OrderActivity;
 use App\Models\OrderNotification;
 use App\Models\Order;
@@ -8,7 +9,6 @@ use App\Models\OrderRead;
 use App\Models\OrderWorkSession;
 use App\Models\User;
 use App\Mail\NewOrderAssignedMail;
-use App\Services\FcmService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Facades\DB;
@@ -19,17 +19,24 @@ public function index()
 {
     $user = auth()->user();
 
-    $orders = Order::with([
-            'members',
-            'clients',
+    $orders = Order::query()
+        ->with([
+            'members:id,name,email,role,profile_photo,about',
+            'clients:id,user_id,name,email',
             'activeWorkSession.user:id,name,email,role,profile_photo',
-            'reads.user:id,name,email,profile_photo',
-            'messages' => function ($q) {
-                $q->with('user:id,name')
-                  ->latest()
-                  ->limit(1);
-            }
+            'reads' => fn ($query) => $query
+                ->select(['id', 'order_id', 'user_id', 'read_at'])
+                ->where('user_id', $user->id),
+            'latestMessage.user:id,name',
+            'files' => fn ($query) => $query
+                ->select([
+                    'id', 'order_id', 'user_id', 'card_type', 'original_name',
+                    'file_path', 'mime_type', 'size', 'created_at',
+                ])
+                ->latest('id')
+                ->limit(12),
         ])
+        ->withCount('files')
         ->withCount([
             'messages as unread_chat_count' => function ($q) use ($user) {
                 $q->where('user_id', '!=', $user?->id)
@@ -58,7 +65,7 @@ public function index()
             $order->user_has_seen = !empty($read?->read_at);
             $order->read_at = $read?->read_at;
 
-            $lastMessage = $order->messages->first();
+            $lastMessage = $order->latestMessage;
 
             $order->last_message_text = $lastMessage?->message;
             $order->last_message_sender = $lastMessage?->user?->name;
@@ -77,6 +84,80 @@ public function index()
                 ]
                 : null;
 
+            $order->unsetRelation('latestMessage');
+
+            return $order;
+        });
+
+    return response()->json($orders);
+}
+
+public function changes(Request $request)
+{
+    $user = auth()->user();
+    $since = $request->date('since');
+
+    $orders = Order::query()
+        ->select(['id', 'status', 'status_color', 'updated_at'])
+        ->when($since, fn ($query) => $query->where('updated_at', '>=', $since))
+        ->when($user->role === 'client', function ($query) use ($user) {
+            $query->whereHas('clients', fn ($clients) =>
+                $clients->where('clients.user_id', $user->id)
+            );
+        })
+        ->when(!in_array($user->role, ['super_admin', 'admin', 'client']), function ($query) use ($user) {
+            $query->whereHas('members', fn ($members) =>
+                $members->where('users.id', $user->id)
+            );
+        })
+        ->orderBy('updated_at')
+        ->limit(1000)
+        ->get();
+
+    return response()->json([
+        'server_time' => now()->toISOString(),
+        'orders' => $orders,
+    ]);
+}
+
+public function notificationSummary()
+{
+    $user = auth()->user();
+
+    $orders = Order::query()
+        ->select(['orders.id', 'orders.name', 'orders.po', 'orders.status', 'orders.status_color', 'orders.created_at'])
+        ->with('latestMessage.user:id,name')
+        ->withExists([
+            'reads as user_has_seen' => fn ($query) => $query
+                ->where('user_id', $user->id)
+                ->whereNotNull('read_at'),
+        ])
+        ->withCount([
+            'messages as unread_chat_count' => function ($query) use ($user) {
+                $query->where('user_id', '!=', $user->id)
+                    ->whereDoesntHave('reads', fn ($reads) =>
+                        $reads->where('user_id', $user->id)
+                    );
+            },
+        ])
+        ->when($user->role === 'client', function ($query) use ($user) {
+            $query->whereHas('clients', fn ($clients) =>
+                $clients->where('clients.user_id', $user->id)
+            );
+        })
+        ->when(!in_array($user->role, ['super_admin', 'admin', 'client']), function ($query) use ($user) {
+            $query->whereHas('members', fn ($members) =>
+                $members->where('users.id', $user->id)
+            );
+        })
+        ->latest('orders.id')
+        ->get()
+        ->map(function ($order) {
+            $message = $order->latestMessage;
+            $order->last_message_at = $message?->created_at;
+            $order->last_message_text = $message?->message;
+            $order->last_message_sender = $message?->user?->name;
+            $order->unsetRelation('latestMessage');
             return $order;
         });
 
@@ -230,6 +311,20 @@ public function update(Request $request, Order $order)
         'client_ids' => 'nullable|array',
         'client_ids.*' => 'exists:clients,id',
     ]);
+
+    if (
+        $request->filled('status')
+        && strcasecmp(trim((string) $request->status), trim((string) $order->status)) !== 0
+        && $this->statusRequiresTracking($request->status)
+    ) {
+        $tracking = $request->exists('trk') ? $request->input('trk') : $order->trk;
+
+        if (!$this->hasTrackingInformation($tracking)) {
+            return response()->json([
+                'message' => 'Please add tracking information before moving this order to Shipped or Delivered.',
+            ], 422);
+        }
+    }
 
     $oldMemberIds = $order->members()
         ->pluck('users.id')
@@ -652,7 +747,7 @@ public function release(Order $order)
             report($e);
         }
 
-        FcmService::send(
+        SendFcmNotification::dispatch(
             $member->fcm_token,
             'New Order Assigned',
             'You have been added to order: ' . $order->name,
@@ -681,7 +776,7 @@ public function release(Order $order)
             'is_read' => 0,
         ]);
 
-        FcmService::send(
+        SendFcmNotification::dispatch(
             $member->fcm_token,
             $title,
             $body,
@@ -693,6 +788,117 @@ public function release(Order $order)
         );
     }
 }
+
+    public function bulkStatus(Request $request)
+    {
+        $validated = $request->validate([
+            'order_ids' => ['required', 'array', 'min:1', 'max:500'],
+            'order_ids.*' => ['integer', 'distinct', 'exists:orders,id'],
+            'status' => ['required', 'string', 'max:255'],
+            'status_color' => ['nullable', 'string', 'max:50'],
+        ]);
+
+        $user = auth()->user();
+
+        if (!$user || $user->role === 'client') {
+            return response()->json(['message' => 'You cannot change order status.'], 403);
+        }
+
+        $orders = Order::whereIn('id', $validated['order_ids'])->get();
+
+        foreach ($orders as $order) {
+            $this->checkAccess($order);
+        }
+
+        if ($this->statusRequiresTracking($validated['status'])) {
+            $ordersWithoutTracking = $orders
+                ->filter(fn (Order $order) => !$this->hasTrackingInformation($order->trk));
+
+            if ($ordersWithoutTracking->isNotEmpty()) {
+                return response()->json([
+                    'message' => 'Please add tracking information before moving this order to Shipped or Delivered.',
+                    'order_ids' => $ordersWithoutTracking->pluck('id')->values(),
+                ], 422);
+            }
+        }
+
+        DB::transaction(function () use ($orders, $validated, $user) {
+            foreach ($orders as $order) {
+                $oldStatus = $order->status;
+                $order->forceFill([
+                    'status' => $validated['status'],
+                    'status_color' => $validated['status_color'] ?? $order->status_color,
+                ])->save();
+
+                if ($oldStatus !== $order->status) {
+                    $this->logActivity(
+                        $order->id,
+                        'status_updated',
+                        $user->name . ' changed status from ' . ($oldStatus ?: 'N/A') . ' to ' . $order->status
+                    );
+                }
+            }
+        });
+
+        foreach ($orders as $order) {
+            $this->sendOrderActivityNotification(
+                $order,
+                $user->id,
+                'Status Updated',
+                $user->name . ' changed status to ' . $validated['status'] . ' in order: ' . $order->name
+            );
+        }
+
+        return response()->json([
+            'success' => true,
+            'orders' => $orders->fresh([
+                'members:id,name,email,role,profile_photo,about',
+                'clients:id,user_id,name,email',
+            ]),
+        ]);
+    }
+
+    private function statusRequiresTracking(?string $status): bool
+    {
+        return in_array(strtolower(trim((string) $status)), ['shipped', 'delivered'], true);
+    }
+
+    private function hasTrackingInformation($tracking): bool
+    {
+        if (is_array($tracking)) {
+            return collect($tracking)->contains(
+                fn ($item) => $this->hasTrackingInformation($item)
+            );
+        }
+
+        $value = trim((string) $tracking);
+
+        if ($value === '') {
+            return false;
+        }
+
+        $decoded = json_decode($value, true);
+
+        if (json_last_error() === JSON_ERROR_NONE && is_array($decoded)) {
+            return collect($decoded)->contains(function ($item) {
+                if (is_array($item)) {
+                    return $this->hasTrackingInformation($item['number'] ?? null)
+                        || $this->hasTrackingInformation($item['company'] ?? null);
+                }
+
+                return $this->hasTrackingInformation($item);
+            });
+        }
+
+        return !in_array(strtolower($value), [
+            'n/a',
+            'na',
+            'none',
+            'null',
+            'undefined',
+            'not available',
+        ], true);
+    }
 
     public function bulkMembers(Request $request)
     {

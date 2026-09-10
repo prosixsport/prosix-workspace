@@ -6200,6 +6200,11 @@ beforeUnmount()  {
 
       if (!status) return
 
+      if (this.statusRequiresTracking(status.label) && !this.orderHasTracking(order)) {
+        alert(this.trackingRequiredMessage())
+        return false
+      }
+
       const activeWorker = this.workingDesigner(order)
       const isShipped =
         String(status.label).trim().toLowerCase() === 'shipped'
@@ -6251,6 +6256,7 @@ beforeUnmount()  {
         if (refresh) {
           await this.fetchOrders({ silent: true, loadFiles: false })
         }
+        return true
       } catch (error) {
         console.error('Inline status error:', error)
 
@@ -6258,6 +6264,7 @@ beforeUnmount()  {
           error.response?.data?.message ||
           'Status could not be updated.'
         )
+        return false
       }
     },
 
@@ -9738,16 +9745,42 @@ async bulkChangeStatus() {
 
   const selectedIds = new Set(this.selectedOrders.map(Number))
   const selected = this.orders.filter(order => selectedIds.has(Number(order.id)))
+
+  if (
+    this.statusRequiresTracking(this.bulkStatusLabel) &&
+    selected.some(order => !this.orderHasTracking(order))
+  ) {
+    alert(this.trackingRequiredMessage())
+    return
+  }
+
   this.bulkStatusSaving = true
 
   try {
-    await Promise.all(
-      selected.map(order =>
-        this.inlineChangeStatus(order, this.bulkStatusLabel, { refresh: false })
-      )
+    const status = this.workflowStatusOptions.find(
+      item => String(item.label || '').trim().toLowerCase() ===
+        String(this.bulkStatusLabel || '').trim().toLowerCase()
     )
+
+    if (!status) return
+
+    await axios.post('/api/orders/bulk-status', {
+      order_ids: selected.map(order => order.id),
+      status: status.label,
+      status_color: status.color
+    }, { headers: this.headers() })
+
+    selected.forEach(order => {
+      order.status = status.label
+      order.statusColor = status.color
+      order.group = status.group || this.statusToGroup(status.label)
+    })
+    this.orders = [...this.orders]
     await this.fetchOrders({ silent: true, loadFiles: false })
     this.clearBulkSelection()
+  } catch (error) {
+    console.error('Bulk status error:', error)
+    alert(error.response?.data?.message || 'Statuses could not be updated.')
   } finally {
     this.bulkStatusSaving = false
   }
@@ -10128,16 +10161,20 @@ alert(e.response?.data?.message || 'Orders were not deleted')
             custom_groups: this.customBoardGroups || [],
             default_group_overrides: this.defaultBoardGroupOverrides || {}
           }, { headers: this.headers() })
+          return true
         } catch (error) {
           console.error('Shared status settings could not be saved:', error)
           alert(error.response?.data?.message || 'Status settings could not be saved.')
+          return false
         } finally {
           this.boardSettingsSaving = false
         }
       }
+
+      return true
     },
 
-    saveCustomStatusOption(status) {
+    async saveCustomStatusOption(status) {
       if (!this.isSuperAdmin || !status?.label) return
 
       const existsIndex = this.statusOptions.findIndex(
@@ -10167,7 +10204,7 @@ alert(e.response?.data?.message || 'Orders were not deleted')
         )
       }
 
-      this.saveAllStatusOptions()
+      return await this.saveAllStatusOptions()
     },
 
     async changeStatusOptionColor(status, color) {
@@ -10305,6 +10342,28 @@ parseTrackingList(value) {
   } catch (e) {}
 
   return [this.parseTracking(value)]
+},
+
+statusRequiresTracking(status) {
+  return ['shipped', 'delivered'].includes(
+    String(status || '').trim().toLowerCase()
+  )
+},
+
+orderHasTracking(order) {
+  const trackingItems = this.parseTrackingList(order?.trk)
+
+  return trackingItems.some(item => {
+    const number = String(item?.number || '').trim().toLowerCase()
+    const company = String(item?.company || '').trim().toLowerCase()
+    const invalid = ['', 'n/a', 'na', 'none', 'null', 'undefined', 'not available']
+
+    return !invalid.includes(number) || !invalid.includes(company)
+  })
+},
+
+trackingRequiredMessage() {
+  return 'Please add tracking information before moving this order to Shipped or Delivered.'
 },
 
 buildTrackingValue(list) {
@@ -11280,7 +11339,8 @@ shipping_address: this.newOrder.shippingAddress,
         groupLabel: targetGroup.label,
         custom: true
       }
-      this.saveCustomStatusOption(custom)
+      const statusSaved = await this.saveCustomStatusOption(custom)
+      if (!statusSaved) return
       await this.changeStatus(custom)
       this.customStatusLabel = ''
       this.customStatusColor = '#6161ff'
@@ -11288,6 +11348,11 @@ shipping_address: this.newOrder.shippingAddress,
 
     async changeStatus(s) {
       if (!this.canChangeOrderStatus || !this.selectedOrder) return
+
+      if (this.statusRequiresTracking(s.label) && !this.orderHasTracking(this.selectedOrder)) {
+        alert(this.trackingRequiredMessage())
+        return
+      }
       const activeWorker = this.workingDesigner(this.selectedOrder)
       const isShipped =
         String(s.label || '').trim().toLowerCase() === 'shipped'
@@ -11320,7 +11385,10 @@ shipping_address: this.newOrder.shippingAddress,
         this.orders = [...this.orders]
         this.showStatusMenu = false
         await this.fetchOrders({ silent: true, loadFiles: false })
-      } catch (e) { console.error('changeStatus error:', e) }
+      } catch (e) {
+        console.error('changeStatus error:', e)
+        alert(e.response?.data?.message || 'Status could not be updated.')
+      }
     },
 
   async updateShipDate(event) {
