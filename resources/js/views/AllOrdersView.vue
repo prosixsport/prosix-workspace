@@ -691,8 +691,17 @@
                 @click.stop="startInlineCell(order, 'name', order.name)"
               >
                 <strong>{{ order.name }}</strong>
-                <small>{{ order.po || 'N/A' }}</small>
-
+                <small class="order-name-meta">
+                  <span class="order-po-number">
+                    {{ order.po || 'N/A' }}
+                  </span>
+                  <span
+                    v-if="order.created_at"
+                    class="order-created-time"
+                  >
+                    {{ formatOrderCreatedAt(order.created_at) }}
+                  </span>
+                </small>
               </button>
 
               <div class="order-working-actions">
@@ -8601,6 +8610,20 @@ body.board-column-resizing .column-resizer::before {
         day: 'numeric'
       })
     },
+
+   formatOrderCreatedAt(value) {
+  if (!value) return ''
+
+  const date = new Date(value)
+
+  if (Number.isNaN(date.getTime())) return ''
+
+  return date.toLocaleTimeString('en-US', {
+    hour: '2-digit',
+    minute: '2-digit',
+    hour12: true
+  })
+},
 
     closeBoardDetail() {
       this.detailOpen = false
@@ -26055,5 +26078,32 @@ body.board-column-resizing .column-resizer::before {
   border-radius: inherit;
   background: linear-gradient(90deg, #3157ff, #6161ff);
   transition: width .22s ease;
+}
+
+/* Order PO and creation time under the order name. */
+.factory-board-page .board-col-name .name-value > .order-name-meta {
+  display: flex !important;
+  align-items: center;
+  gap: 16px;
+}
+
+.factory-board-page .order-po-number {
+  color: #475569;
+  font-size: 10px;
+  font-weight: 900;
+  letter-spacing: .01em;
+}
+
+.factory-board-page .order-created-time {
+  margin-left: 12px;
+  color: #94a3b8;
+  font-size: 10px;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.factory-board-page .order-created-time i {
+  margin-right: 3px;
+  font-size: 9px;
 }
 </style>
