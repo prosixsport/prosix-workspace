@@ -80,6 +80,11 @@ class Order extends Model
         );
     }
 
+    public function latestMessage()
+    {
+        return $this->hasOne(OrderMessage::class)->latestOfMany();
+    }
+
     /*
     |--------------------------------------------------------------------------
     | Files
