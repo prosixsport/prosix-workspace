@@ -11,20 +11,135 @@
                     </p>
                 </div>
                 <div class="dashboard-user-tools">
-                    <button
-                        type="button"
-                        class="dashboard-notification-btn"
-                        title="Open notifications"
-                        @click="openNotifications"
-                    >
-                        <i class="fa-regular fa-bell"></i>
-                        <span
-                            v-if="notificationCount > 0"
-                            class="dashboard-notification-badge"
+                    <div class="dashboard-notification-wrap" @click.stop>
+                        <button
+                            type="button"
+                            class="dashboard-notification-btn"
+                            title="Open notifications"
+                            @click="toggleNotifications"
                         >
-                            {{ notificationCount > 99 ? '99+' : notificationCount }}
-                        </span>
-                    </button>
+                            <i class="fa-regular fa-bell"></i>
+                            <span
+                                v-if="notificationCount > 0"
+                                class="dashboard-notification-badge"
+                            >
+                                {{ notificationCount > 99 ? '99+' : notificationCount }}
+                            </span>
+                        </button>
+
+                        <div
+                            v-if="showNotificationMenu"
+                            class="dashboard-notification-menu notification-center-dropdown"
+                        >
+                            <div class="notification-menu-head notification-center-head">
+                                <div>
+                                    <strong>Notifications</strong>
+                                    <small>{{ totalBellNotificationCount }} unread</small>
+                                </div>
+                                <button type="button" @click="showNotificationMenu = false">
+                                    <i class="fa-solid fa-xmark"></i>
+                                </button>
+                            </div>
+
+                            <div class="notification-tabs">
+                                <button
+                                    type="button"
+                                    :class="{ active: notificationTab === 'chats' }"
+                                    @click="notificationTab = 'chats'"
+                                >
+                                    <i class="fa-solid fa-comments"></i>
+                                    Chats
+                                    <span v-if="totalUnreadChatCount > 0">
+                                        {{ totalUnreadChatCount }}
+                                    </span>
+                                </button>
+                                <button
+                                    type="button"
+                                    :class="{ active: notificationTab === 'orders' }"
+                                    @click="notificationTab = 'orders'"
+                                >
+                                    <i class="fa-solid fa-folder-plus"></i>
+                                    Orders
+                                    <span v-if="unreadOrderNotificationCount > 0">
+                                        {{ unreadOrderNotificationCount }}
+                                    </span>
+                                </button>
+                            </div>
+
+                            <div v-if="notificationsLoading" class="notification-menu-empty">
+                                <i class="fa-solid fa-spinner fa-spin"></i>
+                                Loading...
+                            </div>
+
+                            <div v-else-if="notificationTab === 'chats'" class="notification-list">
+                                <button
+                                    v-for="order in unreadChatOrders"
+                                    :key="'chat-notification-' + order.id"
+                                    type="button"
+                                    class="notification-order chat-notification-item"
+                                    @click="openChatNotification(order)"
+                                >
+                                    <span class="notification-order-icon chat-notification-icon">
+                                        <i class="fa-solid fa-comments"></i>
+                                    </span>
+                                    <span class="notification-order-copy chat-notification-content">
+                                        <strong>{{ order.name }}</strong>
+                                        <small>
+                                            {{ order.last_message_sender || 'New message' }}
+                                            <template v-if="order.last_message_text">
+                                                · {{ shortLastMessage(order.last_message_text) }}
+                                            </template>
+                                        </small>
+                                    </span>
+                                    <span class="chat-notification-badge">
+                                        {{ order.unread_chat_count }}
+                                    </span>
+                                </button>
+                                <div v-if="unreadChatOrders.length === 0" class="notification-menu-empty">
+                                    <i class="fa-regular fa-comment-dots"></i>
+                                    No unread chats
+                                </div>
+                            </div>
+
+                            <div v-else class="notification-list">
+                                <button
+                                    v-for="order in unreadOrderNotifications"
+                                    :key="'order-notification-' + order.id"
+                                    type="button"
+                                    class="notification-order chat-notification-item order-notification-item"
+                                    @click="openOrderNotification(order)"
+                                >
+                                    <span class="notification-order-icon order-notification-icon">
+                                        <i class="fa-solid fa-folder-plus"></i>
+                                    </span>
+                                    <span class="notification-order-copy chat-notification-content">
+                                        <strong>{{ order.name }}</strong>
+                                        <small>
+                                            New order
+                                            <template v-if="order.po"> · {{ order.po }}</template>
+                                            <template v-if="order.created_at">
+                                                · {{ notificationTime(order.created_at) }}
+                                            </template>
+                                        </small>
+                                    </span>
+                                    <span class="order-notification-new-dot"></span>
+                                </button>
+                                <div v-if="unreadOrderNotifications.length === 0" class="notification-menu-empty">
+                                    <i class="fa-regular fa-folder-open"></i>
+                                    No new order notifications
+                                </div>
+                            </div>
+
+                            <button
+                                v-if="totalBellNotificationCount > 0"
+                                type="button"
+                                class="notification-view-all"
+                                @click="openAllNotifications"
+                            >
+                                View all orders
+                            </button>
+                        </div>
+                    </div>
                     <button
                         type="button"
                         class="dashboard-profile-btn"
@@ -382,6 +497,11 @@ export default {
             expandedDesignerId: null,
             recentOrders: [],
             notificationCount: 0,
+            notifications: [],
+            notificationsLoading: false,
+            showNotificationMenu: false,
+            notificationTab: 'chats',
+            notificationTimer: null,
             designers: [],
             stats: {
                 totalOrders: 0,
@@ -394,6 +514,35 @@ export default {
         }
     },
     computed: {
+        unreadChatOrders() {
+            return this.notifications
+                .filter(order => Number(order.unread_chat_count || 0) > 0)
+                .sort((a, b) => {
+                    return new Date(b.last_message_at || 0).getTime() -
+                        new Date(a.last_message_at || 0).getTime()
+                })
+        },
+        totalUnreadChatCount() {
+            return this.unreadChatOrders.reduce(
+                (total, order) => total + Number(order.unread_chat_count || 0),
+                0
+            )
+        },
+        unreadOrderNotifications() {
+            return this.notifications
+                .filter(order => !order.user_has_seen)
+                .sort((a, b) => {
+                    return new Date(b.created_at || 0).getTime() -
+                        new Date(a.created_at || 0).getTime()
+                })
+        },
+        unreadOrderNotificationCount() {
+            return this.unreadOrderNotifications.length
+        },
+        totalBellNotificationCount() {
+            return this.totalUnreadChatCount +
+                this.unreadOrderNotificationCount
+        },
         user() {
             try {
                 return JSON.parse(
@@ -424,35 +573,137 @@ export default {
     },
     mounted() {
         this.fetchDashboard()
-        this.loadNotificationCount()
+        this.loadNotifications()
+        this.notificationTimer = window.setInterval(
+            () => this.loadNotifications(true),
+            5000
+        )
+        document.addEventListener('click', this.closeNotificationMenu)
+    },
+    beforeUnmount() {
+        if (this.notificationTimer) {
+            window.clearInterval(this.notificationTimer)
+        }
+        document.removeEventListener('click', this.closeNotificationMenu)
     },
     methods: {
         openProfilePage() {
             if (this.$route.path === '/profile') return
             this.$router.push('/profile').catch(() => {})
         },
-        openNotifications() {
+        toggleNotifications() {
+            this.showNotificationMenu = !this.showNotificationMenu
+            if (this.showNotificationMenu) {
+                this.loadNotifications()
+                if (
+                    this.totalUnreadChatCount === 0 &&
+                    this.unreadOrderNotificationCount > 0
+                ) {
+                    this.notificationTab = 'orders'
+                } else if (
+                    this.unreadOrderNotificationCount === 0 &&
+                    this.totalUnreadChatCount > 0
+                ) {
+                    this.notificationTab = 'chats'
+                }
+            }
+        },
+        closeNotificationMenu() {
+            this.showNotificationMenu = false
+        },
+        openOrderNotification(order) {
+            this.showNotificationMenu = false
+            this.$router.push({
+                path: '/orders',
+                query: {
+                    type: 'factory',
+                    order_id: order.id
+                }
+            }).catch(() => {})
+        },
+        openChatNotification(order) {
+            this.showNotificationMenu = false
+            this.$router.push({
+                path: '/orders',
+                query: {
+                    type: 'factory',
+                    order_id: order.id,
+                    open_chat: 1
+                }
+            }).catch(() => {})
+        },
+        shortLastMessage(value) {
+            const text = String(value || '').trim()
+            return text.length > 52
+                ? `${text.slice(0, 52)}…`
+                : text
+        },
+        notificationTime(value) {
+            if (!value) return ''
+            const date = new Date(value)
+            if (Number.isNaN(date.getTime())) return ''
+
+            const diff = Date.now() - date.getTime()
+            const minute = 60 * 1000
+            const hour = 60 * minute
+            const day = 24 * hour
+
+            if (diff < minute) return 'Just now'
+            if (diff < hour) return `${Math.floor(diff / minute)}m ago`
+            if (diff < day) return `${Math.floor(diff / hour)}h ago`
+            if (diff < 7 * day) return `${Math.floor(diff / day)}d ago`
+
+            return date.toLocaleDateString('en-US', {
+                month: 'short',
+                day: 'numeric'
+            })
+        },
+        openAllNotifications() {
+            this.showNotificationMenu = false
             this.$router.push({
                 path: '/orders',
                 query: { type: 'factory' }
             }).catch(() => {})
         },
-        async loadNotificationCount() {
+        async loadNotifications(silent = false) {
+            if (!silent) this.notificationsLoading = true
             try {
+                // Use the exact same source as Factory Orders so both bells
+                // always show identical order/chat notification counts.
                 const response = await axios.get('/api/orders', {
                     headers: this.headers()
                 })
                 const orders = Array.isArray(response.data)
                     ? response.data
                     : response.data?.data || []
+                this.notifications = orders.filter(order => {
+                    return !order.user_has_seen ||
+                        Number(order.unread_chat_count || 0) > 0
+                })
+
                 this.notificationCount = orders.reduce((total, order) => {
                     const newOrder = order.user_has_seen ? 0 : 1
                     const unreadChats = Number(order.unread_chat_count || 0)
                     return total + newOrder + unreadChats
                 }, 0)
+
+                if (this.showNotificationMenu) {
+                    if (
+                        this.totalUnreadChatCount === 0 &&
+                        this.unreadOrderNotificationCount > 0
+                    ) {
+                        this.notificationTab = 'orders'
+                    } else if (
+                        this.unreadOrderNotificationCount === 0 &&
+                        this.totalUnreadChatCount > 0
+                    ) {
+                        this.notificationTab = 'chats'
+                    }
+                }
             } catch (error) {
                 console.error('Dashboard notification error:', error)
-                this.notificationCount = 0
+            } finally {
+                this.notificationsLoading = false
             }
         },
         headers() {
@@ -621,20 +872,14 @@ export default {
 }
 .dash {
     min-height: 100vh;
-    padding: 22px;
+    padding: 14px 22px 22px;
     background: #f4f5f8;
 }
 .hero {
-    margin-bottom: 16px;
-    padding: 26px;
-    border-radius: 20px;
-    background:
-        linear-gradient(
-            135deg,
-            #10121a 0%,
-            #202534 100%
-        );
-    color: #ffffff;
+    margin-bottom: 12px;
+    padding: 12px 16px;
+    border-radius: 14px;
+    color: #111827;
     display: flex;
     align-items: center;
     justify-content: space-between;
@@ -644,19 +889,19 @@ export default {
 .section-eyebrow {
     display: block;
     margin-bottom: 7px;
-    color: #9ca3af;
-    font-size: 9px;
+    color: #64748b;
+    font-size: 10px;
     font-weight: 900;
     letter-spacing: 0.14em;
 }
 .hero h2 {
     margin: 0;
-    font-size: 24px;
+    font-size: 30px;
     font-weight: 900;
 }
 .hero p {
-    margin: 6px 0 0;
-    color: #b6bdcc;
+    margin: 3px 0 0;
+    color: #64748b;
     font-size: 12px;
 }
 .dashboard-user-tools {
@@ -670,17 +915,17 @@ export default {
     height: 44px;
     flex: 0 0 44px;
     padding: 0;
-    border: 1px solid rgba(255, 255, 255, .18);
+    border: 1px solid #dce2ea;
     border-radius: 12px;
-    background: rgba(255, 255, 255, .1);
-    color: #ffffff;
+    background: #f8fafc;
+    color: #111827;
     display: grid;
     place-items: center;
     cursor: pointer;
 }
 .dashboard-notification-btn:hover {
-    background: #ffffff;
-    color: #111827;
+    background: #eef2ff;
+    color: #4f46e5;
 }
 .dashboard-notification-badge {
     position: absolute;
@@ -689,7 +934,7 @@ export default {
     min-width: 20px;
     height: 20px;
     padding: 0 5px;
-    border: 2px solid #171b25;
+    border: 2px solid #ffffff;
     border-radius: 999px;
     background: #ef4444;
     color: #ffffff;
@@ -702,10 +947,10 @@ export default {
     min-width: 205px;
     height: 48px;
     padding: 4px 10px 4px 5px;
-    border: 1px solid rgba(255, 255, 255, .18);
+    border: 1px solid #dce2ea;
     border-radius: 13px;
-    background: rgba(255, 255, 255, .1);
-    color: #ffffff;
+    background: #f8fafc;
+    color: #111827;
     display: grid;
     grid-template-columns: 38px minmax(0, 1fr) 14px;
     align-items: center;
@@ -714,7 +959,7 @@ export default {
     cursor: pointer;
 }
 .dashboard-profile-btn:hover {
-    background: rgba(255, 255, 255, .16);
+    background: #f1f5f9;
 }
 .dashboard-profile-avatar {
     width: 38px;
@@ -751,7 +996,7 @@ export default {
 }
 .dashboard-profile-copy small {
     margin-top: 3px;
-    color: #b6bdcc;
+    color: #64748b;
     font-size: 8px;
     font-weight: 700;
 }
@@ -759,7 +1004,186 @@ export default {
     color: #9ca3af;
     font-size: 10px;
 }
+.dashboard-notification-wrap {
+    position: relative;
+}
+.dashboard-notification-menu {
+    position: absolute;
+    top: calc(100% + 9px);
+    right: 0;
+    z-index: 2000;
+    width: 330px;
+    max-height: 420px;
+    overflow-x: hidden;
+    overflow-y: auto;
+    border: 1px solid #e2e8f0;
+    border-radius: 14px;
+    background: #ffffff;
+    box-shadow: 0 18px 50px rgba(15, 23, 42, .18);
+}
+.notification-menu-head {
+    padding: 12px 14px;
+    border-bottom: 1px solid #eef1f5;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+}
+.notification-menu-head strong,
+.notification-menu-head small {
+    display: block;
+}
+.notification-menu-head strong {
+    color: #111827;
+    font-size: 13px;
+    font-weight: 900;
+}
+.notification-menu-head small {
+    margin-top: 2px;
+    color: #64748b;
+    font-size: 9px;
+}
+.notification-menu-head button {
+    width: 28px;
+    height: 28px;
+    border: 0;
+    border-radius: 8px;
+    background: #f1f5f9;
+    color: #475569;
+}
+.notification-tabs {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 6px;
+    padding: 8px;
+    border-bottom: 1px solid #e8edf3;
+    background: #f8fafc;
+}
+.notification-tabs button {
+    min-height: 36px;
+    border: 1px solid transparent;
+    border-radius: 8px;
+    background: transparent;
+    color: #64748b;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    font-size: 11px;
+    font-weight: 900;
+}
+.notification-tabs button:hover,
+.notification-tabs button.active {
+    border-color: #dbe2ea;
+    background: #ffffff;
+    color: #0f172a;
+    box-shadow: 0 2px 8px rgba(15, 23, 42, .06);
+}
+.notification-tabs button > span {
+    min-width: 18px;
+    height: 18px;
+    padding: 0 5px;
+    border-radius: 999px;
+    background: #111827;
+    color: #ffffff;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 9px;
+}
+.notification-list {
+    max-height: 300px;
+    overflow-y: auto;
+    overscroll-behavior: contain;
+}
+.notification-menu-empty {
+    min-height: 110px;
+    padding: 22px;
+    color: #94a3b8;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    font-size: 11px;
+}
+.notification-order {
+    width: 100%;
+    padding: 10px 13px;
+    border: 0;
+    border-bottom: 1px solid #f1f5f9;
+    background: #ffffff;
+    display: grid;
+    grid-template-columns: 34px minmax(0, 1fr) auto;
+    align-items: center;
+    gap: 9px;
+    text-align: left;
+}
+.notification-order:hover {
+    background: #f8fafc;
+}
+.notification-order-icon {
+    width: 34px;
+    height: 34px;
+    border-radius: 10px;
+    background: #eef2ff;
+    color: #4f46e5;
+    display: grid;
+    place-items: center;
+    font-size: 12px;
+}
+.notification-order-copy {
+    min-width: 0;
+}
+.notification-order-copy strong,
+.notification-order-copy small {
+    display: block;
+    overflow: hidden;
+    white-space: nowrap;
+    text-overflow: ellipsis;
+}
+.notification-order-copy strong {
+    color: #111827;
+    font-size: 10px;
+    font-weight: 900;
+}
+.notification-order-copy small {
+    margin-top: 3px;
+    color: #64748b;
+    font-size: 9px;
+}
+.chat-notification-badge {
+    min-width: 22px;
+    height: 22px;
+    padding: 0 6px;
+    border-radius: 999px;
+    background: #ef4444;
+    color: #ffffff;
+    display: grid;
+    place-items: center;
+    font-size: 9px;
+    font-weight: 900;
+}
+.order-notification-icon {
+    background: #ecfdf5;
+    color: #059669;
+}
+.order-notification-new-dot {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background: #22c55e;
+    box-shadow: 0 0 0 3px rgba(34, 197, 94, .12);
+}
+.notification-view-all {
+    width: 100%;
+    padding: 10px;
+    border: 0;
+    background: #111827;
+    color: #ffffff;
+    font-size: 10px;
+    font-weight: 900;
+}
 .stats {
+    margin-top: 78px;
     margin-bottom: 16px;
     display: grid;
     grid-template-columns:
@@ -1211,7 +1635,13 @@ export default {
         flex: 1 1 auto;
         min-width: 0;
     }
+    .dashboard-notification-menu {
+        right: auto;
+        left: 0;
+        width: min(330px, calc(100vw - 24px));
+    }
     .stats {
+        margin-top: 0;
         grid-template-columns: 1fr 1fr;
     }
     .performance-search {
