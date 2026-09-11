@@ -3183,7 +3183,9 @@ export default {
       previewFileIndex: -1,
       boardTrackingDrafts: {},
       boardTrackingSaving: {},
+      boardTrackingSavePromises: {},
       boardTrackingIndexes: {},
+      orderMutationVersion: 0,
       customStatusLabel: '',
       customStatusColor: '#6161ff',
 
@@ -3867,11 +3869,13 @@ async mounted() {
   )
   this.orderSyncTimer = window.setInterval(
     () => {
-      if (!this.textEditing) {
+      const trackingIsSaving = Object.values(this.boardTrackingSaving || {}).some(Boolean)
+
+      if (!this.textEditing && !trackingIsSaving && !this.bulkStatusSaving) {
         this.fetchOrders({ silent: true, loadFiles: false })
       }
     },
-    4000
+    15000
   )
   this.chatSyncTimer = window.setInterval(() => {
     if (this.showChat && this.selectedOrder?.id) {
@@ -6192,6 +6196,8 @@ beforeUnmount()  {
     async inlineChangeStatus(order, label, { refresh = true } = {}) {
       if (!this.canChangeOrderStatus) return
 
+      await this.saveBoardTrackingRows(order)
+
       const status = this.workflowStatusOptions.find(
         item =>
           String(item.label || '').trim().toLowerCase() ===
@@ -6211,6 +6217,7 @@ beforeUnmount()  {
       const shippedBy = isShipped ? this.currentUser : null
 
       try {
+        this.orderMutationVersion += 1
         await axios.put(
           `/api/orders/${order.id}`,
           {
@@ -6253,9 +6260,6 @@ beforeUnmount()  {
 
         // Force the active tab list/counts to react immediately.
         this.orders = [...this.orders]
-        if (refresh) {
-          await this.fetchOrders({ silent: true, loadFiles: false })
-        }
         return true
       } catch (error) {
         console.error('Inline status error:', error)
@@ -9436,31 +9440,63 @@ body.board-column-resizing .column-resizer::before {
       if (!this.canEditWorkflowFields || !order?.id) return
 
       const orderId = Number(order.id)
-      if (this.boardTrackingSaving[orderId]) return
+      if (this.boardTrackingSavePromises[orderId]) {
+        return await this.boardTrackingSavePromises[orderId]
+      }
 
       const rows = this.ensureBoardTrackingDraft(order)
       const value = this.buildTrackingValue(rows)
 
-      if (value === order.trk) return
+      if (value === order.trk) return true
+
+      const previousValue = order.trk
+
+      // Update local state immediately so a status click after Enter/blur
+      // sees the new tracking value while the API request is in progress.
+      order.trk = value
+
+      if (this.selectedOrder && Number(this.selectedOrder.id) === orderId) {
+        this.selectedOrder.trk = value
+      }
+
+      this.orderMutationVersion += 1
 
       this.boardTrackingSaving = {
         ...this.boardTrackingSaving,
         [orderId]: true
       }
 
-      const saved = await this.saveDirectInlineField(order, 'trk', value)
+      const savePromise = this.saveDirectInlineField(order, 'trk', value)
+      this.boardTrackingSavePromises = {
+        ...this.boardTrackingSavePromises,
+        [orderId]: savePromise
+      }
+
+      const saved = await savePromise
 
       if (!saved) {
+        order.trk = previousValue
+
+        if (this.selectedOrder && Number(this.selectedOrder.id) === orderId) {
+          this.selectedOrder.trk = previousValue
+        }
+
         this.boardTrackingDrafts = {
           ...this.boardTrackingDrafts,
-          [orderId]: this.parseTrackingList(order.trk)
+          [orderId]: this.parseTrackingList(previousValue)
         }
       }
+
+      const pendingSaves = { ...this.boardTrackingSavePromises }
+      delete pendingSaves[orderId]
+      this.boardTrackingSavePromises = pendingSaves
 
       this.boardTrackingSaving = {
         ...this.boardTrackingSaving,
         [orderId]: false
       }
+
+      return saved
     },
 
     startInlineOrder() {
@@ -9764,6 +9800,7 @@ async bulkChangeStatus() {
 
     if (!status) return
 
+    this.orderMutationVersion += 1
     await axios.post('/api/orders/bulk-status', {
       order_ids: selected.map(order => order.id),
       status: status.label,
@@ -9776,7 +9813,6 @@ async bulkChangeStatus() {
       order.group = status.group || this.statusToGroup(status.label)
     })
     this.orders = [...this.orders]
-    await this.fetchOrders({ silent: true, loadFiles: false })
     this.clearBulkSelection()
   } catch (error) {
     console.error('Bulk status error:', error)
@@ -10416,6 +10452,7 @@ async saveTracking() {
   const trk = this.buildTrackingValue(this.trackingEditList)
 
   try {
+    this.orderMutationVersion += 1
     await axios.put(
       `/api/orders/${this.selectedOrder.id}`,
       { trk },
@@ -10727,8 +10764,8 @@ closePreviewFile() {
   }
 },
 
-    async fetchOrders({ silent = false, loadFiles = true } = {}) {
-      const loadingStartedAt = Date.now()
+    async fetchOrders({ silent = false, loadFiles = false } = {}) {
+      const requestMutationVersion = this.orderMutationVersion
       if (!silent) {
         this.loadingProgress = 0
         this.loadingOrders = true
@@ -10743,11 +10780,15 @@ closePreviewFile() {
         }
 
         const res = await axios.get('/api/orders', { headers: this.headers() })
+
+        // Ignore an old response if tracking/status changed while it was loading.
+        if (requestMutationVersion !== this.orderMutationVersion) return
+
         const list = Array.isArray(res.data) ? res.data : (res.data?.data || [])
         this.orders = list.map(rawOrder => {
           const freshOrder = this.formatOrder(rawOrder)
 
-          if (!loadFiles) {
+          if (!loadFiles && !Array.isArray(rawOrder.files)) {
             const previousOrder = previousOrders.get(Number(freshOrder.id))
 
             if (previousOrder) {
@@ -10768,10 +10809,6 @@ closePreviewFile() {
         })
 
         if (!silent) this.loadingProgress = 15
-
-        // Load file thumbnails for every board row as well.
-        // This keeps the 3 thumbnail previews visible after a full page refresh.
-        if (loadFiles) await this.loadBoardOrderFiles(!silent)
 
         /*
          * Preserve the SAME selected order after any refresh.
@@ -10797,20 +10834,8 @@ closePreviewFile() {
         if (!silent) console.error('fetchOrders error:', e)
       } finally {
         if (!silent) {
-          const remainingLoadingTime = Math.max(
-            0,
-            2000 - (Date.now() - loadingStartedAt)
-          )
-
-          if (remainingLoadingTime) {
-            await new Promise(resolve =>
-              window.setTimeout(resolve, remainingLoadingTime)
-            )
-          }
-
           this.loadingProgress = 100
           await this.$nextTick()
-          await new Promise(resolve => window.setTimeout(resolve, 300))
           this.loadingOrders = false
         }
       }
@@ -10908,6 +10933,11 @@ async fetchClients() {
     formatOrder(order) {
       const members = order.members || []
       const status = order.status || 'Pending'
+      const normalizedFiles = (order.files || []).map(file => ({
+        ...this.normalizeOrderFile(file),
+        cardType: this.normalizeCardType(file.card_type || file.cardType)
+      }))
+
       return {
         id: order.id,
         created_at: order.created_at || null,
@@ -10973,7 +11003,7 @@ async fetchClients() {
           order.createdBy ||
           null,
 
-        invoiceFiles: [],
+        invoiceFiles: normalizedFiles.filter(file => file.cardType === 'invoice_files'),
         owners: members.map(m => ({
           id: m.id, name: m.name, email: m.email,
           initial: this.initial(m.name), color: this.memberColor(m.id),
@@ -10981,11 +11011,11 @@ async fetchClients() {
           profile_photo_url: m.profile_photo_url || null, about: m.about || ''
         })),
         cards: [
-          { title: 'Approved Mockup', type: 'approved_mockup', icon: 'fa-solid fa-shirt', files: [], thumbnail: '' },
-          { title: 'Logos', type: 'logos', icon: 'fa-solid fa-image', files: [], thumbnail: '' },
-          { title: 'Team Roster', type: 'roster', icon: 'fa-solid fa-users', files: [], thumbnail: '' },
-          { title: 'Finished Products', type: 'finished_products', icon: 'fa-solid fa-box', files: [], thumbnail: '' },
-          { title: 'Files', type: 'order_files', icon: 'fa-solid fa-folder-open', files: [], thumbnail: '' },
+          { title: 'Approved Mockup', type: 'approved_mockup', icon: 'fa-solid fa-shirt', files: normalizedFiles.filter(file => file.cardType === 'approved_mockup'), thumbnail: '' },
+          { title: 'Logos', type: 'logos', icon: 'fa-solid fa-image', files: normalizedFiles.filter(file => file.cardType === 'logos'), thumbnail: '' },
+          { title: 'Team Roster', type: 'roster', icon: 'fa-solid fa-users', files: normalizedFiles.filter(file => file.cardType === 'roster'), thumbnail: '' },
+          { title: 'Finished Products', type: 'finished_products', icon: 'fa-solid fa-box', files: normalizedFiles.filter(file => file.cardType === 'finished_products'), thumbnail: '' },
+          { title: 'Files', type: 'order_files', icon: 'fa-solid fa-folder-open', files: normalizedFiles.filter(file => file.cardType === 'order_files' || file.cardType === 'chat_files'), thumbnail: '' },
           { title: 'Notes', type: 'notes', icon: 'fa-solid fa-file-word', files: [], thumbnail: '', noteText: order.notes || '', saved: false }
         ]
       }
@@ -11349,6 +11379,8 @@ shipping_address: this.newOrder.shippingAddress,
     async changeStatus(s) {
       if (!this.canChangeOrderStatus || !this.selectedOrder) return
 
+      await this.saveBoardTrackingRows(this.selectedOrder)
+
       if (this.statusRequiresTracking(s.label) && !this.orderHasTracking(this.selectedOrder)) {
         alert(this.trackingRequiredMessage())
         return
@@ -11358,6 +11390,7 @@ shipping_address: this.newOrder.shippingAddress,
         String(s.label || '').trim().toLowerCase() === 'shipped'
       const shippedBy = isShipped ? this.currentUser : null
       try {
+        this.orderMutationVersion += 1
         await axios.put(`/api/orders/${this.selectedOrder.id}`, {
           status: s.label,
           status_color: s.color || '#6161ff',
@@ -11384,7 +11417,6 @@ shipping_address: this.newOrder.shippingAddress,
         if (idx !== -1) this.orders[idx] = { ...this.selectedOrder }
         this.orders = [...this.orders]
         this.showStatusMenu = false
-        await this.fetchOrders({ silent: true, loadFiles: false })
       } catch (e) {
         console.error('changeStatus error:', e)
         alert(e.response?.data?.message || 'Status could not be updated.')
