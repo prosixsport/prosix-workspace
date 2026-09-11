@@ -709,7 +709,7 @@
                 <div
                   v-if="isShippedOrder(order) && finishedDesigner(order)"
                   class="finished-user-avatar-only"
-                  :title="finishedDesigner(order).name + ' finished this order'"
+                  :title="finishedOrderHoverText(order)"
                   @click.stop
                 >
                   <img
@@ -745,7 +745,7 @@
                   "
                   type="button"
                   class="working-user-avatar-only working-user-avatar-stop"
-                  :title="'Stop work for ' + workingDesigner(order).name"
+                  :title="workingOrderHoverText(order, true)"
                   aria-label="Stop Work"
                   @click.stop="stopWorking(order)"
                 >
@@ -771,7 +771,7 @@
                 <div
                   v-else-if="workingDesigner(order)"
                   class="working-user-avatar-only working-user-avatar-readonly"
-                  :title="workingDesigner(order).name + ' is working'"
+                  :title="workingOrderHoverText(order)"
                   @click.stop
                 >
                   <img
@@ -2981,52 +2981,41 @@
             </div>
 
             <div class="board-advanced-filters">
-              <div v-for="filter in advancedFilterDefinitions" :key="filter.key" class="board-filter-field">
-                <label><i :class="filter.icon"></i> {{ filter.label }}</label>
+              <div class="board-filter-tabs" role="tablist" aria-label="Order filters">
+                <button
+                  v-for="filter in advancedFilterDefinitions"
+                  :key="filter.key"
+                  type="button"
+                  class="board-filter-tab"
+                  :class="{
+                    active: openAdvancedFilter === `saved:${filter.key}`,
+                    selected: filterSelections[filter.key].length
+                  }"
+                  @click="toggleAdvancedFilter(filter.key)"
+                >
+                  <i :class="filter.icon"></i>
+                  <span>{{ filter.label }}</span>
+                  <b v-if="filterSelections[filter.key].length">{{ filterSelections[filter.key].length }}</b>
+                  <i class="fa-solid fa-chevron-down"></i>
+                </button>
+              </div>
 
-                <div class="board-filter-search-box">
-                  <i class="fa-solid fa-magnifying-glass"></i>
-                  <input
-                    v-model.trim="filterSearches[filter.key]"
-                    :placeholder="`Search ${filter.label.toLowerCase()}...`"
-                    @input="openAdvancedFilterSearch(filter.key, $event.target.value)"
-                    @keydown.enter.prevent="addAdvancedFilter(filter.key, filterSearches[filter.key])"
-                  />
-                  <button type="button" class="board-filter-toggle" @click="toggleAdvancedFilter(filter.key)">
-                    <i class="fa-solid fa-chevron-down" :class="{ rotate: openAdvancedFilter === `saved:${filter.key}` }"></i>
-                  </button>
+              <div v-if="activeAdvancedFilterDefinition" class="board-filter-tab-panel">
+                <button
+                  v-for="value in activeAdvancedFilterDefinition.values"
+                  :key="`${activeAdvancedFilterDefinition.key}-${value}`"
+                  type="button"
+                  class="board-filter-option"
+                  :class="{ active: isAdvancedFilterSelected(activeAdvancedFilterDefinition.key, value) }"
+                  @click="toggleSavedFilter(activeAdvancedFilterDefinition.key, value)"
+                >
+                  <span>{{ value }}</span>
+                  <i v-if="isAdvancedFilterSelected(activeAdvancedFilterDefinition.key, value)" class="fa-solid fa-check"></i>
+                </button>
 
-                  <div v-if="openAdvancedFilter === `saved:${filter.key}`" class="board-filter-suggestions">
-                    <div class="board-filter-dropdown-head">
-                      <strong>Saved ({{ filterHistory[filter.key].length }})</strong>
-                      <button v-if="filterHistory[filter.key].length" type="button" @click="clearAdvancedFilter(filter.key)">Clear All</button>
-                    </div>
-
-                    <div
-                      v-for="value in filterHistory[filter.key]"
-                      :key="`selected-${filter.key}-${value}`"
-                      class="board-filter-selected-row"
-                      :class="{ active: isAdvancedFilterSelected(filter.key, value) }"
-                    >
-                      <button type="button" class="board-filter-select-saved" @click="toggleSavedFilter(filter.key, value)">
-                        <span>{{ value }}</span>
-                        <i v-if="isAdvancedFilterSelected(filter.key, value)" class="fa-solid fa-check"></i>
-                      </button>
-                      <button type="button" class="board-filter-delete-saved" title="Delete saved filter" @click="deleteSavedFilter(filter.key, value)">
-                        <i class="fa-solid fa-xmark"></i>
-                      </button>
-                    </div>
-
-                    <small v-if="!filterHistory[filter.key].length">No saved filters</small>
-                  </div>
-
-                  <div v-if="openAdvancedFilter === `search:${filter.key}` && filterSearches[filter.key]" class="board-filter-suggestions">
-                    <button v-for="value in filter.suggestions" :key="value" type="button" @click="addAdvancedFilter(filter.key, value)">{{ value }}</button>
-                    <button v-if="filterSearches[filter.key] && !filter.suggestions.length" type="button" @click="addAdvancedFilter(filter.key, filterSearches[filter.key])">
-                      Add “{{ filterSearches[filter.key] }}”
-                    </button>
-                  </div>
-                </div>
+                <small v-if="!activeAdvancedFilterDefinition.values.length">
+                  No {{ activeAdvancedFilterDefinition.label.toLowerCase() }} values found.
+                </small>
               </div>
 
               <button
@@ -3497,11 +3486,7 @@ canManageStatusDefinitions() {
     currentTabOrders() {
       return this.accessibleOrders.filter(order =>
         this.activeGroup === 'all' ||
-        order.group === this.activeGroup ||
-        (
-          this.activeGroup === 'delivered' &&
-          String(order.status || '').trim().toLowerCase() === 'delivered'
-        )
+        order.group === this.activeGroup
       )
     },
 
@@ -3532,12 +3517,21 @@ canManageStatusDefinitions() {
         key,
         label,
         icon,
+        values: [...new Set(values.map(value => String(value || '').trim()).filter(Boolean))],
         suggestions: this.filterSuggestionValues(
           values,
           this.filterSearches[key],
           this.filterHistory[key]
         )
       }))
+    },
+
+    activeAdvancedFilterDefinition() {
+      const key = String(this.openAdvancedFilter || '')
+        .replace('saved:', '')
+        .replace('search:', '')
+
+      return this.advancedFilterDefinitions.find(filter => filter.key === key) || null
     },
 
     activeBoardFilterCount() {
@@ -5426,7 +5420,9 @@ beforeUnmount()  {
     },
 
     isShippedOrder(order) {
-      return String(order?.status || '').trim().toLowerCase() === 'shipped'
+      return ['shipped', 'delivered'].includes(
+        String(order?.status || '').trim().toLowerCase()
+      )
     },
 
     finishedDesigner(order) {
@@ -5439,6 +5435,47 @@ beforeUnmount()  {
         this.getFinishedWorkMap()[Number(order.id)] ||
         null
       )
+    },
+
+    formatWorkDateTime(value) {
+      if (!value) return ''
+
+      const date = new Date(value)
+      if (Number.isNaN(date.getTime())) return ''
+
+      return date.toLocaleString('en-US', {
+        month: 'short',
+        day: 'numeric',
+        year: 'numeric',
+        hour: '2-digit',
+        minute: '2-digit',
+        hour12: true
+      })
+    },
+
+    workingOrderHoverText(order, canStop = false) {
+      const worker = this.workingDesigner(order)
+      if (!worker) return 'Start Work'
+
+      const startedAt = worker.started_at || order?.working_started_at
+      const action = canStop ? 'Click to stop work. ' : ''
+      const when = this.formatWorkDateTime(startedAt)
+
+      return when
+        ? `${action}${worker.name} started this order on ${when}`
+        : `${action}${worker.name} is working on this order`
+    },
+
+    finishedOrderHoverText(order) {
+      const finisher = this.finishedDesigner(order)
+      if (!finisher) return 'Order finished'
+
+      const finishedAt = order?.finished_at || finisher.finished_at
+      const when = this.formatWorkDateTime(finishedAt)
+
+      return when
+        ? `${finisher.name} finished this order on ${when}`
+        : `${finisher.name} finished this order`
     },
 
     async finishWorkForShippedOrder(order, worker = null) {
@@ -5466,6 +5503,7 @@ beforeUnmount()  {
         this.markOrderFinished(order.id, savedFinisher)
         this.clearOrderWorkStarted(order.id)
         order.finished_by = savedFinisher
+        order.finished_at = response.data?.finished_at || savedFinisher.finished_at || new Date().toISOString()
         order.work_started = false
         order.is_working = false
         order.work_session_active = false
@@ -6100,6 +6138,11 @@ beforeUnmount()  {
           order[field] = value
         }
 
+        if (field === 'trk') {
+          order.group = this.orderDisplayGroup(order)
+          this.orders = [...this.orders]
+        }
+
         this.cancelInlineCell()
       } catch (error) {
         console.error('Inline cell save error:', error)
@@ -6178,6 +6221,10 @@ beforeUnmount()  {
           } else {
             this.selectedOrder[field] = value
           }
+
+          if (field === 'trk') {
+            this.selectedOrder.group = order.group
+          }
         }
 
         return true
@@ -6206,11 +6253,6 @@ beforeUnmount()  {
 
       if (!status) return
 
-      if (this.statusRequiresTracking(status.label) && !this.orderHasTracking(order)) {
-        alert(this.trackingRequiredMessage())
-        return false
-      }
-
       const activeWorker = this.workingDesigner(order)
       const isShipped =
         String(status.label).trim().toLowerCase() === 'shipped'
@@ -6237,8 +6279,7 @@ beforeUnmount()  {
 
         order.status = status.label
         order.statusColor = status.color
-        const targetGroup = status.group || this.statusToGroup(status.label)
-        order.group = targetGroup
+        order.group = this.orderDisplayGroup(order)
 
         if (isShipped && shippedBy) {
           this.markOrderFinished(order.id, shippedBy)
@@ -9476,9 +9517,11 @@ body.board-column-resizing .column-resizer::before {
 
       if (!saved) {
         order.trk = previousValue
+        order.group = this.orderDisplayGroup(order)
 
         if (this.selectedOrder && Number(this.selectedOrder.id) === orderId) {
           this.selectedOrder.trk = previousValue
+          this.selectedOrder.group = order.group
         }
 
         this.boardTrackingDrafts = {
@@ -9782,14 +9825,6 @@ async bulkChangeStatus() {
   const selectedIds = new Set(this.selectedOrders.map(Number))
   const selected = this.orders.filter(order => selectedIds.has(Number(order.id)))
 
-  if (
-    this.statusRequiresTracking(this.bulkStatusLabel) &&
-    selected.some(order => !this.orderHasTracking(order))
-  ) {
-    alert(this.trackingRequiredMessage())
-    return
-  }
-
   this.bulkStatusSaving = true
 
   try {
@@ -9810,7 +9845,7 @@ async bulkChangeStatus() {
     selected.forEach(order => {
       order.status = status.label
       order.statusColor = status.color
-      order.group = status.group || this.statusToGroup(status.label)
+      order.group = this.orderDisplayGroup(order)
     })
     this.orders = [...this.orders]
     this.clearBulkSelection()
@@ -10380,12 +10415,6 @@ parseTrackingList(value) {
   return [this.parseTracking(value)]
 },
 
-statusRequiresTracking(status) {
-  return ['shipped', 'delivered'].includes(
-    String(status || '').trim().toLowerCase()
-  )
-},
-
 orderHasTracking(order) {
   const trackingItems = this.parseTrackingList(order?.trk)
 
@@ -10396,10 +10425,6 @@ orderHasTracking(order) {
 
     return !invalid.includes(number) || !invalid.includes(company)
   })
-},
-
-trackingRequiredMessage() {
-  return 'Please add tracking information before moving this order to Shipped or Delivered.'
 },
 
 buildTrackingValue(list) {
@@ -10947,7 +10972,7 @@ async fetchClients() {
           this.persistentSeenOrderIds.includes(Number(order.id)),
         read_at: order.read_at || null,
         read_info: order.read_info || [],
-        group: this.statusToGroup(status),
+        group: this.orderDisplayGroup(order),
         name: order.name,
         hasChildren: false,
         po: order.po || 'N/A',
@@ -11043,6 +11068,19 @@ async fetchClients() {
       }
 
       return 'in_production'
+    },
+
+    orderDisplayGroup(order) {
+      const status = String(order?.status || '').trim().toLowerCase()
+
+      if (
+        ['shipped', 'delivered'].includes(status) &&
+        !this.orderHasTracking(order)
+      ) {
+        return 'in_production'
+      }
+
+      return this.statusToGroup(status)
     },
 
     groupForDropdownStatus(label) {
@@ -11381,10 +11419,6 @@ shipping_address: this.newOrder.shippingAddress,
 
       await this.saveBoardTrackingRows(this.selectedOrder)
 
-      if (this.statusRequiresTracking(s.label) && !this.orderHasTracking(this.selectedOrder)) {
-        alert(this.trackingRequiredMessage())
-        return
-      }
       const activeWorker = this.workingDesigner(this.selectedOrder)
       const isShipped =
         String(s.label || '').trim().toLowerCase() === 'shipped'
@@ -11403,8 +11437,7 @@ shipping_address: this.newOrder.shippingAddress,
         }, { headers: this.headers() })
         this.selectedOrder.status = s.label
         this.selectedOrder.statusColor = s.color || '#6161ff'
-        const targetGroup = s.group || this.statusToGroup(s.label)
-        this.selectedOrder.group = targetGroup
+        this.selectedOrder.group = this.orderDisplayGroup(this.selectedOrder)
         if (isShipped && shippedBy) {
           this.markOrderFinished(this.selectedOrder.id, shippedBy)
           this.selectedOrder.finished_by = shippedBy
@@ -25900,6 +25933,182 @@ body.board-column-resizing .column-resizer::before {
   gap: 13px;
 }
 
+.board-filter-tabs {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 6px;
+}
+
+.board-filter-tab {
+  min-width: 0;
+  height: 40px;
+  padding: 0 9px;
+  border: 1px solid #dbe1e8;
+  border-radius: 9px;
+  background: #fff;
+  color: #475569;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  font-size: 11px;
+  font-weight: 900;
+  cursor: pointer;
+}
+
+.board-filter-tab > span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.board-filter-tab > b {
+  min-width: 18px;
+  height: 18px;
+  padding: 0 5px;
+  border-radius: 999px;
+  background: #6161ff;
+  color: #fff;
+  display: grid;
+  place-items: center;
+  font-size: 9px;
+}
+
+.board-filter-tab.active,
+.board-filter-tab.selected {
+  border-color: #6161ff;
+  background: #f1f1ff;
+  color: #3730a3;
+}
+
+.board-filter-tab-panel {
+  max-height: 230px;
+  padding: 6px;
+  overflow-y: auto;
+  border: 1px solid #dbe1e8;
+  border-radius: 10px;
+  background: #fff;
+  box-shadow: 0 10px 25px rgba(15, 23, 42, .1);
+}
+
+.board-filter-option {
+  width: 100%;
+  min-height: 37px;
+  padding: 7px 10px;
+  border: 0;
+  border-radius: 7px;
+  background: transparent;
+  color: #334155;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  text-align: left;
+  font-size: 12px;
+  font-weight: 800;
+  cursor: pointer;
+}
+
+.board-filter-option:hover,
+.board-filter-option.active {
+  background: #eef2ff;
+  color: #3730a3;
+}
+
+.board-filter-tab-panel > small {
+  display: block;
+  padding: 18px 8px;
+  color: #94a3b8;
+  text-align: center;
+}
+
+.board-filter-tabs {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 6px;
+}
+
+.board-filter-tab {
+  min-width: 0;
+  height: 40px;
+  padding: 0 9px;
+  border: 1px solid #dbe1e8;
+  border-radius: 9px;
+  background: #fff;
+  color: #475569;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  font-size: 11px;
+  font-weight: 900;
+  cursor: pointer;
+}
+
+.board-filter-tab > span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.board-filter-tab > b {
+  min-width: 18px;
+  height: 18px;
+  padding: 0 5px;
+  border-radius: 999px;
+  background: #6161ff;
+  color: #fff;
+  display: grid;
+  place-items: center;
+  font-size: 9px;
+}
+
+.board-filter-tab.active,
+.board-filter-tab.selected {
+  border-color: #6161ff;
+  background: #f1f1ff;
+  color: #3730a3;
+}
+
+.board-filter-tab-panel {
+  max-height: 230px;
+  padding: 6px;
+  overflow-y: auto;
+  border: 1px solid #dbe1e8;
+  border-radius: 10px;
+  background: #fff;
+  box-shadow: 0 10px 25px rgba(15, 23, 42, .1);
+}
+
+.board-filter-option {
+  width: 100%;
+  min-height: 37px;
+  padding: 7px 10px;
+  border: 0;
+  border-radius: 7px;
+  background: transparent;
+  color: #334155;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  text-align: left;
+  font-size: 12px;
+  font-weight: 800;
+  cursor: pointer;
+}
+
+.board-filter-option:hover,
+.board-filter-option.active {
+  background: #eef2ff;
+  color: #3730a3;
+}
+
+.board-filter-tab-panel > small {
+  display: block;
+  padding: 18px 8px;
+  color: #94a3b8;
+  text-align: center;
+}
+
 .board-filter-field {
   display: grid;
   gap: 7px;
@@ -26188,7 +26397,7 @@ body.board-column-resizing .column-resizer::before {
 }
 
 .factory-board-page .order-po-number {
-  color: #475569;
+  color: #94a3b8;
   font-size: 10px;
   font-weight: 900;
   letter-spacing: .01em;
