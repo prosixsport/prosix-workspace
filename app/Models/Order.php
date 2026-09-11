@@ -179,4 +179,13 @@ class Order extends Model
             ->whereNull('ended_at')
             ->latestOfMany('started_at');
     }
+
+    public function latestFinishedWorkSession()
+    {
+        return $this->hasOne(
+            OrderWorkSession::class
+        )
+            ->whereNotNull('ended_at')
+            ->latestOfMany('ended_at');
+    }
 }

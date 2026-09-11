@@ -24,6 +24,7 @@ public function index()
             'members:id,name,email,role,profile_photo,about',
             'clients:id,user_id,name,email',
             'activeWorkSession.user:id,name,email,role,profile_photo',
+            'latestFinishedWorkSession.user:id,name,email,role,profile_photo',
             'reads' => fn ($query) => $query
                 ->select(['id', 'order_id', 'user_id', 'read_at'])
                 ->where('user_id', $user->id),
@@ -83,6 +84,19 @@ public function index()
                     'started_at' => $activeWork->started_at,
                 ]
                 : null;
+
+            $finishedWork = $order->latestFinishedWorkSession;
+            $order->finished_by = $finishedWork?->user
+                ? [
+                    'id' => $finishedWork->user->id,
+                    'name' => $finishedWork->user->name,
+                    'email' => $finishedWork->user->email,
+                    'role' => $finishedWork->user->role,
+                    'profile_photo_url' => $finishedWork->user->profile_photo_url,
+                    'finished_at' => $finishedWork->ended_at,
+                ]
+                : null;
+            $order->finished_at = $finishedWork?->ended_at;
 
             $order->unsetRelation('latestMessage');
 
@@ -311,20 +325,6 @@ public function update(Request $request, Order $order)
         'client_ids' => 'nullable|array',
         'client_ids.*' => 'exists:clients,id',
     ]);
-
-    if (
-        $request->filled('status')
-        && strcasecmp(trim((string) $request->status), trim((string) $order->status)) !== 0
-        && $this->statusRequiresTracking($request->status)
-    ) {
-        $tracking = $request->exists('trk') ? $request->input('trk') : $order->trk;
-
-        if (!$this->hasTrackingInformation($tracking)) {
-            return response()->json([
-                'message' => 'Please add tracking information before moving this order to Shipped or Delivered.',
-            ], 422);
-        }
-    }
 
     $oldMemberIds = $order->members()
         ->pluck('users.id')
@@ -678,10 +678,21 @@ public function release(Order $order)
         'last_seen_at' => now(),
     ]);
 
+    $activeWork->load('user:id,name,email,role,profile_photo');
+
     return response()->json([
         'success' => true,
         'message' => 'Working status stopped.',
         'working_by' => null,
+        'finished_by' => [
+            'id' => $activeWork->user->id,
+            'name' => $activeWork->user->name,
+            'email' => $activeWork->user->email,
+            'role' => $activeWork->user->role,
+            'profile_photo_url' => $activeWork->user->profile_photo_url,
+            'finished_at' => $activeWork->ended_at,
+        ],
+        'finished_at' => $activeWork->ended_at,
     ]);
 }
 
@@ -810,18 +821,6 @@ public function release(Order $order)
             $this->checkAccess($order);
         }
 
-        if ($this->statusRequiresTracking($validated['status'])) {
-            $ordersWithoutTracking = $orders
-                ->filter(fn (Order $order) => !$this->hasTrackingInformation($order->trk));
-
-            if ($ordersWithoutTracking->isNotEmpty()) {
-                return response()->json([
-                    'message' => 'Please add tracking information before moving this order to Shipped or Delivered.',
-                    'order_ids' => $ordersWithoutTracking->pluck('id')->values(),
-                ], 422);
-            }
-        }
-
         DB::transaction(function () use ($orders, $validated, $user) {
             foreach ($orders as $order) {
                 $oldStatus = $order->status;
@@ -856,48 +855,6 @@ public function release(Order $order)
                 'clients:id,user_id,name,email',
             ]),
         ]);
-    }
-
-    private function statusRequiresTracking(?string $status): bool
-    {
-        return in_array(strtolower(trim((string) $status)), ['shipped', 'delivered'], true);
-    }
-
-    private function hasTrackingInformation($tracking): bool
-    {
-        if (is_array($tracking)) {
-            return collect($tracking)->contains(
-                fn ($item) => $this->hasTrackingInformation($item)
-            );
-        }
-
-        $value = trim((string) $tracking);
-
-        if ($value === '') {
-            return false;
-        }
-
-        $decoded = json_decode($value, true);
-
-        if (json_last_error() === JSON_ERROR_NONE && is_array($decoded)) {
-            return collect($decoded)->contains(function ($item) {
-                if (is_array($item)) {
-                    return $this->hasTrackingInformation($item['number'] ?? null)
-                        || $this->hasTrackingInformation($item['company'] ?? null);
-                }
-
-                return $this->hasTrackingInformation($item);
-            });
-        }
-
-        return !in_array(strtolower($value), [
-            'n/a',
-            'na',
-            'none',
-            'null',
-            'undefined',
-            'not available',
-        ], true);
     }
 
     public function bulkMembers(Request $request)
