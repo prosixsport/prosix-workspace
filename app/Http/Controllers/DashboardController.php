@@ -22,11 +22,26 @@ class DashboardController extends Controller
             ], 401);
         }
 
+        $isSuperAdmin = $user->role === 'super_admin';
+
         $orders = Order::query()
             ->with([
                 'members:id,name,role,profile_photo',
                 'activeWorkSession.user:id,name,role,profile_photo',
             ])
+            ->when(!$isSuperAdmin && $user->role === 'client', function ($query) use ($user) {
+                $query->whereHas('clients', fn ($clients) =>
+                    $clients->where('clients.user_id', $user->id)
+                );
+            })
+            ->when(!$isSuperAdmin && $user->role !== 'client', function ($query) use ($user) {
+                $query->where(function ($orders) use ($user) {
+                    $orders->where('created_by', $user->id)
+                        ->orWhereHas('members', fn ($members) =>
+                            $members->where('users.id', $user->id)
+                        );
+                });
+            })
             ->latest()
             ->get();
 
@@ -95,11 +110,11 @@ class DashboardController extends Controller
             'stats' => $stats,
             'recent_orders' => $recentOrders,
             'designer_performance' =>
-                $this->designerPerformanceData(),
+                $this->designerPerformanceData($user, $orders),
         ]);
     }
 
-    private function designerPerformanceData()
+    private function designerPerformanceData(User $viewer, $visibleOrders)
     {
         $designers = User::query()
             ->whereIn('role', [
@@ -107,6 +122,9 @@ class DashboardController extends Controller
                 'admin',
                 'member',
             ])
+            ->when($viewer->role !== 'super_admin', fn ($query) =>
+                $query->where('id', $viewer->id)
+            )
             ->orderByRaw("
                 CASE
                     WHEN role = 'super_admin' THEN 1
@@ -123,15 +141,60 @@ class DashboardController extends Controller
                 'profile_photo',
             ]);
 
+        if ($designers->isEmpty()) {
+            return collect();
+        }
+
+        $designerIds = $designers->pluck('id');
+        $visibleOrderIds = $visibleOrders->pluck('id');
+
         $sessions = OrderWorkSession::query()
             ->with('order:id,name,po,status')
+            ->whereIn('user_id', $designerIds)
+            ->whereIn('order_id', $visibleOrderIds)
             ->orderByDesc('started_at')
             ->get();
 
         $activities = OrderActivity::query()
             ->with('order:id,name,po,status')
+            ->whereIn('order_id', $visibleOrderIds)
             ->orderByDesc('created_at')
             ->get();
+
+        $statusOrdersByUser = [];
+
+        foreach ($visibleOrders as $order) {
+            $category = $this->statusCategory($order->status);
+
+            $matchingActivity = $activities
+                ->where('order_id', $order->id)
+                ->first(fn ($activity) =>
+                    $activity->user_id &&
+                    $this->activityMovedTo($activity, $category)
+                );
+
+            $latestSession = $sessions
+                ->where('order_id', $order->id)
+                ->first();
+
+            $ownerId = $category === 'in_production'
+                ? $latestSession?->user_id
+                : ($matchingActivity?->user_id ?: $latestSession?->user_id);
+
+            if (!$ownerId || !$designerIds->contains((int) $ownerId)) {
+                continue;
+            }
+
+            $statusOrdersByUser[(int) $ownerId][$category][] = [
+                'order_id' => $order->id,
+                'order_name' => $order->name ?: 'Deleted Order',
+                'po' => $order->po,
+                'status' => $order->status,
+                'status_color' => $order->status_color,
+                'started_at' => $latestSession?->started_at,
+                'changed_at' => $matchingActivity?->created_at ?: $order->updated_at,
+            ];
+        }
 
         return $designers->map(function ($designer) use (
             $sessions,
@@ -163,30 +226,11 @@ class DashboardController extends Controller
                 ->unique()
                 ->values();
 
-            $completedOrders = $designerActivities
-                ->filter(
-                    fn ($activity) =>
-                        $this->activityMovedTo(
-                            $activity,
-                            'completed'
-                        )
-                )
-                ->pluck('order_id')
-                ->filter()
-                ->unique()
-                ->count();
-
-            $forwardedOrders = $designerActivities
-                ->filter(
-                    fn ($activity) =>
-                        str_contains(
-                            strtolower(
-                                (string) $activity->action
-                            ),
-                            'forward'
-                        )
-                )
-                ->count();
+            $categoryOrders = $statusOrdersByUser[(int) $designer->id] ?? [];
+            $inProductionOrders = collect($categoryOrders['in_production'] ?? [])->values();
+            $completedOrders = collect($categoryOrders['completed'] ?? [])->values();
+            $shippedOrders = collect($categoryOrders['shipped'] ?? [])->values();
+            $deliveredOrders = collect($categoryOrders['delivered'] ?? [])->values();
 
             $currentlyWorking = $designerSessions
                 ->whereNull('ended_at')
@@ -258,14 +302,14 @@ class DashboardController extends Controller
                         ])
                         ->values(),
 
-                'total_worked_orders' =>
-                    $workedOrderIds->count(),
-
-                'completed_orders' =>
-                    $completedOrders,
-
-                'forwarded_orders' =>
-                    $forwardedOrders,
+                'in_production_orders' => $inProductionOrders,
+                'in_production_count' => $inProductionOrders->count(),
+                'completed_order_list' => $completedOrders,
+                'completed_orders' => $completedOrders->count(),
+                'shipped_order_list' => $shippedOrders,
+                'shipped_orders' => $shippedOrders->count(),
+                'delivered_order_list' => $deliveredOrders,
+                'delivered_orders' => $deliveredOrders->count(),
 
                 'total_minutes' =>
                     $totalMinutes,
@@ -297,6 +341,7 @@ class DashboardController extends Controller
 
         $newStatus = strtolower(
             (string) (
+                $changes['new'] ??
                 $changes['status']['new'] ??
                 $changes['status']['to'] ??
                 $changes['to_status'] ??
@@ -305,10 +350,21 @@ class DashboardController extends Controller
         );
 
         return (
+            $this->statusCategory($newStatus) === $status ||
             str_contains($action, $status) ||
-            str_contains($description, $status) ||
-            $newStatus === strtolower($status)
+            str_contains($description, $status)
         );
+    }
+
+    private function statusCategory($status): string
+    {
+        $status = strtolower(trim((string) $status));
+
+        if (str_contains($status, 'delivered')) return 'delivered';
+        if (str_contains($status, 'shipped')) return 'shipped';
+        if (str_contains($status, 'completed')) return 'completed';
+
+        return 'in_production';
     }
 
     private function statusContains(

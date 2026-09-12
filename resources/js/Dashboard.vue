@@ -213,7 +213,7 @@
                             Working, completed and total time record for every designer.
                         </p>
                     </div>
-                    <div class="performance-search">
+                    <div v-if="isSuperAdmin" class="performance-search">
                         <i class="fa-solid fa-magnifying-glass"></i>
                         <input
                             v-model.trim="designerSearch"
@@ -300,27 +300,27 @@
                         </div>
                         <div class="designer-metrics">
                             <div>
-                                <span>Working Now</span>
+                                <span>In Production</span>
                                 <strong>
-                                    {{ designer.currently_working }}
-                                </strong>
-                            </div>
-                            <div>
-                                <span>Worked Orders</span>
-                                <strong>
-                                    {{ designer.total_worked_orders }}
+                                    {{ designer.in_production_count || 0 }}
                                 </strong>
                             </div>
                             <div>
                                 <span>Completed</span>
                                 <strong>
-                                    {{ designer.completed_orders }}
+                                    {{ designer.completed_orders || 0 }}
                                 </strong>
                             </div>
                             <div>
-                                <span>Shipped / Finished</span>
+                                <span>Shipped</span>
                                 <strong>
-                                    {{ designerShippedCount(designer) }}
+                                    {{ designer.shipped_orders || 0 }}
+                                </strong>
+                            </div>
+                            <div>
+                                <span>Delivered</span>
+                                <strong>
+                                    {{ designer.delivered_orders || 0 }}
                                 </strong>
                             </div>
                         </div>
@@ -340,78 +340,40 @@
                         </div>
                         <div
                             v-if="
-                                designer.currently_working_orders?.length
-                            "
-                            class="working-orders"
-                        >
-                            <span class="working-label">
-                                <i class="fa-solid fa-circle"></i>
-                                Working now
-                            </span>
-                            <button
-                                v-for="order in designer.currently_working_orders"
-                                :key="order.order_id"
-                                type="button"
-                                @click="openOrder(order.order_id)"
-                            >
-                                {{ order.order_name }}
-                            </button>
-                        </div>
-                        <div
-                            v-if="
                                 expandedDesignerId === designer.id
                             "
                             class="designer-history"
                         >
                             <div class="history-head">
-                                <strong>Recent Work Record</strong>
-                                <span>
-                                    {{ designer.recent_record?.length || 0 }}
-                                    sessions
-                                </span>
+                                <strong>Status Order Record</strong>
                             </div>
                             <div
-                                v-if="!designer.recent_record?.length"
-                                class="history-empty"
+                                v-for="section in designerStatusSections(designer)"
+                                :key="section.key"
+                                class="designer-status-section"
                             >
-                                No working sessions yet.
-                            </div>
-                            <button
-                                v-for="record in designer.recent_record"
-                                v-else
-                                :key="record.id"
-                                type="button"
-                                class="history-row"
-                                @click="openOrder(record.order_id)"
-                            >
-                                <div>
-                                    <strong>
-                                        {{ record.order_name }}
-                                    </strong>
-                                    <small>
-                                        {{ formatDateTime(record.started_at) }}
-                                    </small>
+                                <div class="designer-status-title" :style="{ color: section.color }">
+                                    <i class="fa-solid fa-circle"></i>
+                                    {{ section.label }} ({{ section.orders.length }})
                                 </div>
-                                <span
-                                    v-if="isShippedRecord(record)"
-                                    class="history-status finished"
-                                >
-                                    <i class="fa-solid fa-flag-checkered"></i>
-                                    Finished
-                                </span>
-                                <span
-                                    v-else-if="record.is_working"
-                                    class="history-status live"
-                                >
-                                    Working
-                                </span>
-                                <span
+                                <div v-if="!section.orders.length" class="history-empty compact">No orders.</div>
+                                <button
+                                    v-for="order in section.orders"
                                     v-else
-                                    class="history-status"
+                                    :key="`${section.key}-${order.order_id}`"
+                                    type="button"
+                                    class="history-row"
+                                    @click="openOrder(order.order_id)"
                                 >
-                                    {{ formatMinutes(record.minutes) }}
-                                </span>
-                            </button>
+                                    <div>
+                                        <strong>{{ order.order_name }}</strong>
+                                        <small>{{ order.po || formatDateTime(order.changed_at || order.started_at) }}</small>
+                                    </div>
+                                    <span class="history-status" :style="{ background: section.softColor, color: section.color }">
+                                        {{ section.label }}
+                                    </span>
+                                </button>
+                            </div>
                         </div>
                     </article>
                 </div>
@@ -551,6 +513,9 @@ export default {
             } catch {
                 return null
             }
+        },
+        isSuperAdmin() {
+            return this.user?.role === 'super_admin'
         },
         filteredDesigners() {
             const search = this.designerSearch
@@ -745,6 +710,38 @@ export default {
                     ? null
                     : id
         },
+        designerStatusSections(designer) {
+            return [
+                {
+                    key: 'in_production',
+                    label: 'In Production',
+                    color: '#6161ff',
+                    softColor: '#eeeeff',
+                    orders: designer?.in_production_orders || []
+                },
+                {
+                    key: 'completed',
+                    label: 'Completed',
+                    color: '#00a86b',
+                    softColor: '#e8fff3',
+                    orders: designer?.completed_order_list || []
+                },
+                {
+                    key: 'shipped',
+                    label: 'Shipped',
+                    color: '#d97706',
+                    softColor: '#fff7e6',
+                    orders: designer?.shipped_order_list || []
+                },
+                {
+                    key: 'delivered',
+                    label: 'Delivered',
+                    color: '#00a86b',
+                    softColor: '#e8fff3',
+                    orders: designer?.delivered_order_list || []
+                }
+            ]
+        },
         designerShippedCount(designer) {
             const direct = Number(
                 designer?.shipped_orders ??
@@ -878,7 +875,9 @@ export default {
 .hero {
     margin-bottom: 12px;
     padding: 12px 16px;
+    border: 1px solid #e3e7ee;
     border-radius: 14px;
+    background: #ffffff;
     color: #111827;
     display: flex;
     align-items: center;
@@ -890,19 +889,19 @@ export default {
     display: block;
     margin-bottom: 7px;
     color: #64748b;
-    font-size: 10px;
+    font-size: 9px;
     font-weight: 900;
     letter-spacing: 0.14em;
 }
 .hero h2 {
     margin: 0;
-    font-size: 30px;
+    font-size: 20px;
     font-weight: 900;
 }
 .hero p {
     margin: 3px 0 0;
     color: #64748b;
-    font-size: 12px;
+    font-size: 11px;
 }
 .dashboard-user-tools {
     display: flex;
@@ -1463,6 +1462,28 @@ export default {
     margin-top: 12px;
     border-top: 1px solid #e4e7ec;
     padding-top: 11px;
+}
+.designer-status-section {
+    margin-top: 10px;
+    padding: 9px;
+    border: 1px solid #edf0f4;
+    border-radius: 10px;
+    background: #ffffff;
+}
+.designer-status-title {
+    margin-bottom: 5px;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 9px;
+    font-weight: 900;
+    text-transform: uppercase;
+}
+.designer-status-title i {
+    font-size: 6px;
+}
+.history-empty.compact {
+    padding: 8px;
 }
 .history-head {
     margin-bottom: 6px;
