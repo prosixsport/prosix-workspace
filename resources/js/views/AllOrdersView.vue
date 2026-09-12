@@ -2816,7 +2816,7 @@
       </div>
     </div>
 
-    <!-- VIEWED BY MODAL -->
+    <!-- COMPLETE ORDER INFORMATION AND AUDIT HISTORY PANEL -->
     <div
       v-if="orderInfoModal"
       class="viewed-modal-overlay"
@@ -2825,8 +2825,8 @@
       <div class="viewed-modal">
         <div class="viewed-modal-header">
           <div>
-            <h3>Order View History</h3>
-            <p>{{ infoOrder?.name || 'Order' }}</p>
+            <h3>Order Information & History</h3>
+            <p>{{ infoOrder?.name || 'Order' }} · {{ infoOrder?.po || 'N/A' }}</p>
           </div>
 
           <button
@@ -2837,64 +2837,102 @@
           </button>
         </div>
 
-        <div
-          v-if="orderReadInfo.length === 0"
-          class="viewed-empty"
-        >
-          No member has opened this order yet.
+        <div v-if="orderInfoLoading" class="viewed-empty">
+          <i class="fa-solid fa-spinner fa-spin"></i> Loading complete history...
         </div>
 
-        <div
-          v-for="read in orderReadInfo"
-          :key="read.id || read.user_id"
-          class="viewed-person-row"
-        >
-          <div class="viewed-avatar">
-            <img
-              v-if="read.user?.profile_photo_url || read.profile_photo_url"
-              :src="read.user?.profile_photo_url || read.profile_photo_url"
-              alt=""
-            />
+        <div v-else class="order-audit-content">
+          <section class="order-audit-section">
+            <h4><i class="fa-solid fa-circle-info"></i> Order Created</h4>
+            <div class="viewed-person-row">
+              <div class="viewed-avatar">
+                <img v-if="orderInfoData.order?.creator?.profile_photo_url" :src="orderInfoData.order.creator.profile_photo_url" alt="" />
+                <span v-else>{{ initial(orderInfoData.order?.creator?.name || 'U') }}</span>
+              </div>
+              <div class="viewed-person-info">
+                <strong>{{ orderInfoData.order?.creator?.name || 'Unknown user' }}</strong>
+                <small>Created: {{ formatReadDate(orderInfoData.order?.created_at) }}</small>
+              </div>
+            </div>
+          </section>
 
-            <span v-else>
-              {{ initial(read.user?.name || read.name || 'U') }}
-            </span>
-          </div>
-          <div class="viewed-person-info">
-            <strong>
-              {{ read.user?.name || read.name || 'Member' }}
-            </strong>
+          <section class="order-audit-section">
+            <h4><i class="fa-solid fa-users"></i> Included Members ({{ orderInfoData.members.length }})</h4>
+            <div v-if="!orderInfoData.members.length" class="viewed-empty compact">No members assigned.</div>
+            <div v-for="member in orderInfoData.members" :key="`member-${member.id}`" class="viewed-person-row">
+              <div class="viewed-avatar">
+                <img v-if="member.profile_photo_url" :src="member.profile_photo_url" alt="" />
+                <span v-else>{{ initial(member.name || 'U') }}</span>
+              </div>
+              <div class="viewed-person-info">
+                <strong>{{ member.name || 'Member' }}</strong>
+                <small>{{ member.email || member.role || 'Member' }}</small>
+                <small v-if="member.assigned_at">Assigned: {{ formatReadDate(member.assigned_at) }}</small>
+              </div>
+            </div>
+          </section>
 
-            <small>
-              Opened: {{
-                formatReadDate(
-                  read.last_viewed_at ||
-                  read.read_at ||
-                  read.created_at
-                )
-              }}
-            </small>
+          <section class="order-audit-section">
+            <h4><i class="fa-regular fa-eye"></i> Order Viewed By ({{ orderInfoData.reads.length }})</h4>
+            <div v-if="!orderInfoData.reads.length" class="viewed-empty compact">No one has opened this order yet.</div>
+            <div v-for="read in orderInfoData.reads" :key="`read-${read.id || read.user_id}`" class="viewed-person-row">
+              <div class="viewed-avatar">
+                <img v-if="read.profile_photo_url" :src="read.profile_photo_url" alt="" />
+                <span v-else>{{ initial(read.name || 'U') }}</span>
+              </div>
+              <div class="viewed-person-info">
+                <strong>{{ read.name || 'Member' }}</strong>
+                <small>First opened: {{ formatReadDate(read.first_opened_at) }}</small>
+                <small>Last viewed: {{ formatReadDate(read.last_viewed_at) }}</small>
+              </div>
+              <span v-if="workingDesigner(infoOrder) && Number(workingDesigner(infoOrder)?.id) === Number(read.user_id)" class="currently-working-badge">Working now</span>
+            </div>
+          </section>
 
-            <small v-if="read.views_count">
-              Views: {{ read.views_count }}
-            </small>
-          </div>
+          <section class="order-audit-section">
+            <h4><i class="fa-solid fa-comments"></i> Chat Read By ({{ orderInfoData.chat_readers.length }})</h4>
+            <div v-if="!orderInfoData.chat_readers.length" class="viewed-empty compact">No chat read records yet.</div>
+            <div v-for="reader in orderInfoData.chat_readers" :key="`chat-reader-${reader.user_id}`" class="viewed-person-row">
+              <div class="viewed-avatar">
+                <img v-if="reader.profile_photo_url" :src="reader.profile_photo_url" alt="" />
+                <span v-else>{{ initial(reader.name || 'U') }}</span>
+              </div>
+              <div class="viewed-person-info">
+                <strong>{{ reader.name || 'Member' }}</strong>
+                <small>Messages read: {{ reader.messages_read }}</small>
+                <small>Last read: {{ formatReadDate(reader.last_read_at) }}</small>
+              </div>
+            </div>
+          </section>
 
-          <span
-            v-if="
-              infoOrder &&
-              workingDesigner(infoOrder) &&
-              Number(
-                workingDesigner(infoOrder)?.id
-              ) === Number(
-                read.user_id ||
-                read.user?.id
-              )
-            "
-            class="currently-working-badge"
-          >
-            Working now
-          </span>
+          <section class="order-audit-section">
+            <h4><i class="fa-solid fa-stopwatch"></i> Work Sessions ({{ orderInfoData.work_sessions.length }})</h4>
+            <div v-if="!orderInfoData.work_sessions.length" class="viewed-empty compact">Work has not been started yet.</div>
+            <div v-for="session in orderInfoData.work_sessions" :key="`session-${session.id}`" class="viewed-person-row">
+              <div class="viewed-avatar">
+                <img v-if="session.profile_photo_url" :src="session.profile_photo_url" alt="" />
+                <span v-else>{{ initial(session.name || 'U') }}</span>
+              </div>
+              <div class="viewed-person-info">
+                <strong>{{ session.name || 'Member' }}</strong>
+                <small>Started: {{ formatReadDate(session.started_at) }}</small>
+                <small>{{ session.is_active ? 'Still working' : `Finished: ${formatReadDate(session.finished_at)}` }}</small>
+              </div>
+              <span v-if="session.is_active" class="currently-working-badge">Working now</span>
+            </div>
+          </section>
+
+          <section class="order-audit-section">
+            <h4><i class="fa-solid fa-clock-rotate-left"></i> Modification History ({{ orderInfoData.activities.length }})</h4>
+            <div v-if="!orderInfoData.activities.length" class="viewed-empty compact">No modification history found.</div>
+            <div v-for="activity in orderInfoData.activities" :key="`activity-${activity.id}`" class="viewed-person-row activity-row">
+              <div class="audit-action-icon"><i :class="orderActivityIcon(activity.action)"></i></div>
+              <div class="viewed-person-info">
+                <strong>{{ activity.description || orderActivityTitle(activity.action) }}</strong>
+                <small>{{ activity.user?.name || 'System' }} · {{ formatReadDate(activity.created_at) }}</small>
+              </div>
+            </div>
+          </section>
         </div>
       </div>
     </div>
@@ -3233,6 +3271,15 @@ export default {
       orderInfoModal: false,
       infoOrder: null,
       orderReadInfo: [],
+      orderInfoLoading: false,
+      orderInfoData: {
+        order: null,
+        members: [],
+        reads: [],
+        chat_readers: [],
+        work_sessions: [],
+        activities: []
+      },
       profileModal: false,
       profileUser: null,
       profileForm: { name: '', about: '', profile_photo: null, preview: '' },
@@ -11182,7 +11229,7 @@ this.activeTrackingIndex = 0
     },
 
     async markOrderRead(order) {
-      if (!order?.id || order.user_has_seen) return
+      if (!order?.id) return
       try {
         const res = await axios.post(`/api/orders/${order.id}/mark-read`, {}, { headers: this.headers() })
         order.user_has_seen = true
@@ -11214,19 +11261,78 @@ this.activeTrackingIndex = 0
       this.orderReadInfo = order.read_info || []
       this.openOrderMenuId = null
       this.orderInfoModal = true
+      this.orderInfoLoading = true
       try {
         const res = await axios.get(`/api/orders/${order.id}/read-info`, { headers: this.headers() })
         this.orderReadInfo = res.data?.reads || []
+        this.orderInfoData = {
+          order: res.data?.order || null,
+          members: res.data?.members || [],
+          reads: res.data?.reads || [],
+          chat_readers: res.data?.chat_readers || [],
+          work_sessions: res.data?.work_sessions || [],
+          activities: res.data?.activities || []
+        }
       } catch (e) { console.error('openOrderInfo error:', e) }
+      finally { this.orderInfoLoading = false }
     },
 
-    closeOrderInfo() { this.orderInfoModal = false; this.infoOrder = null; this.orderReadInfo = [] },
+    closeOrderInfo() {
+      this.orderInfoModal = false
+      this.infoOrder = null
+      this.orderReadInfo = []
+      this.orderInfoLoading = false
+      this.orderInfoData = {
+        order: null,
+        members: [],
+        reads: [],
+        chat_readers: [],
+        work_sessions: [],
+        activities: []
+      }
+    },
 
     formatReadDate(date) {
       if (!date) return 'Not seen yet'
       const d = new Date(date)
       if (Number.isNaN(d.getTime())) return date
       return d.toLocaleString('en-US', { month: 'short', day: 'numeric', year: 'numeric', hour: '2-digit', minute: '2-digit' })
+    },
+
+    orderActivityTitle(action) {
+      const titles = {
+        created: 'Order created',
+        order_opened: 'Order opened',
+        work_started: 'Work started',
+        work_finished: 'Work finished',
+        status_updated: 'Status changed',
+        tracking_updated: 'Tracking updated',
+        payment_updated: 'Payment updated',
+        notes_updated: 'Notes updated',
+        members_updated: 'Members updated',
+        deleted: 'Order moved to Recycle Bin',
+        restored: 'Order restored'
+      }
+
+      return titles[action] || String(action || 'Activity').replaceAll('_', ' ')
+    },
+
+    orderActivityIcon(action) {
+      const icons = {
+        created: 'fa-solid fa-circle-plus',
+        order_opened: 'fa-regular fa-eye',
+        work_started: 'fa-solid fa-play',
+        work_finished: 'fa-solid fa-flag-checkered',
+        status_updated: 'fa-solid fa-tag',
+        tracking_updated: 'fa-solid fa-truck-fast',
+        payment_updated: 'fa-solid fa-money-check-dollar',
+        notes_updated: 'fa-solid fa-note-sticky',
+        members_updated: 'fa-solid fa-users',
+        deleted: 'fa-solid fa-trash',
+        restored: 'fa-solid fa-rotate-left'
+      }
+
+      return icons[action] || 'fa-solid fa-clock-rotate-left'
     },
 
 async fetchMessages(orderId) {
@@ -15460,8 +15566,8 @@ grid-template-columns: 32px 1fr 118px 38px;
 }
 
 .viewed-modal {
-  width: min(520px, 100%);
-  max-height: 80vh;
+  width: min(760px, 100%);
+  max-height: 88vh;
   overflow-y: auto;
   border-radius: 14px;
   background: #ffffff;
@@ -15561,6 +15667,70 @@ grid-template-columns: 32px 1fr 118px 38px;
   color: #6b7280;
   text-align: center;
   font-size: 12px;
+}
+
+.viewed-empty.compact {
+  padding: 18px;
+}
+
+.order-audit-content {
+  padding: 14px;
+  display: grid;
+  gap: 14px;
+}
+
+.order-audit-section {
+  overflow: hidden;
+  border: 1px solid #e5e7eb;
+  border-radius: 12px;
+  background: #ffffff;
+}
+
+.order-audit-section h4 {
+  margin: 0;
+  padding: 11px 14px;
+  border-bottom: 1px solid #e5e7eb;
+  background: #f8fafc;
+  color: #111827;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 12px;
+  font-weight: 900;
+}
+
+.order-audit-section h4 i {
+  color: #6161ff;
+}
+
+.activity-row {
+  align-items: flex-start;
+}
+
+.audit-action-icon {
+  flex: 0 0 36px;
+  width: 36px;
+  height: 36px;
+  border-radius: 10px;
+  background: #eef2ff;
+  color: #4f46e5;
+  display: grid;
+  place-items: center;
+  font-size: 13px;
+}
+
+@media (max-width: 600px) {
+  .viewed-modal-overlay {
+    padding: 8px;
+  }
+
+  .viewed-modal {
+    max-height: 94vh;
+  }
+
+  .order-audit-content {
+    padding: 8px;
+  }
 }
 
 /* CLEAN DETAIL HEADER */

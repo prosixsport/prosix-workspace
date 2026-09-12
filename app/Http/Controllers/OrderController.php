@@ -93,6 +93,7 @@ public function index()
                     'email' => $finishedWork->user->email,
                     'role' => $finishedWork->user->role,
                     'profile_photo_url' => $finishedWork->user->profile_photo_url,
+                    'started_at' => $finishedWork->started_at,
                     'finished_at' => $finishedWork->ended_at,
                 ]
                 : null;
@@ -364,6 +365,30 @@ if ($isSuperAdmin || $user->can_create_orders) {
 
             $order->members()->sync($syncData);
 
+            $updatedMemberIds = collect(array_keys($syncData))
+                ->map(fn ($id) => (int) $id)
+                ->sort()
+                ->values()
+                ->all();
+
+            $previousMemberIds = collect($oldMemberIds)
+                ->map(fn ($id) => (int) $id)
+                ->sort()
+                ->values()
+                ->all();
+
+            if ($updatedMemberIds !== $previousMemberIds) {
+                $this->logActivity(
+                    $order->id,
+                    'members_updated',
+                    auth()->user()->name . ' updated order members',
+                    [
+                        'old_member_ids' => $previousMemberIds,
+                        'new_member_ids' => $updatedMemberIds,
+                    ]
+                );
+            }
+
             $newMemberIds = collect(array_keys($syncData))
                 ->map(fn ($id) => (int) $id)
                 ->filter(fn ($id) => !in_array($id, $oldMemberIds))
@@ -405,6 +430,10 @@ $order->update($request->only($allowedFields));
     $order->refresh();
 
     if ($request->has('notes') && $oldNotes !== $order->notes) {
+        $this->logActivity($order->id, 'notes_updated', auth()->user()->name . ' updated order notes', [
+            'old' => $oldNotes,
+            'new' => $order->notes,
+        ]);
         $this->sendOrderActivityNotification(
             $order,
             auth()->id(),
@@ -414,6 +443,10 @@ $order->update($request->only($allowedFields));
     }
 
     if ($request->has('status') && $oldStatus !== $order->status) {
+        $this->logActivity($order->id, 'status_updated', auth()->user()->name . ' changed status from ' . ($oldStatus ?: 'N/A') . ' to ' . $order->status, [
+            'old' => $oldStatus,
+            'new' => $order->status,
+        ]);
         $this->sendOrderActivityNotification(
             $order,
             auth()->id(),
@@ -423,6 +456,10 @@ $order->update($request->only($allowedFields));
     }
 
     if ($request->has('trk') && $oldTracking !== $order->trk) {
+        $this->logActivity($order->id, 'tracking_updated', auth()->user()->name . ' updated tracking information', [
+            'old' => $oldTracking,
+            'new' => $order->trk,
+        ]);
         $this->sendOrderActivityNotification(
             $order,
             auth()->id(),
@@ -436,6 +473,11 @@ $order->update($request->only($allowedFields));
         ($request->has('payment_received') && (float) $oldReceived !== (float) $order->payment_received) ||
         ($request->has('payment_balance') && (float) $oldBalance !== (float) $order->payment_balance)
     ) {
+        $this->logActivity($order->id, 'payment_updated', auth()->user()->name . ' updated payment details', [
+            'payment' => ['old' => $oldPayment, 'new' => $order->payment],
+            'received' => ['old' => $oldReceived, 'new' => $order->payment_received],
+            'balance' => ['old' => $oldBalance, 'new' => $order->payment_balance],
+        ]);
         $this->sendOrderActivityNotification(
             $order,
             auth()->id(),
@@ -522,42 +564,152 @@ $this->logActivity(
         $user = auth()->user();
         $order = Order::findOrFail($orderId);
 
-        if (in_array($user->role, ['super_admin', 'admin'])) {
-            return response()->json(['success' => true]);
-        }
+        $this->checkAccess($order);
 
-        DB::table('order_reads')->updateOrInsert(
-            [
-                'order_id' => $order->id,
-                'user_id'  => $user->id,
-            ],
-            [
-                'read_at'    => now(),
-                'created_at' => now(),
-                'updated_at' => now(),
-            ]
+        $read = OrderRead::firstOrNew([
+            'order_id' => $order->id,
+            'user_id' => $user->id,
+        ]);
+
+        $read->read_at = now();
+        $read->save();
+
+        $this->logActivity(
+            $order->id,
+            'order_opened',
+            $user->name . ' opened this order'
         );
 
-        return response()->json(['success' => true]);
+        return response()->json([
+            'success' => true,
+            'read_at' => $read->read_at,
+        ]);
     }
 
     public function readInfo(Order $order)
     {
         $this->checkAccess($order);
 
-        $reads = OrderRead::with('user:id,name,email')
+        $order->load([
+            'creator:id,name,email,role,profile_photo',
+            'members:id,name,email,role,profile_photo',
+        ]);
+
+        $reads = OrderRead::with('user:id,name,email,role,profile_photo')
             ->where('order_id', $order->id)
             ->latest('read_at')
             ->get()
             ->map(function ($read) {
                 return [
+                    'id' => $read->id,
+                    'user_id' => $read->user_id,
                     'name' => $read->user?->name,
                     'email' => $read->user?->email,
-                    'read_at' => $read->read_at?->format('M d, Y h:i A'),
+                    'role' => $read->user?->role,
+                    'profile_photo_url' => $read->user?->profile_photo_url,
+                    'first_opened_at' => $read->created_at,
+                    'last_viewed_at' => $read->read_at,
                 ];
             });
 
-        return response()->json(['reads' => $reads]);
+        $chatReaders = DB::table('order_message_reads as message_reads')
+            ->join('order_messages as messages', 'messages.id', '=', 'message_reads.order_message_id')
+            ->join('users', 'users.id', '=', 'message_reads.user_id')
+            ->where('messages.order_id', $order->id)
+            ->groupBy('users.id', 'users.name', 'users.email', 'users.role', 'users.profile_photo')
+            ->select([
+                'users.id as user_id',
+                'users.name',
+                'users.email',
+                'users.role',
+                'users.profile_photo',
+                DB::raw('COUNT(DISTINCT message_reads.order_message_id) as messages_read'),
+                DB::raw('MIN(message_reads.read_at) as first_read_at'),
+                DB::raw('MAX(message_reads.read_at) as last_read_at'),
+            ])
+            ->orderByDesc('last_read_at')
+            ->get()
+            ->map(function ($reader) {
+                $user = User::find($reader->user_id);
+
+                return [
+                    'user_id' => $reader->user_id,
+                    'name' => $reader->name,
+                    'email' => $reader->email,
+                    'role' => $reader->role,
+                    'profile_photo_url' => $user?->profile_photo_url,
+                    'messages_read' => (int) $reader->messages_read,
+                    'first_read_at' => $reader->first_read_at,
+                    'last_read_at' => $reader->last_read_at,
+                ];
+            });
+
+        $workSessions = OrderWorkSession::with('user:id,name,email,role,profile_photo')
+            ->where('order_id', $order->id)
+            ->latest('started_at')
+            ->get()
+            ->map(function ($session) {
+                return [
+                    'id' => $session->id,
+                    'user_id' => $session->user_id,
+                    'name' => $session->user?->name,
+                    'email' => $session->user?->email,
+                    'role' => $session->user?->role,
+                    'profile_photo_url' => $session->user?->profile_photo_url,
+                    'started_at' => $session->started_at,
+                    'finished_at' => $session->ended_at,
+                    'is_active' => is_null($session->ended_at),
+                ];
+            });
+
+        $activities = OrderActivity::with('user:id,name,email,role,profile_photo')
+            ->where('order_id', $order->id)
+            ->latest()
+            ->get()
+            ->map(function ($activity) {
+                return [
+                    'id' => $activity->id,
+                    'action' => $activity->action,
+                    'description' => $activity->description,
+                    'changes' => $activity->changes,
+                    'created_at' => $activity->created_at,
+                    'user' => $activity->user ? [
+                        'id' => $activity->user->id,
+                        'name' => $activity->user->name,
+                        'email' => $activity->user->email,
+                        'role' => $activity->user->role,
+                        'profile_photo_url' => $activity->user->profile_photo_url,
+                    ] : null,
+                ];
+            });
+
+        return response()->json([
+            'order' => [
+                'id' => $order->id,
+                'name' => $order->name,
+                'po' => $order->po,
+                'created_at' => $order->created_at,
+                'creator' => $order->creator ? [
+                    'id' => $order->creator->id,
+                    'name' => $order->creator->name,
+                    'email' => $order->creator->email,
+                    'role' => $order->creator->role,
+                    'profile_photo_url' => $order->creator->profile_photo_url,
+                ] : null,
+            ],
+            'members' => $order->members->map(fn ($member) => [
+                'id' => $member->id,
+                'name' => $member->name,
+                'email' => $member->email,
+                'role' => $member->pivot?->role ?: $member->role,
+                'profile_photo_url' => $member->profile_photo_url,
+                'assigned_at' => $member->pivot?->created_at,
+            ])->values(),
+            'reads' => $reads,
+            'chat_readers' => $chatReaders,
+            'work_sessions' => $workSessions,
+            'activities' => $activities,
+        ]);
     }
 
 
@@ -611,6 +763,13 @@ public function claim(Order $order)
                 'started_at' => now(),
                 'last_seen_at' => now(),
             ]);
+
+            $this->logActivity(
+                $order->id,
+                'work_started',
+                $user->name . ' started work on this order',
+                ['started_at' => $activeWork->started_at]
+            );
         } else {
             $activeWork->update([
                 'last_seen_at' => now(),
@@ -680,6 +839,16 @@ public function release(Order $order)
 
     $activeWork->load('user:id,name,email,role,profile_photo');
 
+    $this->logActivity(
+        $order->id,
+        'work_finished',
+        $activeWork->user->name . ' finished work on this order',
+        [
+            'started_at' => $activeWork->started_at,
+            'finished_at' => $activeWork->ended_at,
+        ]
+    );
+
     return response()->json([
         'success' => true,
         'message' => 'Working status stopped.',
@@ -690,6 +859,7 @@ public function release(Order $order)
             'email' => $activeWork->user->email,
             'role' => $activeWork->user->role,
             'profile_photo_url' => $activeWork->user->profile_photo_url,
+            'started_at' => $activeWork->started_at,
             'finished_at' => $activeWork->ended_at,
         ],
         'finished_at' => $activeWork->ended_at,
