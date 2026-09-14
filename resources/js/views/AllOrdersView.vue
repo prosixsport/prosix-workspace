@@ -26348,7 +26348,7 @@ body.board-column-resizing .column-resizer::before {
   border-color: #6161ff;
   box-shadow: 0 0 0 3px rgba(97, 97, 255, .12);
 }
-
+  
 .board-filter-suggestions {
   position: absolute;
   top: calc(100% + 5px);
