@@ -312,7 +312,7 @@ public function update(Request $request, Order $order)
         'ship_date' => 'nullable|date',
         'status' => 'nullable|string|max:255',
         'status_color' => 'nullable|string|max:255',
-        'trk' => 'nullable|string|max:255',
+        'trk' => 'nullable|string',
         'payment' => 'nullable|string|max:255',
         'payment_received' => 'nullable|numeric',
         'payment_balance' => 'nullable|numeric',
