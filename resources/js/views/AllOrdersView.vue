@@ -3995,15 +3995,21 @@ beforeUnmount()  {
       let left = rect.left
       let top = rect.bottom + 6
 
+      // Estimate the rendered height so short tracking text stays close to
+      // the hovered row instead of always jumping 190px upward.
+      const charactersPerLine = Math.max(24, Math.floor((width - 30) / 7))
+      const lineCount = Math.max(1, Math.ceil(text.length / charactersPerLine))
+      const estimatedHeight = Math.min(190, 26 + lineCount * 20)
+
       if (left + width > window.innerWidth - padding) {
         left = window.innerWidth - width - padding
       }
 
       if (left < padding) left = padding
 
-      // Near the bottom, place the popup above the row.
-      if (top + 190 > window.innerHeight) {
-        top = Math.max(padding, rect.top - 190)
+      // Near the bottom, place the popup directly above the hovered row.
+      if (top + estimatedHeight > window.innerHeight - padding) {
+        top = Math.max(padding, rect.top - estimatedHeight - 6)
       }
 
       this.copyableHoverTooltip = { text, top, left, width }
