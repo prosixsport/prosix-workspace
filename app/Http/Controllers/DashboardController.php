@@ -106,16 +106,38 @@ class DashboardController extends Controller
                 'created_at' => $order->created_at,
             ]);
 
+        /*
+         * Staff performance is shared across the team. It must not be
+         * restricted to orders assigned to the person viewing the dashboard.
+         * Client accounts do not receive internal staff performance data.
+         */
+        $performanceOrders = $user->role === 'client'
+            ? collect()
+            : Order::query()
+                ->latest()
+                ->get([
+                    'id',
+                    'name',
+                    'po',
+                    'status',
+                    'status_color',
+                    'updated_at',
+                ]);
+
         return response()->json([
             'stats' => $stats,
             'recent_orders' => $recentOrders,
             'designer_performance' =>
-                $this->designerPerformanceData($user, $orders),
+                $this->designerPerformanceData($user, $performanceOrders),
         ]);
     }
 
     private function designerPerformanceData(User $viewer, $visibleOrders)
     {
+        if ($viewer->role === 'client') {
+            return collect();
+        }
+
         $designers = User::query()
             ->whereIn('role', [
                 'super_admin',
@@ -123,7 +145,7 @@ class DashboardController extends Controller
                 'member',
             ])
             ->when($viewer->role !== 'super_admin', fn ($query) =>
-                $query->where('id', $viewer->id)
+                $query->where('role', '!=', 'super_admin')
             )
             ->orderByRaw("
                 CASE
@@ -198,7 +220,8 @@ class DashboardController extends Controller
 
         return $designers->map(function ($designer) use (
             $sessions,
-            $activities
+            $activities,
+            $statusOrdersByUser
         ) {
             $designerSessions = $sessions
                 ->where('user_id', $designer->id)
