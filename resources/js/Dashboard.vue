@@ -299,30 +299,46 @@
                             </button>
                         </div>
                         <div class="designer-metrics">
-                            <div>
+                            <button
+                                type="button"
+                                :class="{ active: activeDesignerStatus[designer.id] === 'in_production' }"
+                                @click="toggleDesignerStatus(designer.id, 'in_production')"
+                            >
                                 <span>In Production</span>
                                 <strong>
                                     {{ designer.in_production_count || 0 }}
                                 </strong>
-                            </div>
-                            <div>
+                            </button>
+                            <button
+                                type="button"
+                                :class="{ active: activeDesignerStatus[designer.id] === 'completed' }"
+                                @click="toggleDesignerStatus(designer.id, 'completed')"
+                            >
                                 <span>Completed</span>
                                 <strong>
                                     {{ designer.completed_orders || 0 }}
                                 </strong>
-                            </div>
-                            <div>
+                            </button>
+                            <button
+                                type="button"
+                                :class="{ active: activeDesignerStatus[designer.id] === 'shipped' }"
+                                @click="toggleDesignerStatus(designer.id, 'shipped')"
+                            >
                                 <span>Shipped</span>
                                 <strong>
                                     {{ designer.shipped_orders || 0 }}
                                 </strong>
-                            </div>
-                            <div>
+                            </button>
+                            <button
+                                type="button"
+                                :class="{ active: activeDesignerStatus[designer.id] === 'delivered' }"
+                                @click="toggleDesignerStatus(designer.id, 'delivered')"
+                            >
                                 <span>Delivered</span>
                                 <strong>
                                     {{ designer.delivered_orders || 0 }}
                                 </strong>
-                            </div>
+                            </button>
                         </div>
                         <div class="designer-time">
                             <div>
@@ -348,7 +364,7 @@
                                 <strong>Status Order Record</strong>
                             </div>
                             <div
-                                v-for="section in designerStatusSections(designer)"
+                                v-for="section in designerStatusSections(designer).filter(item => item.key === activeDesignerStatus[designer.id])"
                                 :key="section.key"
                                 class="designer-status-section"
                             >
@@ -457,6 +473,7 @@ export default {
             loading: false,
             designerSearch: '',
             expandedDesignerId: null,
+            activeDesignerStatus: {},
             recentOrders: [],
             notificationCount: 0,
             notifications: [],
@@ -705,10 +722,40 @@ export default {
             }
         },
         toggleDesigner(id) {
-            this.expandedDesignerId =
-                this.expandedDesignerId === id
-                    ? null
-                    : id
+            if (this.expandedDesignerId === id) {
+                this.expandedDesignerId = null
+                this.activeDesignerStatus = {
+                    ...this.activeDesignerStatus,
+                    [id]: null
+                }
+                return
+            }
+
+            this.expandedDesignerId = id
+            this.activeDesignerStatus = {
+                ...this.activeDesignerStatus,
+                [id]: this.activeDesignerStatus[id] || 'in_production'
+            }
+        },
+        toggleDesignerStatus(id, statusKey) {
+            const isSameOpenTab =
+                this.expandedDesignerId === id &&
+                this.activeDesignerStatus[id] === statusKey
+
+            if (isSameOpenTab) {
+                this.expandedDesignerId = null
+                this.activeDesignerStatus = {
+                    ...this.activeDesignerStatus,
+                    [id]: null
+                }
+                return
+            }
+
+            this.expandedDesignerId = id
+            this.activeDesignerStatus = {
+                ...this.activeDesignerStatus,
+                [id]: statusKey
+            }
         },
         designerStatusSections(designer) {
             return [
@@ -1388,14 +1435,34 @@ export default {
     background: #ffffff;
     overflow: hidden;
 }
-.designer-metrics > div {
+.designer-metrics > button {
     min-width: 0;
     padding: 9px 7px;
+    border: 0;
     border-right: 1px solid #eceef2;
+    background: #ffffff;
+    cursor: pointer;
     text-align: center;
+    transition: background .18s ease, box-shadow .18s ease;
 }
-.designer-metrics > div:last-child {
+.designer-metrics > button:last-child {
     border-right: 0;
+}
+.designer-metrics > button:hover {
+    background: #f7f8fb;
+}
+.designer-metrics > button.active {
+    background: #f1f3ff;
+    box-shadow: inset 0 -3px 0 #6161ff;
+}
+.designer-metrics > button:nth-child(2).active,
+.designer-metrics > button:nth-child(4).active {
+    background: #ecfdf5;
+    box-shadow: inset 0 -3px 0 #00a86b;
+}
+.designer-metrics > button:nth-child(3).active {
+    background: #fff7e6;
+    box-shadow: inset 0 -3px 0 #d97706;
 }
 .designer-metrics span,
 .designer-time span {
@@ -1469,6 +1536,10 @@ export default {
     border: 1px solid #edf0f4;
     border-radius: 10px;
     background: #ffffff;
+    max-height: 270px;
+    overflow-y: auto;
+    overscroll-behavior: contain;
+    scrollbar-width: thin;
 }
 .designer-status-title {
     margin-bottom: 5px;
@@ -1671,10 +1742,10 @@ export default {
     .designer-metrics {
         grid-template-columns: 1fr 1fr;
     }
-    .designer-metrics > div:nth-child(2) {
+    .designer-metrics > button:nth-child(2) {
         border-right: 0;
     }
-    .designer-metrics > div:nth-child(-n + 2) {
+    .designer-metrics > button:nth-child(-n + 2) {
         border-bottom: 1px solid #eceef2;
     }
 }
