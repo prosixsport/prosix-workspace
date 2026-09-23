@@ -203,7 +203,12 @@
               activeSectionCollapsed = false
             "
           >
-            <span class="workflow-tab-label">{{ group.label }}</span>
+            <span class="workflow-tab-label">
+              <span class="workflow-tab-icon" aria-hidden="true">
+                <i :class="workflowGroupIcon(group)"></i>
+              </span>
+              <span>{{ group.label }}</span>
+            </span>
 
             <span
               class="workflow-total-box"
@@ -3351,25 +3356,25 @@ activeTrackingIndex: 0,
           key: 'in_production',
           label: 'IN PRODUCTION',
           color: statusColorByLabel('In Production', '#6161ff'),
-          icon: 'fa-solid fa-house'
+          icon: 'fa-solid fa-shirt'
         },
         {
           key: 'completed',
           label: 'COMPLETED',
           color: statusColorByLabel('Completed', '#00c875'),
-          icon: 'fa-solid fa-house'
+          icon: 'fa-solid fa-circle-check'
         },
         {
           key: 'shipped',
           label: 'SHIPPED',
           color: statusColorByLabel('Shipped', '#fdab3d'),
-          icon: 'fa-solid fa-house'
+          icon: 'fa-solid fa-flag-checkered'
         },
         {
           key: 'delivered',
           label: 'DELIVERED',
           color: statusColorByLabel('Delivered', '#00c875'),
-          icon: 'fa-solid fa-house'
+          icon: 'fa-solid fa-truck-fast'
         }
       ]
 
@@ -8502,6 +8507,33 @@ body.board-column-resizing .column-resizer::before {
       const safeIndex = index >= 0 ? index : 0
 
       return ((safeIndex + 1) * 10) + Number(part)
+    },
+
+    workflowGroupIcon(group) {
+      const key = String(group?.key || '').trim().toLowerCase()
+      const label = String(group?.label || '').trim().toLowerCase()
+
+      if (key === 'in_production' || label.includes('production')) {
+        return 'fa-solid fa-shirt'
+      }
+
+      if (key === 'completed' || label.includes('complete')) {
+        return 'fa-solid fa-circle-check'
+      }
+
+      if (key === 'shipped' || label.includes('shipped')) {
+        return 'fa-solid fa-flag-checkered'
+      }
+
+      if (key === 'delivered' || label.includes('delivered')) {
+        return 'fa-solid fa-truck-fast'
+      }
+
+      if (key === 'return' || label.includes('return')) {
+        return 'fa-solid fa-arrow-rotate-left'
+      }
+
+      return group?.icon || 'fa-solid fa-layer-group'
     },
 
 
@@ -17642,6 +17674,25 @@ body.board-column-resizing .column-resizer::before {
   font-weight: 700 !important;
   line-height: 1.2 !important;
   white-space: nowrap !important;
+}
+
+.workflow-tab-icon {
+  flex: 0 0 auto !important;
+  width: 24px !important;
+  height: 24px !important;
+  margin-right: 7px !important;
+  border-radius: 7px !important;
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  color: #ffffff !important;
+  background: var(--group-color) !important;
+  font-size: 11px !important;
+  box-shadow: 0 2px 6px color-mix(in srgb, var(--group-color) 30%, transparent) !important;
+}
+
+.workflow-tab.active .workflow-tab-icon {
+  transform: scale(1.04) !important;
 }
 
 /* ---------- COLLAPSED CATEGORIES: clean, NO background bar ---------- */
