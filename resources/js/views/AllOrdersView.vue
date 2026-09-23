@@ -599,19 +599,6 @@
                   </option>
                 </select>
 
-                <label
-                  class="inline-urgent-order-toggle"
-                  title="Mark this order as urgent"
-                >
-                  <input
-                    v-model="inlineUrgentOrder"
-                    type="checkbox"
-                    @change="syncInlineUrgentPriority"
-                  />
-                  <span class="inline-urgent-order-light"></span>
-                  <span>Urgent Order</span>
-                </label>
-
                 <select class="inline-fixed-select" disabled title="Payment is fixed for client orders">
                   <option>Not Yet</option>
                 </select>
@@ -668,7 +655,7 @@
             opened: order.user_has_seen,
             selected: selectedOrders.includes(order.id),
             'last-opened-order': Number(lastOpenedOrderId) === Number(order.id),
-            'urgent-order-row': isUrgentOrder(order)
+            'customer-created-order-row': isCustomerCreatedOrder(order)
           }"
           :style="boardGridStyle"
           @click.stop="openBoardOrder(order)"
@@ -684,12 +671,12 @@
 
           <div class="board-col board-col-name" :style="boardColumnOrderStyle('name')">
             <span
-              v-if="isUrgentOrder(order)"
-              class="urgent-order-indicator"
-              title="Urgent Order"
-              aria-label="Urgent Order"
+              v-if="isCustomerCreatedOrder(order)"
+              class="customer-order-indicator"
+              title="New customer order"
+              aria-label="New customer order"
             >
-              <i class="fa-solid fa-triangle-exclamation"></i>
+              <i class="fa-solid fa-bell"></i>
             </span>
             <span v-if="!order.user_has_seen" class="board-new-dot"></span>
 
@@ -3161,7 +3148,6 @@ export default {
       inlineAddOpen: false,
       inlineOrderName: '',
       inlinePriorityOptionId: '',
-      inlineUrgentOrder: false,
       inlineOrderSaving: false,
       inlineEditingCell: null,
       inlineEditValue: '',
@@ -4856,18 +4842,28 @@ beforeUnmount()  {
       return (column.options || []).find(option => Number(option.id) === Number(optionId)) || null
     },
 
-    urgentPriorityOption() {
-      return this.priorityOptions.find(option =>
-        String(option?.label || '').trim().toLowerCase() === 'urgent'
-      ) || null
-    },
-
-    isUrgentOrder(order) {
+    isCustomerCreatedOrder(order) {
       if (!order) return false
-      if (order.is_urgent === true || Number(order.is_urgent) === 1) return true
 
-      const option = this.getOrderCustomOption(order, this.priorityColumn)
-      return String(option?.label || '').trim().toLowerCase() === 'urgent'
+      if (
+        order.is_customer_order === true ||
+        Number(order.is_customer_order) === 1 ||
+        order.created_by_client === true ||
+        Number(order.created_by_client) === 1
+      ) {
+        return true
+      }
+
+      const creatorRole = String(
+        order.creator?.role ||
+        order.created_by_user?.role ||
+        order.createdBy?.role ||
+        order.creator_role ||
+        order.created_by_role ||
+        ''
+      ).trim().toLowerCase()
+
+      return creatorRole === 'client' || creatorRole === 'customer'
     },
 
     customFieldButtonStyle(order, column) {
@@ -9635,7 +9631,6 @@ body.board-column-resizing .column-resizer::before {
       this.inlineAddOpen = true
       this.inlineOrderName = ''
       this.inlinePriorityOptionId = ''
-      this.inlineUrgentOrder = false
 
       this.$nextTick(() => {
         const input = this.$refs.inlineOrderInput
@@ -9655,30 +9650,7 @@ body.board-column-resizing .column-resizer::before {
       this.inlineAddOpen = false
       this.inlineOrderName = ''
       this.inlinePriorityOptionId = ''
-      this.inlineUrgentOrder = false
       this.inlineOrderSaving = false
-    },
-
-    syncInlineUrgentPriority() {
-      const urgentOption = this.urgentPriorityOption()
-
-      if (this.inlineUrgentOrder) {
-        if (!urgentOption) {
-          this.inlineUrgentOrder = false
-          alert('Urgent priority is not configured. Super Admin must add an "Urgent" option in the Priority column.')
-          return
-        }
-
-        this.inlinePriorityOptionId = String(urgentOption.id)
-        return
-      }
-
-      if (
-        urgentOption &&
-        Number(this.inlinePriorityOptionId) === Number(urgentOption.id)
-      ) {
-        this.inlinePriorityOptionId = ''
-      }
     },
 
     async createInlineOrder() {
@@ -9693,17 +9665,6 @@ body.board-column-resizing .column-resizer::before {
       ) {
         return
       }
-
-      const urgentOption = this.urgentPriorityOption()
-
-      if (this.isClient && this.inlineUrgentOrder && !urgentOption) {
-        alert('Urgent priority is not configured. Super Admin must add an "Urgent" option in the Priority column.')
-        return
-      }
-
-      const selectedPriorityOptionId = this.inlineUrgentOrder
-        ? String(urgentOption?.id || '')
-        : String(this.inlinePriorityOptionId || '')
 
       this.inlineOrderSaving = true
 
@@ -9751,32 +9712,17 @@ body.board-column-resizing .column-resizer::before {
           this.isClient &&
           createdId &&
           this.priorityColumn?.id &&
-          selectedPriorityOptionId
+          this.inlinePriorityOptionId
         ) {
-          const priorityResponse = await axios.put(
+          await axios.put(
             `/api/orders/${createdId}/custom-values/${this.priorityColumn.id}`,
-            { option_id: Number(selectedPriorityOptionId) },
+            { option_id: Number(this.inlinePriorityOptionId) },
             { headers: this.headers() }
           )
+        }
 
-          const savedPriorityValue = priorityResponse.data?.value || null
-
-          if (savedPriorityValue) {
-            const customValues = Array.isArray(createdOrder.custom_values)
-              ? [...createdOrder.custom_values]
-              : []
-            const priorityValueIndex = customValues.findIndex(item =>
-              Number(item.column_id) === Number(this.priorityColumn.id)
-            )
-
-            if (priorityValueIndex === -1) {
-              customValues.push(savedPriorityValue)
-            } else {
-              customValues.splice(priorityValueIndex, 1, savedPriorityValue)
-            }
-
-            createdOrder.custom_values = customValues
-          }
+        if (this.isClient) {
+          createdOrder.created_by_client = true
         }
 
         if (
@@ -11169,6 +11115,19 @@ async fetchClients() {
           order.created_by_user ||
           order.createdBy ||
           null,
+        is_customer_order:
+          order.is_customer_order === true ||
+          Number(order.is_customer_order) === 1,
+        created_by_client:
+          order.created_by_client === true ||
+          Number(order.created_by_client) === 1,
+        creator_role:
+          order.creator_role ||
+          order.created_by_role ||
+          order.creator?.role ||
+          order.created_by_user?.role ||
+          order.createdBy?.role ||
+          '',
 
         invoiceFiles: normalizedFiles.filter(file => file.cardType === 'invoice_files'),
         owners: members.map(m => ({
@@ -26681,47 +26640,22 @@ body.board-column-resizing .column-resizer::before {
   font-size: 9px;
 }
 
-/* Customer urgent-order control and persistent red alert marker. */
-.factory-board-page .inline-urgent-order-toggle {
-  min-height: 36px;
-  padding: 0 12px;
-  border: 1px solid #fecaca;
-  border-radius: 8px;
-  background: #fff1f2;
-  color: #b91c1c;
-  display: inline-flex;
-  align-items: center;
-  gap: 8px;
-  font-size: 11px;
-  font-weight: 900;
-  white-space: nowrap;
-  cursor: pointer;
+/* Every order created by a customer is automatically highlighted for everyone. */
+.factory-board-page .customer-created-order-row {
+  background: #fff1f2 !important;
+  box-shadow: inset 5px 0 0 #dc2626;
 }
 
-.factory-board-page .inline-urgent-order-toggle input {
-  position: absolute;
-  opacity: 0;
-  pointer-events: none;
+.factory-board-page .customer-created-order-row > .board-col {
+  background: #fff1f2 !important;
 }
 
-.factory-board-page .inline-urgent-order-light {
-  width: 10px;
-  height: 10px;
-  border-radius: 50%;
-  background: #dc2626;
-  box-shadow: 0 0 0 0 rgba(220, 38, 38, .7);
+.factory-board-page .customer-created-order-row:hover,
+.factory-board-page .customer-created-order-row:hover > .board-col {
+  background: #ffe4e6 !important;
 }
 
-.factory-board-page .inline-urgent-order-toggle input:checked + .inline-urgent-order-light,
-.factory-board-page .urgent-order-indicator {
-  animation: urgentOrderPulse 1s ease-in-out infinite;
-}
-
-.factory-board-page .urgent-order-row {
-  box-shadow: inset 4px 0 0 #dc2626;
-}
-
-.factory-board-page .urgent-order-indicator {
+.factory-board-page .customer-order-indicator {
   flex: 0 0 auto;
   width: 25px;
   height: 25px;
@@ -26733,9 +26667,10 @@ body.board-column-resizing .column-resizer::before {
   place-items: center;
   font-size: 11px;
   box-shadow: 0 0 0 0 rgba(220, 38, 38, .65);
+  animation: customerOrderPulse 1s ease-in-out infinite;
 }
 
-@keyframes urgentOrderPulse {
+@keyframes customerOrderPulse {
   0%, 100% {
     opacity: 1;
     transform: scale(1);
