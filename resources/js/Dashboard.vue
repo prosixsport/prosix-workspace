@@ -18,6 +18,7 @@
                             title="Open notifications"
                             @click="toggleNotifications"
                         >
+                        
                             <i class="fa-regular fa-bell"></i>
                             <span
                                 v-if="notificationCount > 0"
@@ -36,7 +37,7 @@
                                     <strong>Notifications</strong>
                                     <small>{{ totalBellNotificationCount }} unread</small>
                                 </div>
-                                <button type="button" @click="showNotificationMenu = false">
+                                 <button type="button" @click="showNotificationMenu = false">
                                     <i class="fa-solid fa-xmark"></i>
                                 </button>
                             </div>
@@ -47,12 +48,14 @@
                                     :class="{ active: notificationTab === 'chats' }"
                                     @click="notificationTab = 'chats'"
                                 >
+
                                     <i class="fa-solid fa-comments"></i>
                                     Chats
                                     <span v-if="totalUnreadChatCount > 0">
                                         {{ totalUnreadChatCount }}
                                     </span>
                                 </button>
+
                                 <button
                                     type="button"
                                     :class="{ active: notificationTab === 'orders' }"
@@ -354,6 +357,7 @@
                                 </strong>
                             </div>
                         </div>
+
                         <div
                             v-if="
                                 expandedDesignerId === designer.id
@@ -1727,6 +1731,7 @@ export default {
         flex: 1 1 auto;
         min-width: 0;
     }
+
     .dashboard-notification-menu {
         right: auto;
         left: 0;
