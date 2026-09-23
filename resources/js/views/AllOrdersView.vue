@@ -655,7 +655,7 @@
             opened: order.user_has_seen,
             selected: selectedOrders.includes(order.id),
             'last-opened-order': Number(lastOpenedOrderId) === Number(order.id),
-            'customer-created-order-row': isCustomerCreatedOrder(order)
+            'customer-order-attention': shouldHighlightCustomerOrder(order)
           }"
           :style="boardGridStyle"
           @click.stop="openBoardOrder(order)"
@@ -671,8 +671,8 @@
 
           <div class="board-col board-col-name" :style="boardColumnOrderStyle('name')">
             <span
-              v-if="isCustomerCreatedOrder(order)"
-              class="customer-order-indicator"
+              v-if="shouldHighlightCustomerOrder(order)"
+              class="customer-order-alert-icon"
               title="New customer order"
               aria-label="New customer order"
             >
@@ -4842,28 +4842,39 @@ beforeUnmount()  {
       return (column.options || []).find(option => Number(option.id) === Number(optionId)) || null
     },
 
-    isCustomerCreatedOrder(order) {
-      if (!order) return false
-
-      if (
-        order.is_customer_order === true ||
-        Number(order.is_customer_order) === 1 ||
-        order.created_by_client === true ||
-        Number(order.created_by_client) === 1
-      ) {
-        return true
-      }
+    isOrderCreatedByCustomer(order) {
+      if (!order || this.isClient) return false
 
       const creatorRole = String(
         order.creator?.role ||
-        order.created_by_user?.role ||
-        order.createdBy?.role ||
         order.creator_role ||
         order.created_by_role ||
         ''
       ).trim().toLowerCase()
 
-      return creatorRole === 'client' || creatorRole === 'customer'
+      if (creatorRole === 'client' || creatorRole === 'customer') {
+        return true
+      }
+
+      const creatorId = Number(
+        order.created_by ||
+        order.creator?.id ||
+        0
+      )
+
+      if (!creatorId) return false
+
+      return this.availableClients.some(client =>
+        Number(client?.user_id || 0) === creatorId
+      )
+    },
+
+    shouldHighlightCustomerOrder(order) {
+      return Boolean(
+        order &&
+        !order.user_has_seen &&
+        this.isOrderCreatedByCustomer(order)
+      )
     },
 
     customFieldButtonStyle(order, column) {
@@ -9721,10 +9732,6 @@ body.board-column-resizing .column-resizer::before {
           )
         }
 
-        if (this.isClient) {
-          createdOrder.created_by_client = true
-        }
-
         if (
           createdId &&
           !this.newlyCreatedOrderIds.includes(
@@ -11061,6 +11068,12 @@ async fetchClients() {
         read_at: order.read_at || null,
         read_info: order.read_info || [],
         group: this.orderDisplayGroup(order),
+        created_by: order.created_by || order.creator?.id || null,
+        creator_role:
+          order.creator_role ||
+          order.created_by_role ||
+          order.creator?.role ||
+          '',
         name: order.name,
         hasChildren: false,
         po: order.po || 'N/A',
@@ -11115,19 +11128,6 @@ async fetchClients() {
           order.created_by_user ||
           order.createdBy ||
           null,
-        is_customer_order:
-          order.is_customer_order === true ||
-          Number(order.is_customer_order) === 1,
-        created_by_client:
-          order.created_by_client === true ||
-          Number(order.created_by_client) === 1,
-        creator_role:
-          order.creator_role ||
-          order.created_by_role ||
-          order.creator?.role ||
-          order.created_by_user?.role ||
-          order.createdBy?.role ||
-          '',
 
         invoiceFiles: normalizedFiles.filter(file => file.cardType === 'invoice_files'),
         owners: members.map(m => ({
@@ -26640,22 +26640,20 @@ body.board-column-resizing .column-resizer::before {
   font-size: 9px;
 }
 
-/* Every order created by a customer is automatically highlighted for everyone. */
-.factory-board-page .customer-created-order-row {
-  background: #fff1f2 !important;
-  box-shadow: inset 5px 0 0 #dc2626;
+/*
+ * New customer order alert:
+ * shown to staff only and removed immediately after that user opens the order.
+ */
+.factory-board-page .board-table-row.customer-order-attention {
+  box-shadow: inset 5px 0 0 #dc2626 !important;
 }
 
-.factory-board-page .customer-created-order-row > .board-col {
-  background: #fff1f2 !important;
+.factory-board-page .board-table-row.customer-order-attention,
+.factory-board-page .board-table-row.customer-order-attention > .board-col {
+  animation: customerOrderRowBlink 1.15s ease-in-out infinite !important;
 }
 
-.factory-board-page .customer-created-order-row:hover,
-.factory-board-page .customer-created-order-row:hover > .board-col {
-  background: #ffe4e6 !important;
-}
-
-.factory-board-page .customer-order-indicator {
+.factory-board-page .customer-order-alert-icon {
   flex: 0 0 auto;
   width: 25px;
   height: 25px;
@@ -26667,19 +26665,28 @@ body.board-column-resizing .column-resizer::before {
   place-items: center;
   font-size: 11px;
   box-shadow: 0 0 0 0 rgba(220, 38, 38, .65);
-  animation: customerOrderPulse 1s ease-in-out infinite;
+  animation: customerOrderIconBlink .85s ease-in-out infinite;
 }
 
-@keyframes customerOrderPulse {
+@keyframes customerOrderRowBlink {
+  0%, 100% {
+    background-color: #fff1f2;
+  }
+  50% {
+    background-color: #fecdd3;
+  }
+}
+
+@keyframes customerOrderIconBlink {
   0%, 100% {
     opacity: 1;
     transform: scale(1);
     box-shadow: 0 0 0 0 rgba(220, 38, 38, .65);
   }
   50% {
-    opacity: .55;
-    transform: scale(.9);
-    box-shadow: 0 0 0 7px rgba(220, 38, 38, 0);
+    opacity: .45;
+    transform: scale(.88);
+    box-shadow: 0 0 0 8px rgba(220, 38, 38, 0);
   }
 }
 </style>
