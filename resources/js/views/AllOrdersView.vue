@@ -3410,6 +3410,15 @@ activeTrackingIndex: 0,
         .filter(status => status?.label)
         .map(status => this.normalizeStatusDefinition(status))
 
+      /*
+       * Manual/custom statuses belong only to the workflow tab in which
+       * they were created. Built-in statuses remain available everywhere
+       * so an order can still be moved between the main workflow tabs.
+       */
+      const menuGroup = this.rowStatusMenuOrder
+        ? this.orderDisplayGroup(this.rowStatusMenuOrder)
+        : (this.activeGroup === 'all' ? 'in_production' : this.activeGroup)
+
       // Every top tab must also have one matching dropdown status so an
       // order can be moved into that tab from the status dropdown.
       this.boardGroups.forEach(group => {
@@ -3438,6 +3447,7 @@ activeTrackingIndex: 0,
       return options.filter(status => {
         const key = String(status.label || '').trim().toLowerCase()
         if (!key || seen.has(key)) return false
+        if (status.custom === true && status.group !== menuGroup) return false
         seen.add(key)
         return true
       })
@@ -9154,10 +9164,22 @@ body.board-column-resizing .column-resizer::before {
           label.toLowerCase()
       )
 
-      // Adding a status from the dropdown must never create a top tab.
-      // If its label matches an existing tab, link it to that tab;
-      // otherwise always keep it under IN PRODUCTION.
-      const targetGroup = this.groupForDropdownStatus(label)
+      // Save the manual status inside the tab/group where this dropdown
+      // was opened. It will not appear in any other tab's dropdown.
+      const targetGroupKey = this.orderDisplayGroup(order) ||
+        (this.activeGroup === 'all' ? 'in_production' : this.activeGroup)
+      const targetBoardGroup = this.boardGroups.find(
+        group => group.key === targetGroupKey
+      )
+      const targetGroup = {
+        key: targetGroupKey,
+        label: targetBoardGroup?.label || order.groupLabel || 'In Production'
+      }
+
+      if (existing?.custom === true && existing.group !== targetGroup.key) {
+        alert(`"${label}" already exists in another tab. Please use a different status name.`)
+        return
+      }
 
       const status = existing || {
         label,
@@ -9168,7 +9190,8 @@ body.board-column-resizing .column-resizer::before {
       }
 
       if (!existing) {
-        this.saveCustomStatusOption(status)
+        const saved = await this.saveCustomStatusOption(status)
+        if (!saved) return
       }
 
       this.customStatusLabel = ''
