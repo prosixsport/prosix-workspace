@@ -93,7 +93,7 @@
         class="permission-btn me-1"
         :class="member.can_create_orders ? 'allowed' : 'blocked'"
     >
-        {{ member.can_create_orders ? 'Can Add Orders' : 'No Order Access' }}
+        {{ member.can_create_orders ? 'Orders + Clients Access' : 'No Orders/Clients Access' }}
     </button>
 
     <button @click="toggleStatus(member)" class="outline-btn me-1">

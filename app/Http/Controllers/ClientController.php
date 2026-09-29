@@ -186,6 +186,18 @@ class ClientController extends Controller
 
     public function store(Request $request): JsonResponse
     {
+        $user = $request->user();
+
+        if (
+            !$user ||
+            ($user->role !== 'super_admin' && !$user->can_create_orders)
+        ) {
+            return response()->json([
+                'success' => false,
+                'message' => 'You do not have permission to add clients.',
+            ], 403);
+        }
+
         $data = $request->validate([
             'name' => [
                 'required',

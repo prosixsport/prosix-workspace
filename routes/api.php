@@ -738,6 +738,11 @@ Route::post('/user/profile', [
         'index'
     ]);
 
+    Route::post('/clients', [
+        ClientController::class,
+        'store'
+    ]);
+
 
     Route::middleware('superadmin')->group(function () {
 
@@ -762,12 +767,6 @@ Route::post('/user/profile', [
         Route::patch('/client-requests/{client}/reject', [
             ClientController::class,
             'reject'
-        ]);
-
-
-        Route::post('/clients', [
-            ClientController::class,
-            'store'
         ]);
 
 

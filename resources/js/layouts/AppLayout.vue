@@ -436,7 +436,7 @@
 
                 <!-- CLIENTS -->
 
-                <div v-if="isSuperAdmin" class="clients-menu">
+                <div v-if="canAccessClients" class="clients-menu">
                     <button
                         type="button"
                         class="nav-link-custom clients-menu-button"
@@ -466,6 +466,7 @@
                         </router-link>
 
                         <router-link
+                            v-if="isSuperAdmin"
                             to="/clients/requests"
                             class="clients-submenu-link"
                             @click="sidebarOpen = false"
@@ -721,6 +722,12 @@ export default {
         isSuperAdmin() {
 
             return this.user?.role === 'super_admin'
+
+        },
+
+        canAccessClients() {
+
+            return this.isSuperAdmin || this.user?.can_create_orders === true
 
         },
 

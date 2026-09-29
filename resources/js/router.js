@@ -141,6 +141,10 @@ const routes = [
     |--------------------------------------------------------------------------
     | Clients
     |--------------------------------------------------------------------------
+    |
+    | Super Admin aur can_create_orders permission wala member
+    | Customers page open kar sakta hai.
+    |
     */
 
     {
@@ -149,7 +153,7 @@ const routes = [
         component: () => import('./views/ClientsView.vue'),
         meta: {
             requiresAuth: true,
-            superAdmin: true
+            clientAccess: true
         }
     },
 
@@ -157,6 +161,9 @@ const routes = [
     |--------------------------------------------------------------------------
     | Try Login Customers
     |--------------------------------------------------------------------------
+    |
+    | Yeh page sirf Super Admin ke liye rahega.
+    |
     */
 
     {
@@ -232,6 +239,7 @@ const routes = [
 const router = createRouter({
     history: createWebHistory(),
     routes,
+
     scrollBehavior() {
         return {
             top: 0,
@@ -296,6 +304,24 @@ router.beforeEach((to, from, next) => {
     if (
         to.meta.superAdmin &&
         user?.role !== 'super_admin'
+    ) {
+        return next('/dashboard')
+    }
+
+    /*
+    |--------------------------------------------------------------------------
+    | Customers Page Access
+    |--------------------------------------------------------------------------
+    |
+    | Super Admin ya can_create_orders permission wala member Customers
+    | page access kar sakta hai.
+    |
+    */
+
+    if (
+        to.meta.clientAccess &&
+        user?.role !== 'super_admin' &&
+        user?.can_create_orders !== true
     ) {
         return next('/dashboard')
     }

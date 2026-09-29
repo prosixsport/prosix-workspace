@@ -99,13 +99,15 @@
                                         <i class="fa-solid fa-eye"></i>
                                     </button>
 
-                                    <button class="icon-btn" @click="openModal(client)">
+                                    <button v-if="isSuperAdmin" class="icon-btn" @click="openModal(client)">
 
                                         <i class="fa-solid fa-pen"></i>
 
                                     </button>
 
                                     <button
+
+                                        v-if="isSuperAdmin"
 
                                         class="icon-btn danger"
 
@@ -183,7 +185,7 @@
                         </div>
                     </section>
 
-                    <button class="details-edit-button" type="button" @click="editFromDetails">
+                    <button v-if="isSuperAdmin" class="details-edit-button" type="button" @click="editFromDetails">
                         <i class="fa-solid fa-pen"></i> Edit Client
                     </button>
                 </div>
@@ -600,6 +602,12 @@ export default {
                 return {}
 
             }
+
+        },
+
+        isSuperAdmin() {
+
+            return this.currentUser?.role === 'super_admin'
 
         },
 
