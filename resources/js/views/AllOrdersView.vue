@@ -98,7 +98,7 @@
               <small>
                 {{ order.last_message_sender || 'New message' }}
                 <template v-if="order.last_message_text">
-                  · {{ shortLastMessage(order.last_message_text) }}
+                  Â· {{ shortLastMessage(order.last_message_text) }}
                 </template>
               </small>
             </span>
@@ -134,10 +134,10 @@
               <small>
                 New order
                 <template v-if="order.po">
-                  · {{ order.po }}
+                  Â· {{ order.po }}
                 </template>
                 <template v-if="order.created_at">
-                  · {{ notificationTime(order.created_at) }}
+                  Â· {{ notificationTime(order.created_at) }}
                 </template>
               </small>
             </span>
@@ -324,7 +324,7 @@
 
             <span class="active-section-meta">
               {{ unreadOrdersCount }} TO OPEN
-              · {{ filteredOrders.length }} TOTAL
+              Â· {{ filteredOrders.length }} TOTAL
             </span>
           </div>
         </div>
@@ -1663,7 +1663,7 @@
       <div class="monday-status-options">
         <div
           v-for="status in workflowStatusOptions"
-          :key="'status-fixed-' + status.label"
+          :key="'status-fixed-' + status.group + '-' + status.label"
           class="monday-status-row"
           :class="{
             active: status.label === rowStatusMenuOrder.status,
@@ -1881,7 +1881,7 @@
                 <strong>{{ order.name }}</strong>
                 <small>
                   {{ order.po || 'No PO' }}
-                  <template v-if="order.status"> · {{ order.status }}</template>
+                  <template v-if="order.status"> Â· {{ order.status }}</template>
                 </small>
               </span>
 
@@ -2028,7 +2028,7 @@
 
   <span class="status-name">{{ s.label }}</span>
 
-  <span class="status-group-tag">→ {{ s.groupLabel }}</span>
+  <span class="status-group-tag">â†’ {{ s.groupLabel }}</span>
 
   <button v-if="canManageStatusDefinitions && s.custom" class="status-action-btn" @click.stop="editCustomStatus(s)">
     <i class="fa-solid fa-pen"></i>
@@ -2195,7 +2195,7 @@
 
 <div class="notes-footer">
   <span class="notes-count text-dark">{{ card.noteText ? card.noteText.length : 0 }} chars</span>
-  <span v-if="card.saved" class="notes-saved-msg">✅ Saved!</span>
+  <span v-if="card.saved" class="notes-saved-msg">âœ… Saved!</span>
 
   <button v-if="canEditNotes" class="notes-save-btn" @click="saveNote(card)">
     <i class="fa-solid fa-floppy-disk me-1"></i>Save
@@ -2631,7 +2631,7 @@
                 type="button"
                 @click.stop="remove(option)"
               >
-                ×
+                Ã—
               </button>
             </span>
           </template>
@@ -2774,7 +2774,7 @@
                 type="button"
                 @click.stop="remove(option)"
               >
-                ×
+                Ã—
               </button>
             </span>
           </template>
@@ -2840,7 +2840,7 @@
         <div class="viewed-modal-header">
           <div>
             <h3>Order Information & History</h3>
-            <p>{{ infoOrder?.name || 'Order' }} · {{ infoOrder?.po || 'N/A' }}</p>
+            <p>{{ infoOrder?.name || 'Order' }} Â· {{ infoOrder?.po || 'N/A' }}</p>
           </div>
 
           <button
@@ -2943,7 +2943,7 @@
               <div class="audit-action-icon"><i :class="orderActivityIcon(activity.action)"></i></div>
               <div class="viewed-person-info">
                 <strong>{{ activity.description || orderActivityTitle(activity.action) }}</strong>
-                <small>{{ activity.user?.name || 'System' }} · {{ formatReadDate(activity.created_at) }}</small>
+                <small>{{ activity.user?.name || 'System' }} Â· {{ formatReadDate(activity.created_at) }}</small>
               </div>
             </div>
           </section>
@@ -3445,9 +3445,27 @@ activeTrackingIndex: 0,
 
       const seen = new Set()
       return options.filter(status => {
-        const key = String(status.label || '').trim().toLowerCase()
+        const key = `${String(status.group || '').trim().toLowerCase()}::${String(status.label || '').trim().toLowerCase()}`
         if (!key || seen.has(key)) return false
-        if (status.custom === true && status.group !== menuGroup) return false
+
+        const isWorkflowTabStatus = this.boardGroups.some(group => {
+          if (group.key !== status.group) return false
+
+          const expectedLabel =
+            this.defaultBoardGroupOverrides?.[group.key]?.label ||
+            defaultLabels[group.key] ||
+            group.label
+
+          return String(expectedLabel || '').trim().toLowerCase() ===
+            String(status.label || '').trim().toLowerCase()
+        })
+
+        if (
+          status.custom === true &&
+          !isWorkflowTabStatus &&
+          status.group !== menuGroup
+        ) return false
+
         seen.add(key)
         return true
       })
@@ -6351,15 +6369,27 @@ beforeUnmount()  {
       }
     },
 
-    async inlineChangeStatus(order, label, { refresh = true } = {}) {
+    async inlineChangeStatus(order, statusOrLabel, { refresh = true } = {}) {
       if (!this.canChangeOrderStatus) return
 
       await this.saveBoardTrackingRows(order)
 
-      const status = this.workflowStatusOptions.find(
-        item =>
-          String(item.label || '').trim().toLowerCase() ===
-          String(label || '').trim().toLowerCase()
+      const requestedStatus =
+        statusOrLabel && typeof statusOrLabel === 'object'
+          ? statusOrLabel
+          : null
+
+      const requestedLabel = requestedStatus?.label || statusOrLabel
+      const requestedGroup = requestedStatus?.group || null
+
+      const status = requestedStatus || this.workflowStatusOptions.find(
+        item => {
+          const sameLabel =
+            String(item.label || '').trim().toLowerCase() ===
+            String(requestedLabel || '').trim().toLowerCase()
+
+          return sameLabel && (!requestedGroup || item.group === requestedGroup)
+        }
       )
 
       if (!status) return
@@ -6390,7 +6420,7 @@ beforeUnmount()  {
 
         order.status = status.label
         order.statusColor = status.color
-        order.group = this.orderDisplayGroup(order)
+        order.group = status.group || this.orderDisplayGroup(order)
 
         if (isShipped && shippedBy) {
           this.markOrderFinished(order.id, shippedBy)
@@ -7705,7 +7735,7 @@ body.board-column-resizing * {
 
 
 /* =========================================================
-   FINAL FIX — VERTICAL PIPELINES + SECTION TARTEEB
+   FINAL FIX â€” VERTICAL PIPELINES + SECTION TARTEEB
    ========================================================= */
 
 /* ---------- SECTION CHEVRONS: ONE EXACT VERTICAL LINE ---------- */
@@ -8190,7 +8220,7 @@ body.board-column-resizing .column-resizer::before {
               </div>
 
               <footer class="print-footer">
-                <span>Prosix Sports — Internal Use</span>
+                <span>Prosix Sports â€” Internal Use</span>
                 <strong>
                   ${pageOrders.length} orders on this page
                 </strong>
@@ -8943,10 +8973,7 @@ body.board-column-resizing .column-resizer::before {
       this.rowStatusMenuId = null
       this.rowStatusMenuOrder = null
 
-      await this.inlineChangeStatus(
-        order,
-        status.label
-      )
+      await this.inlineChangeStatus(order, status)
     },
 
     startRowStatusEdit(status) {
@@ -8974,9 +9001,9 @@ body.board-column-resizing .column-resizer::before {
 
       const duplicate = this.statusOptions.some(
         item =>
-          String(item.label || '').trim().toLowerCase() !== oldLabel.toLowerCase() &&
-          String(item.label || '').trim().toLowerCase() ===
-          newLabel.toLowerCase()
+          item !== status &&
+          String(item.group || 'in_production') === String(status.group || 'in_production') &&
+          String(item.label || '').trim().toLowerCase() === newLabel.toLowerCase()
       )
 
       if (duplicate) {
@@ -8991,7 +9018,9 @@ body.board-column-resizing .column-resizer::before {
       )
 
       let sourceIndex = this.statusOptions.findIndex(
-        item => String(item.label || '').trim().toLowerCase() === oldLabel.toLowerCase()
+        item =>
+          String(item.group || 'in_production') === String(status.group || 'in_production') &&
+          String(item.label || '').trim().toLowerCase() === oldLabel.toLowerCase()
       )
 
       if (sourceIndex === -1) {
@@ -9086,7 +9115,9 @@ body.board-column-resizing .column-resizer::before {
 
       const normalizedLabel = label.toLowerCase()
       const sourceStatus = this.statusOptions.find(
-        item => String(item.label || '').trim().toLowerCase() === normalizedLabel
+        item =>
+          String(item.group || 'in_production') === String(status.group || 'in_production') &&
+          String(item.label || '').trim().toLowerCase() === normalizedLabel
       )
 
       const groupKey = sourceStatus?.group || status.group
@@ -9119,7 +9150,10 @@ body.board-column-resizing .column-resizer::before {
       }
 
       this.statusOptions = this.statusOptions.filter(
-        item => String(item.label || '').trim().toLowerCase() !== normalizedLabel
+        item => !(
+          String(item.group || 'in_production') === String(groupKey || 'in_production') &&
+          String(item.label || '').trim().toLowerCase() === normalizedLabel
+        )
       )
 
       const linkedCustomGroup = this.customBoardGroups.find(
@@ -9158,12 +9192,6 @@ body.board-column-resizing .column-resizer::before {
       const label = String(this.customStatusLabel || '').trim()
       if (!label) return
 
-      const existing = this.statusOptions.find(
-        item =>
-          String(item.label || '').toLowerCase() ===
-          label.toLowerCase()
-      )
-
       // Save the manual status inside the tab/group where this dropdown
       // was opened. It will not appear in any other tab's dropdown.
       const targetGroupKey = this.orderDisplayGroup(order) ||
@@ -9176,10 +9204,11 @@ body.board-column-resizing .column-resizer::before {
         label: targetBoardGroup?.label || order.groupLabel || 'In Production'
       }
 
-      if (existing?.custom === true && existing.group !== targetGroup.key) {
-        alert(`"${label}" already exists in another tab. Please use a different status name.`)
-        return
-      }
+      const existing = this.statusOptions.find(
+        item =>
+          String(item.group || 'in_production') === String(targetGroup.key) &&
+          String(item.label || '').trim().toLowerCase() === label.toLowerCase()
+      )
 
       const status = existing || {
         label,
@@ -9197,7 +9226,7 @@ body.board-column-resizing .column-resizer::before {
       this.customStatusLabel = ''
       this.customStatusColor = '#6161ff'
 
-      await this.inlineChangeStatus(order, status.label)
+      await this.inlineChangeStatus(order, status)
 
       this.rowStatusMenuId = null
       this.rowStatusMenuOrder = null
@@ -9207,7 +9236,9 @@ body.board-column-resizing .column-resizer::before {
       if (!status || !color) return
 
       let source = this.statusOptions.find(
-        item => String(item.label || '').trim().toLowerCase() === String(status.label || '').trim().toLowerCase()
+        item =>
+          String(item.group || 'in_production') === String(status.group || 'in_production') &&
+          String(item.label || '').trim().toLowerCase() === String(status.label || '').trim().toLowerCase()
       )
       if (!source) {
         source = this.normalizeStatusDefinition({ ...status, color })
@@ -9402,7 +9433,7 @@ body.board-column-resizing .column-resizer::before {
         .split(/\s+/)
         .filter(Boolean)
 
-      if (!words.length) return '—'
+      if (!words.length) return 'â€”'
 
       if (words.length <= 2) {
         return words.join(' ')
@@ -9623,7 +9654,7 @@ body.board-column-resizing .column-resizer::before {
         .map((item, index) => {
           const number = String(item.number || 'No tracking number').trim()
           const company = String(item.company || '').trim()
-          return `${index + 1}. ${number}${company ? ` — ${company}` : ''}`
+          return `${index + 1}. ${number}${company ? ` â€” ${company}` : ''}`
         })
         .join('\n')
     },
@@ -10400,6 +10431,8 @@ alert(e.response?.data?.message || 'Orders were not deleted')
 
       const existsIndex = this.statusOptions.findIndex(
         item =>
+          String(item.group || 'in_production') ===
+          String(status.group || 'in_production') &&
           String(item.label || '').trim().toLowerCase() ===
           String(status.label || '').trim().toLowerCase()
       )
@@ -10432,7 +10465,9 @@ alert(e.response?.data?.message || 'Orders were not deleted')
       if (!this.canManageStatusDefinitions || !status || !color) return
 
       const source = this.statusOptions.find(
-        item => String(item.label || '').trim().toLowerCase() === String(status.label || '').trim().toLowerCase()
+        item =>
+          String(item.group || 'in_production') === String(status.group || 'in_production') &&
+          String(item.label || '').trim().toLowerCase() === String(status.label || '').trim().toLowerCase()
       )
       if (!source) return
 
@@ -11614,7 +11649,15 @@ shipping_address: this.newOrder.shippingAddress,
       if (!this.canManageStatusDefinitions || !this.selectedOrder) return
       const label = (this.customStatusLabel || '').trim()
       if (!label) return
-      const targetGroup = this.groupForDropdownStatus(label)
+      const currentGroupKey = this.orderDisplayGroup(this.selectedOrder) ||
+        (this.activeGroup === 'all' ? 'in_production' : this.activeGroup)
+      const currentBoardGroup = this.boardGroups.find(
+        group => group.key === currentGroupKey
+      )
+      const targetGroup = {
+        key: currentGroupKey,
+        label: currentBoardGroup?.label || 'In Production'
+      }
       const custom = {
         label,
         color: this.customStatusColor || '#6161ff',
@@ -12978,7 +13021,7 @@ grid-template-columns: 32px 1fr 118px 38px;
   padding: 0;
 }
 
-/* INFO BAR WRAPPER — horizontal scroll on small screens */
+/* INFO BAR WRAPPER â€” horizontal scroll on small screens */
 .detail-topbar-wrapper {
   overflow-x: auto;
   flex-shrink: 0;
@@ -14118,7 +14161,7 @@ grid-template-columns: 32px 1fr 118px 38px;
 }
 
 /* ===========================
-   RESPONSIVE — TABLET (768px)
+   RESPONSIVE â€” TABLET (768px)
    =========================== */
 
 @media (max-width: 900px) {
@@ -14127,7 +14170,7 @@ grid-template-columns: 32px 1fr 118px 38px;
 }
 
 /* ===========================
-   RESPONSIVE — MOBILE (< 768px)
+   RESPONSIVE â€” MOBILE (< 768px)
    =========================== */
 @media (max-width: 767px) {
 
@@ -17335,7 +17378,7 @@ grid-template-columns: 32px 1fr 118px 38px;
 .board-avatar-add {
   margin-left: 3px !important;
 }
-/* OWNER AVATARS — NEVER OVERFLOW */
+/* OWNER AVATARS â€” NEVER OVERFLOW */
 .board-col-owner {
   min-width: 0;
   overflow: hidden;
@@ -17631,7 +17674,7 @@ body.board-column-resizing .column-resizer::before {
   background: #000000 !important;
 }
 
-/* TABLE HEADER — BLACK */
+/* TABLE HEADER â€” BLACK */
 .board-table-head {
   background: #000000 !important;
   color: #ffffff !important;
@@ -17652,7 +17695,7 @@ body.board-column-resizing .column-resizer::before {
 }
 
 /* =========================================================
-   CLEAN LAYOUT FIX — only requested visual corrections
+   CLEAN LAYOUT FIX â€” only requested visual corrections
    ========================================================= */
 
 /* ---------- ACTIVE SECTION HEADER ---------- */
@@ -18447,7 +18490,7 @@ body.board-column-resizing .column-resizer::before {
 
 
 /* =========================================================
-   UNIFORM SECTION BARS — FINAL
+   UNIFORM SECTION BARS â€” FINAL
    All open/closed bars same size and same clean style.
    ========================================================= */
 
@@ -18476,7 +18519,7 @@ body.board-column-resizing .column-resizer::before {
   gap: 12px !important;
 }
 
-/* CLOSED BAR — EXACT SAME SIZE AS OPEN BAR */
+/* CLOSED BAR â€” EXACT SAME SIZE AS OPEN BAR */
 .collapsed-status-bar {
   width: 100% !important;
   height: 58px !important;
@@ -19094,7 +19137,7 @@ body.board-column-resizing .column-resizer::before {
 
 
 /* =========================================================
-   WORKING STATUS DROPDOWN — FINAL
+   WORKING STATUS DROPDOWN â€” FINAL
    ========================================================= */
 .status-fixed-dropdown {
   position: fixed !important;
@@ -19748,7 +19791,7 @@ body.board-column-resizing .column-resizer::before {
 }
 
 /* =========================================================
-   ROW VERTICAL PIPELINES — TOP TO BOTTOM ATTACHED
+   ROW VERTICAL PIPELINES â€” TOP TO BOTTOM ATTACHED
    ========================================================= */
 
 /* Remove older short pseudo pipeline */
@@ -22622,7 +22665,7 @@ body.board-column-resizing .column-resizer::before {
 
 
 /* =========================================================
-   FINAL FIX — KEEP APP SIDEBAR VISIBLE IN ORDER DETAIL
+   FINAL FIX â€” KEEP APP SIDEBAR VISIBLE IN ORDER DETAIL
    =========================================================
    AppLayout desktop sidebar width = 250px.
    Detail overlay starts AFTER the sidebar instead of covering it.
